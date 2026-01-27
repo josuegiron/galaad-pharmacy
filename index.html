@@ -32,12 +32,13 @@
       top: 0;
       z-index: 10;
       backdrop-filter: blur(10px);
-      background: rgba(7, 10, 20, 0.75);
+      background: rgba(7, 10, 20, 0.9);
       border-bottom: 1px solid var(--stroke);
-      padding: 14px 28px;
+      padding: 14px 18px;
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
+      justify-content: space-between;
     }
     .nav .logo { font-weight: 700; letter-spacing: 0.2px; }
     .nav .pill {
@@ -52,9 +53,9 @@
       border-color: rgba(233, 255, 112, 0.35);
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
     }
-    main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+    main { width: min(560px, 100%); margin: 0 auto; padding: 12px 10px 40px; }
     .btn {
-      padding: 12px 20px;
+      padding: 10px 16px;
       border-radius: 12px;
       border: 1px solid var(--stroke);
       background: var(--card);
@@ -70,26 +71,26 @@
       border: none;
       box-shadow: 0 12px 35px rgba(94, 248, 176, 0.25);
     }
-    .section-title { font-size: 26px; margin: 0 0 18px; letter-spacing: -0.2px; }
+    .section-title { font-size: 22px; margin: 0 0 10px; letter-spacing: -0.2px; }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
     .card {
       background: var(--card);
       border: 1px solid var(--stroke);
       border-radius: 18px;
-      padding: 18px 18px 20px;
+      padding: 12px 12px 14px;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.22);
     }
     .card h3 { margin: 0 0 10px; }
     .card p { margin: 0; color: var(--muted); font-size: 15px; }
     .form-wrap {
-      margin-top: 32px;
-      background: var(--card);
-      border: 1px solid var(--stroke);
-      border-radius: 20px;
-      padding: 22px;
-      box-shadow: 0 16px 60px rgba(0, 0, 0, 0.32);
+      margin-top: 18px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
     }
-    form#ventaForm { display: flex; flex-direction: column; gap: 14px; }
+    form#ventaForm { display: flex; flex-direction: column; gap: 10px; }
     label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
     input, textarea {
       width: 100%;
@@ -97,7 +98,7 @@
       border: 1px solid var(--stroke);
       background: rgba(255, 255, 255, 0.04);
       color: var(--text);
-      padding: 12px 12px;
+      padding: 10px 12px;
       font-size: 15px;
       outline: none;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -166,12 +167,12 @@
       background: linear-gradient(135deg, rgba(233, 255, 112, 0.08), rgba(94, 248, 176, 0.08));
       border: 1px solid rgba(233, 255, 112, 0.35);
       border-radius: 16px;
-      padding: 14px 16px;
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 2px;
       color: var(--text);
-      box-shadow: 0 10px 30px rgba(233, 255, 112, 0.12);
+      box-shadow: none;
     }
     .message {
       margin-top: 14px;
@@ -186,7 +187,7 @@
       border-color: rgba(255, 122, 122, 0.45);
       color: var(--danger);
     }
-    .items-card { padding: 16px; }
+    .items-card { padding: 12px; }
     .items-wrapper { display:flex; flex-direction:column; gap:14px; }
     .item-card {
       background: rgba(255,255,255,0.04);

@@ -1,11 +1,10 @@
 /**
- * Web App para registrar ventas en la hoja "movimientos".
- * - Recibe POST (form-data) y agrega una fila con numero correlativo, fecha,
- *   codigo_producto, tipo=1, cantidad, valor_unitario, costo_total, comentario,
- *   facturado, credito.
- * - Devuelve JSON simple; si lo llamas desde un HTML externo usa fetch con mode:"no-cors".
+ * Web App para registrar ventas en la hoja "movimientos" y hacer el registro en caja.
+ * Recibe POST (form-data o JSON payload) con múltiples ítems y agrega filas en lote.
+ * También registra cada movimiento en la pestaña "caja" con tipo 1 (venta).
  */
 const SHEET_NAME = 'movimientos';
+const CAJA_SHEET_NAME = 'caja';
 
 function doGet() {
   return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
@@ -58,6 +57,8 @@ function doPost(e) {
 
     sheet.getRange(lastRow + 1, 1, rows.length, 10).setValues(rows);
 
+    insertCaja(payload, rows);
+
     return jsonResponse({ ok: true, inserted: rows.length, first_numero: nextNum });
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message || String(err) }, 400);
@@ -68,6 +69,18 @@ function jsonResponse(obj, status) {
   const out = ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
   if (status) out.setResponseCode(status);
   return out;
+}
+
+function insertCaja(payload, rows) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!sheet || !rows.length) return;
+  const totalMonto = rows.reduce((sum, row) => sum + (Number(row[6]) || 0), 0);
+  const fecha = payload.fecha ? new Date(payload.fecha) : new Date();
+  const concepto = payload.concepto || (payload.items && payload.items[0] && payload.items[0].comentario) || 'Venta múltiple';
+  const monto = Math.abs(totalMonto);
+  const nextRow = sheet.getLastRow() + 1;
+  const id = Math.max(1, nextRow - 1);
+  sheet.appendRow([id, fecha, 1, monto, concepto]);
 }
 
 function parsePayload(e) {

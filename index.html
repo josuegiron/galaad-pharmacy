@@ -162,6 +162,32 @@
       opacity: 0.9;
       pointer-events: auto;
     }
+    .search-results {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 20;
+      background: #1a1f2b;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      max-height: 280px;
+      overflow-y: auto;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    }
+    .search-results button {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .search-results button:hover {
+      background: rgba(255,255,255,0.06);
+    }
     .hint { color: var(--muted); font-size: 14px; margin-top: -4px; }
     .total {
       background: linear-gradient(135deg, rgba(233, 255, 112, 0.08), rgba(94, 248, 176, 0.08));
@@ -287,8 +313,9 @@
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; align-items:flex-end;">
             <label style="flex:1 1 320px; position:relative;">
               Buscar producto
-              <input list="catalogOptions" id="productSearch" placeholder="Código o nombre">
+              <input id="productSearch" placeholder="Código o nombre" autocomplete="off">
               <button type="button" class="clear-btn" id="clearSearchBtn" aria-label="Limpiar búsqueda">×</button>
+              <div id="searchResults" class="search-results" hidden></div>
             </label>
             <button type="button" class="btn" id="addSelectedBtn">Agregar producto</button>
           </div>
@@ -326,6 +353,7 @@
     const addSelectedBtn = document.getElementById('addSelectedBtn');
     const productSearch = document.getElementById('productSearch');
     const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const searchResults = document.getElementById('searchResults');
     const productMeta = document.getElementById('productMeta');
     const catalogOptions = document.createElement('datalist');
     catalogOptions.id = 'catalogOptions';
@@ -540,16 +568,57 @@
         clearSearchBtn.classList.remove('visible');
       }
     };
+    function renderResults(query) {
+      const normalized = query.trim().toLowerCase();
+      if (!normalized) {
+        searchResults.hidden = true;
+        searchResults.innerHTML = '';
+        return;
+      }
+      const results = catalog.filter(p => {
+        const code = String(p.codigo).toLowerCase();
+        const name = String(p.nombre).toLowerCase();
+        const provider = String(p.proveedor || '').toLowerCase();
+        return code.includes(normalized) || name.includes(normalized) || provider.includes(normalized);
+      }).slice(0, 8);
+      if (!results.length) {
+        searchResults.hidden = true;
+        searchResults.innerHTML = '';
+        return;
+      }
+      searchResults.innerHTML = results.map(p => {
+        const label = `${p.codigo} - ${p.nombre} / ${p.proveedor || '—'} / Q.${p.precio_venta}`;
+        return `<button type="button" data-code="${p.codigo}">${label}</button>`;
+      }).join('');
+      searchResults.hidden = false;
+    }
+
+    searchResults.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const code = btn.getAttribute('data-code');
+      const product = catalog.find(p => String(p.codigo) === String(code));
+      if (product) {
+        currentProduct = product;
+        productSearch.value = `${product.codigo} - ${product.nombre} / ${product.proveedor || '—'} / Q.${product.precio_venta}`;
+        showProductMeta(product);
+        toggleClear();
+        searchResults.hidden = true;
+      }
+    });
+
     productSearch.addEventListener('input', () => {
       currentProduct = findProduct(productSearch.value);
       showProductMeta(currentProduct);
       toggleClear();
+      renderResults(productSearch.value);
     });
     clearSearchBtn.addEventListener('click', () => {
       productSearch.value = '';
       currentProduct = null;
       showProductMeta(null);
       toggleClear();
+      renderResults('');
       productSearch.focus();
     });
 

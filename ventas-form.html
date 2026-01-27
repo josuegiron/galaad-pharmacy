@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registrar venta</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c1020;
+      --card: rgba(255, 255, 255, 0.06);
+      --stroke: rgba(255, 255, 255, 0.12);
+      --text: #e9eefb;
+      --muted: #b4bfd8;
+      --accent: #e9ff70;
+      --accent-2: #5ef8b0;
+      --danger: #ff7a7a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', 'Manrope', system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: radial-gradient(120% 120% at 10% 10%, rgba(94, 248, 176, 0.08), transparent 50%),
+                  radial-gradient(90% 90% at 90% 0%, rgba(233, 255, 112, 0.08), transparent 55%),
+                  linear-gradient(160deg, #0b1120 0%, #0c1224 60%, #070b18 100%);
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+      background: rgba(7, 10, 20, 0.75);
+      border-bottom: 1px solid var(--stroke);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .nav .logo { font-weight: 700; letter-spacing: 0.2px; }
+    .nav .pill {
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      color: var(--text);
+      transition: all 0.2s ease;
+    }
+    .nav .pill.active, .nav .pill:hover {
+      background: linear-gradient(120deg, rgba(233, 255, 112, 0.25), rgba(94, 248, 176, 0.18));
+      border-color: rgba(233, 255, 112, 0.35);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+    .btn {
+      padding: 12px 20px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: var(--card);
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(233, 255, 112, 0.4); }
+    .btn.primary {
+      background: linear-gradient(140deg, #e9ff70 0%, #5ef8b0 100%);
+      color: #0a0f1c;
+      border: none;
+      box-shadow: 0 12px 35px rgba(94, 248, 176, 0.25);
+    }
+    .section-title { font-size: 26px; margin: 0 0 18px; letter-spacing: -0.2px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: 18px;
+      padding: 18px 18px 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.22);
+    }
+    .card h3 { margin: 0 0 10px; }
+    .card p { margin: 0; color: var(--muted); font-size: 15px; }
+    .form-wrap {
+      margin-top: 32px;
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: 20px;
+      padding: 22px;
+      box-shadow: 0 16px 60px rgba(0, 0, 0, 0.32);
+    }
+    form#ventaForm { display: flex; flex-direction: column; gap: 14px; }
+    label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
+    input, textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      padding: 12px 12px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    input:focus, textarea:focus {
+      border-color: rgba(233, 255, 112, 0.65);
+      box-shadow: 0 0 0 3px rgba(233, 255, 112, 0.16);
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    .inline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .inline input { width: auto; }
+    .checkbox-row {
+      display: flex;
+      gap: 40px;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .checkbox-vertical {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .checkbox-vertical input {
+      width: 18px;
+      height: 18px;
+    }
+    .clear-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: transparent;
+      color: var(--text);
+      border-radius: 50%;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .clear-btn.visible {
+      opacity: 0.9;
+      pointer-events: auto;
+    }
+    .hint { color: var(--muted); font-size: 14px; margin-top: -4px; }
+    .total {
+      background: linear-gradient(135deg, rgba(233, 255, 112, 0.08), rgba(94, 248, 176, 0.08));
+      border: 1px solid rgba(233, 255, 112, 0.35);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: var(--text);
+      box-shadow: 0 10px 30px rgba(233, 255, 112, 0.12);
+    }
+    .message {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      display: none;
+    }
+    .message.error {
+      border-color: rgba(255, 122, 122, 0.45);
+      color: var(--danger);
+    }
+    .items-card { padding: 16px; }
+    .items-wrapper { display:flex; flex-direction:column; gap:14px; }
+    .item-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .item-card .row {
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .item-card .product-meta {
+      flex:1 1 200px;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .item-card .code {
+      font-size:13px;
+      color: var(--muted);
+    }
+    .item-card .product-name {
+      font-weight:600;
+      font-size:16px;
+    }
+    .item-card .extra {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .item-card .controls {
+      width: 100%;
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap:10px;
+    }
+    .item-card .controls input {
+      height: 40px;
+    }
+    .item-card .remove-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      padding: 0;
+    }
+    .footer { margin-top: 28px; color: var(--muted); font-size: 14px; text-align: center; }
+    @media (max-width: 768px) {
+      body { background: #050710; }
+      .nav { flex-direction: column; align-items: flex-start; padding: 10px 16px; gap: 8px; }
+      .form-wrap { padding: 18px; }
+      .card { padding: 14px; }
+      .item-card .controls {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+      }
+      .item-card {
+        gap: 8px;
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="logo">Inventario</div>
+    <a class="pill active" href="#form">Registrar venta</a>
+  </nav>
+
+  <main>
+    <section id="form" class="form-wrap">
+      <h2 class="section-title" style="margin-bottom:10px;">Registrar venta</h2>
+      <form id="ventaForm">
+        <div class="card" style="display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:12px;">
+          <label>
+            Fecha
+            <input type="date" name="fecha" required>
+          </label>
+          <div class="checkbox-row">
+            <label class="checkbox-vertical">
+              <span>Facturado</span>
+              <input type="checkbox" name="facturado" id="facturado">
+            </label>
+            <label class="checkbox-vertical">
+              <span>Crédito</span>
+              <input type="checkbox" name="credito" id="credito">
+            </label>
+          </div>
+        </div>
+
+        <div class="card items-card">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; align-items:flex-end;">
+            <label style="flex:1 1 320px; position:relative;">
+              Buscar producto
+              <input list="catalogOptions" id="productSearch" placeholder="Código o nombre">
+              <button type="button" class="clear-btn" id="clearSearchBtn" aria-label="Limpiar búsqueda">×</button>
+            </label>
+            <button type="button" class="btn" id="addSelectedBtn">Agregar producto</button>
+          </div>
+          <div id="productMeta" class="hint" style="min-height:24px;">Proveedor y costo unitario aparecerán aquí.</div>
+          <div id="itemsWrapper" class="items-wrapper"></div>
+      </div>
+
+        <div class="total">
+          <strong>Costo total</strong>
+          <div id="costoTotal">Q.0.00</div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:4px;">
+          <button type="submit" class="btn primary" id="submitBtn">Guardar venta</button>
+        </div>
+      </form>
+      <div class="message" id="message"></div>
+    </section>
+
+    <div class="footer">
+      Hecho para tu inventario en Google Sheets.
+    </div>
+  </main>
+
+  <script>
+    // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7o_TXKqXypfMslFX-TQaPKBJKNS1L1FNWgu5_b0K-nSWFTK3fP52mjgnYWWrmk2MW/exec';
+    const SHEET_NAME = 'movimientos';
+
+    const form = document.getElementById('ventaForm');
+    const costoTotalEl = document.getElementById('costoTotal');
+    const messageEl = document.getElementById('message');
+    const submitBtn = document.getElementById('submitBtn');
+    const itemsWrapper = document.getElementById('itemsWrapper');
+    const addSelectedBtn = document.getElementById('addSelectedBtn');
+    const productSearch = document.getElementById('productSearch');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    const productMeta = document.getElementById('productMeta');
+    const catalogOptions = document.createElement('datalist');
+    catalogOptions.id = 'catalogOptions';
+    document.body.appendChild(catalogOptions);
+
+    // URL de catálogo publicado como JSON (gviz/tq). Ajusta si cambias la hoja/ID.
+    const CATALOG_JSONP_URL = 'https://docs.google.com/spreadsheets/d/1qephLnvRxMWv3772u87nfeOlm3g5KoR5en3Y1xnAIvE/gviz/tq?gid=0&tqx=out:json';
+    let catalog = [];
+    let currentProduct = null;
+
+    form.fecha.value = new Date().toISOString().slice(0, 10);
+
+    const showMessage = (text, isError = false) => {
+      messageEl.textContent = text;
+      messageEl.classList.toggle('error', isError);
+      messageEl.style.display = 'block';
+    };
+
+    const createItemRow = (item = {}) => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.dataset.codigo = item.codigo || '';
+      card.dataset.producto = item.nombre || '';
+      card.dataset.proveedor = item.proveedor || '';
+      card.dataset.precio = item.precio_venta || '';
+      card.innerHTML = `
+        <div class="row">
+          <div class="product-meta">
+            <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'}</span>
+            <p class="extra">Proveedor: ${item.proveedor || '—'}</p>
+            <p class="extra">Costo de venta: Q.${item.precio_venta || '—'}</p>
+          </div>
+          <button type="button" class="remove-btn">✕</button>
+        </div>
+        <div class="controls">
+          <input type="number" class="cantidad" step="0.01" placeholder="Cantidad" value="${item.cantidad || 1}" required>
+          <input type="number" class="valor" step="0.01" placeholder="Valor unitario" value="${item.valor_unitario || item.precio_venta || ''}" required>
+        </div>
+      `;
+      card.querySelector('.remove-btn').addEventListener('click', () => {
+        card.remove();
+        updateTotal();
+      });
+      ['cantidad', 'valor'].forEach(cls => {
+        card.querySelector('.' + cls).addEventListener('input', updateTotal);
+      });
+      itemsWrapper.appendChild(card);
+    };
+
+    addSelectedBtn.addEventListener('click', () => {
+      const query = (productSearch.value || '').trim();
+      if (!query) return showMessage('Busca un producto antes de agregar.', true);
+      currentProduct = findProduct(query);
+      if (!currentProduct) return showMessage('No se encontró el producto en el catálogo.', true);
+      const item = {
+        codigo: currentProduct.codigo,
+        nombre: currentProduct.nombre,
+        proveedor: currentProduct.proveedor,
+        precio_venta: currentProduct.precio_venta,
+        valor_unitario: currentProduct.precio_venta,
+      };
+      createItemRow(item);
+      productSearch.value = '';
+      showProductMeta(null);
+      updateTotal();
+    });
+
+    const updateTotal = () => {
+      let total = 0;
+      itemsWrapper.querySelectorAll('.item-card').forEach(row => {
+        const qtyRaw = parseFloat(row.querySelector('.cantidad').value) || 0;
+        const qtyDisplay = Math.abs(qtyRaw); // siempre mostramos positivo
+        const valor = parseFloat(row.querySelector('.valor').value) || 0;
+        total += qtyDisplay * valor;
+      });
+      costoTotalEl.textContent = isFinite(total) ? total.toFixed(2) : '0.00';
+      costoTotalEl.style.color = total > 0 ? '#5ef8b0' : (total < 0 ? '#ffb36b' : 'var(--text)');
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      messageEl.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+      try {
+        const endpoint = SCRIPT_URL;
+        const rows = [...itemsWrapper.querySelectorAll('.item-card')];
+        if (!rows.length) throw new Error('Agrega al menos un ítem.');
+
+        const items = rows.map(row => {
+          const qtyRaw = Number(row.querySelector('.cantidad').value || 0);
+          const cantidad = -Math.abs(qtyRaw); // todas ventas → negativo
+          const valor = Number(row.querySelector('.valor').value || 0);
+          const codigo = (row.dataset.codigo || '').trim();
+          const nombre = (row.dataset.producto || '').trim();
+          const comentario = nombre || 'Venta mostrador';
+          const proveedor = (row.dataset.proveedor || '').trim();
+          const precio_venta = parseFloat(row.dataset.precio || '') || 0;
+          return { codigo, tipo: 1, cantidad, valor_unitario: valor, comentario, proveedor, precio_venta };
+        });
+
+        const payload = {
+          fecha: form.fecha.value || new Date().toISOString().slice(0, 10),
+          facturado: form.facturado.checked ? 1 : 0,
+          credito: form.credito.checked ? 1 : 0,
+          items,
+        };
+
+        const fd = new FormData();
+        fd.append('payload', JSON.stringify(payload));
+
+        await fetch(endpoint, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: fd,
+        });
+
+        showMessage('Venta enviada. Revisa la hoja "movimientos".');
+        form.reset();
+        form.fecha.value = new Date().toISOString().slice(0, 10);
+        itemsWrapper.innerHTML = '';
+        createItemRow();
+        updateTotal();
+      } catch (err) {
+        showMessage(err.message || 'No se pudo enviar.', true);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Guardar venta en Sheets';
+      }
+    });
+
+    function normalizeNumber(val) {
+      if (val === undefined || val === null) return NaN;
+      if (typeof val === 'number') return val;
+      return Number(String(val).replace(',', '.'));
+    }
+
+    function handleCatalogResponse(json) {
+      try {
+        const cols = json.table.cols.map(col => (col.label || '').toLowerCase());
+        const idxCodigo = cols.findIndex(cell => cell.includes('codigo'));
+        const idxNombre = cols.findIndex(cell => cell.includes('nombre'));
+        const idxPrecio = cols.findIndex(cell => cell.includes('precio'));
+        const idxProveedor = cols.findIndex(cell => cell.includes('proveedor'));
+        catalog = json.table.rows.map(row => {
+          const cell = (index) => row.c[index] ? (row.c[index].v ?? '') : '';
+          return {
+            codigo: cell(idxCodigo),
+            nombre: cell(idxNombre),
+            precio_venta: normalizeNumber(cell(idxPrecio)) || 0,
+            proveedor: cell(idxProveedor),
+          };
+        }).filter(p => p.codigo || p.nombre);
+        catalogOptions.innerHTML = catalog.map(p => `<option value="${p.codigo} - ${p.nombre} / ${p.proveedor || '—'} / Q.${p.precio_venta}">`).join('');
+        showProductMeta(null);
+      } catch (err) {
+        console.log('No se pudo procesar catálogo', err);
+      }
+    }
+
+    function loadCatalog() {
+      window.google = window.google || {};
+      window.google.visualization = window.google.visualization || {};
+      window.google.visualization.Query = window.google.visualization.Query || {};
+      window.google.visualization.Query.setResponse = handleCatalogResponse;
+      const script = document.createElement('script');
+      script.src = CATALOG_JSONP_URL;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+
+    function findProduct(query) {
+      if (!query) return null;
+      const trimmed = query.trim();
+      const codeMatch = trimmed.match(/^(\d+)/);
+      if (codeMatch) {
+        const codeNumber = codeMatch[1];
+        const byCode = catalog.find(p => String(p.codigo) === codeNumber);
+        if (byCode) return byCode;
+      }
+      const normalized = trimmed.toLowerCase();
+      return catalog.find(p => {
+        const code = String(p.codigo).toLowerCase();
+        const name = String(p.nombre).toLowerCase();
+        const provider = String(p.proveedor || '').toLowerCase();
+        const price = String(p.precio_venta || '').toLowerCase();
+        const combined = `${code} - ${name}`;
+        const extended = `${combined} / ${provider} / q. ${price}`;
+        return code === normalized ||
+          name === normalized ||
+          combined === normalized ||
+          extended === normalized ||
+          name.includes(normalized) ||
+          provider.includes(normalized) ||
+          extended.includes(normalized) ||
+          combined.toLowerCase().includes(normalized);
+      });
+    }
+
+    function showProductMeta(product) {
+      if (!product) {
+        productMeta.textContent = 'Proveedor y costo de venta aparecerán aquí.';
+        return;
+      }
+      productMeta.textContent = `Proveedor: ${product.proveedor || '—'} · Costo de venta: Q.${product.precio_venta || '—'}`;
+    }
+
+    const toggleClear = () => {
+      if (productSearch.value.trim()) {
+        clearSearchBtn.classList.add('visible');
+      } else {
+        clearSearchBtn.classList.remove('visible');
+      }
+    };
+    productSearch.addEventListener('input', () => {
+      currentProduct = findProduct(productSearch.value);
+      showProductMeta(currentProduct);
+      toggleClear();
+    });
+    clearSearchBtn.addEventListener('click', () => {
+      productSearch.value = '';
+      currentProduct = null;
+      showProductMeta(null);
+      toggleClear();
+      productSearch.focus();
+    });
+
+    loadCatalog();
+    updateTotal();
+  </script>
+</body>
+</html>

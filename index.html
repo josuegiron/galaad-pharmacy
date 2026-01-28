@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Registrar venta</title>
+  <title>Ventas</title>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -71,6 +71,10 @@
       border: none;
       box-shadow: 0 12px 35px rgba(94, 248, 176, 0.25);
     }
+    .btn.full-width {
+      width: 100%;
+      justify-content: center;
+    }
     .section-title { font-size: 22px; margin: 0 0 10px; letter-spacing: -0.2px; }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
     .card {
@@ -116,51 +120,34 @@
       color: var(--muted);
     }
     .inline input { width: auto; }
-    .checkbox-row {
-      display: flex;
-      gap: 40px;
-      flex-wrap: nowrap;
-      align-items: flex-start;
-      justify-content: center;
+    .date-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 12px;
     }
-    .checkbox-vertical {
+    .date-field {
+      margin: 0;
+    }
+    .checkbox-row-inline {
       display: flex;
-      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 4px;
+    }
+    .checkbox-inline {
+      display: flex;
       align-items: center;
       gap: 6px;
       font-weight: 600;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 13px;
+      white-space: nowrap;
     }
-    .checkbox-vertical input {
-      width: 18px;
-      height: 18px;
-    }
-    .clear-btn {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 24px;
-      height: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      background: transparent;
-      color: var(--text);
-      border-radius: 50%;
-      font-size: 16px;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-    }
-    .clear-btn.visible {
-      opacity: 0.9;
-      pointer-events: auto;
+    .checkbox-inline input {
+      width: 16px;
+      height: 16px;
     }
     .search-results {
       position: absolute;
@@ -188,6 +175,12 @@
     .search-results button:hover {
       background: rgba(255,255,255,0.06);
     }
+    .search-error {
+      width: 100%;
+      color: #ff7a7a;
+      font-size: 13px;
+      margin-top: -2px;
+    }
     .hint { color: var(--muted); font-size: 14px; margin-top: -4px; }
     .total {
       background: linear-gradient(135deg, rgba(233, 255, 112, 0.08), rgba(94, 248, 176, 0.08));
@@ -200,10 +193,19 @@
       color: var(--text);
       box-shadow: none;
     }
+    .total-line {
+      align-items: center;
+      justify-content: center;
+      padding: 16px 14px;
+    }
+    .total-text {
+      font-size: 22px;
+      font-weight: 700;
+    }
     .message {
       margin-top: 14px;
       padding: 12px 14px;
-      border-radius: 12px;
+      border-radius: 14px;
       border: 1px solid var(--stroke);
       background: rgba(255, 255, 255, 0.05);
       color: var(--text);
@@ -212,6 +214,11 @@
     .message.error {
       border-color: rgba(255, 122, 122, 0.45);
       color: var(--danger);
+    }
+    .message.success {
+      border-color: rgba(94, 248, 176, 0.5);
+      background: rgba(94, 248, 176, 0.08);
+      color: #b7ffd9;
     }
     .items-card { padding: 12px; }
     .items-wrapper { display:flex; flex-direction:column; gap:14px; }
@@ -287,6 +294,12 @@
       font-weight: 700;
       color: var(--text);
     }
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: var(--stroke);
+      margin: 8px 0 10px;
+    }
     .item-card .remove-btn {
       width: 36px;
       height: 36px;
@@ -312,24 +325,24 @@
 <body>
   <nav class="nav">
     <div class="logo">Inventario</div>
-    <a class="pill active" href="#form">Registrar venta</a>
+    <a class="pill active" href="#form">Ventas</a>
   </nav>
 
   <main>
     <section id="form" class="form-wrap">
       <h2 class="section-title" style="margin-bottom:10px;">Registrar venta</h2>
       <form id="ventaForm">
-        <div class="card" style="display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:12px;">
-          <label>
+        <div class="card date-card">
+          <label class="date-field">
             Fecha
             <input type="date" name="fecha" required>
           </label>
-          <div class="checkbox-row">
-            <label class="checkbox-vertical">
+          <div class="checkbox-row-inline">
+            <label class="checkbox-inline">
               <span>Facturado</span>
               <input type="checkbox" name="facturado" id="facturado">
             </label>
-            <label class="checkbox-vertical">
+            <label class="checkbox-inline">
               <span>Crédito</span>
               <input type="checkbox" name="credito" id="credito">
             </label>
@@ -341,29 +354,29 @@
             <label style="flex:1 1 320px; position:relative;">
               Buscar producto
               <input id="productSearch" placeholder="Código o nombre" autocomplete="off">
-              <button type="button" class="clear-btn" id="clearSearchBtn" aria-label="Limpiar búsqueda">×</button>
               <div id="searchResults" class="search-results" hidden></div>
             </label>
+            <div id="searchError" class="search-error" hidden>No se encontró el producto en el catálogo.</div>
             <button type="button" class="btn" id="addSelectedBtn">Agregar producto</button>
+            <button type="button" class="btn" id="clearSearchBtn">Limpiar búsqueda</button>
           </div>
-          <div id="productMeta" class="hint" style="min-height:24px;">Proveedor y costo unitario aparecerán aquí.</div>
+          <div class="divider"></div>
           <div id="itemsWrapper" class="items-wrapper"></div>
       </div>
 
-        <div class="total">
-          <strong>Costo total</strong>
-          <div id="costoTotal">Q.0.00</div>
+        <div class="total total-line">
+          <div class="total-text">Total: <span id="costoTotal">Q.0.00</span></div>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:4px;">
-          <button type="submit" class="btn primary" id="submitBtn">Guardar venta</button>
+          <button type="submit" class="btn primary full-width" id="submitBtn">Guardar venta</button>
         </div>
       </form>
       <div class="message" id="message"></div>
     </section>
 
     <div class="footer">
-      Hecho para tu inventario en Google Sheets.
+      
     </div>
   </main>
 
@@ -381,7 +394,7 @@
     const productSearch = document.getElementById('productSearch');
     const clearSearchBtn = document.getElementById('clearSearchBtn');
     const searchResults = document.getElementById('searchResults');
-    const productMeta = document.getElementById('productMeta');
+    const searchError = document.getElementById('searchError');
     const catalogOptions = document.createElement('datalist');
     catalogOptions.id = 'catalogOptions';
     document.body.appendChild(catalogOptions);
@@ -393,10 +406,16 @@
 
     form.fecha.value = new Date().toISOString().slice(0, 10);
 
+    let messageTimer = null;
     const showMessage = (text, isError = false) => {
       messageEl.textContent = text;
       messageEl.classList.toggle('error', isError);
+      messageEl.classList.toggle('success', !isError);
       messageEl.style.display = 'block';
+      if (messageTimer) clearTimeout(messageTimer);
+      messageTimer = setTimeout(() => {
+        messageEl.style.display = 'none';
+      }, 5000);
     };
 
     const createItemRow = (item = {}) => {
@@ -410,7 +429,7 @@
         <div class="row">
           <div class="product-meta">
             <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'}</span>
-            <p class="extra">${item.proveedor || '—'} | Precio unitario: <strong>Q.${item.precio_venta || '—'}</strong></p>
+            <p class="extra">${item.proveedor || '—'} · Precio unitario: <strong>Q.${item.precio_venta || '—'}</strong></p>
           </div>
           <button type="button" class="remove-btn">✕</button>
         </div>
@@ -441,9 +460,16 @@
 
     addSelectedBtn.addEventListener('click', () => {
       const query = (productSearch.value || '').trim();
-      if (!query) return showMessage('Busca un producto antes de agregar.', true);
+      if (!query) {
+        searchError.hidden = false;
+        return;
+      }
       currentProduct = findProduct(query);
-      if (!currentProduct) return showMessage('No se encontró el producto en el catálogo.', true);
+      if (!currentProduct) {
+        searchError.hidden = false;
+        return;
+      }
+      searchError.hidden = true;
       const item = {
         codigo: currentProduct.codigo,
         nombre: currentProduct.nombre,
@@ -453,7 +479,6 @@
       };
       createItemRow(item);
       productSearch.value = '';
-      showProductMeta(null);
       updateTotal();
     });
 
@@ -469,7 +494,7 @@
         if (totalEl) totalEl.textContent = `Q.${itemTotal.toFixed(2)}`;
         total += itemTotal;
       });
-      costoTotalEl.textContent =  isFinite(total) ? total.toFixed(2) : '0.00';
+      costoTotalEl.textContent = isFinite(total) ? `Q.${total.toFixed(2)}` : 'Q.0.00';
       costoTotalEl.style.color = total > 0 ? '#5ef8b0' : (total < 0 ? '#ffb36b' : 'var(--text)');
     };
 
@@ -512,17 +537,16 @@
           body: fd,
         });
 
-        showMessage('Venta enviada. Revisa la hoja "movimientos".');
+        showMessage('¡Venta registrada con éxito!');
         form.reset();
         form.fecha.value = new Date().toISOString().slice(0, 10);
         itemsWrapper.innerHTML = '';
-        createItemRow();
         updateTotal();
       } catch (err) {
         showMessage(err.message || 'No se pudo enviar.', true);
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Guardar venta en Sheets';
+        submitBtn.textContent = 'Guardar venta';
       }
     });
 
@@ -549,7 +573,6 @@
           };
         }).filter(p => p.codigo || p.nombre);
         catalogOptions.innerHTML = catalog.map(p => `<option value="${p.codigo} - ${p.nombre} / ${p.proveedor || '—'} / Q.${p.precio_venta}">`).join('');
-        showProductMeta(null);
       } catch (err) {
         console.log('No se pudo procesar catálogo', err);
       }
@@ -594,20 +617,8 @@
       });
     }
 
-    function showProductMeta(product) {
-      if (!product) {
-        productMeta.textContent = 'Proveedor y costo de venta aparecerán aquí.';
-        return;
-      }
-      productMeta.textContent = `Proveedor: ${product.proveedor || '—'} · Costo de venta: Q.${product.precio_venta || '—'}`;
-    }
-
     const toggleClear = () => {
-      if (productSearch.value.trim()) {
-        clearSearchBtn.classList.add('visible');
-      } else {
-        clearSearchBtn.classList.remove('visible');
-      }
+      clearSearchBtn.disabled = !productSearch.value.trim();
     };
     function renderResults(query) {
       const normalized = query.trim().toLowerCase();
@@ -628,7 +639,7 @@
         return;
       }
       searchResults.innerHTML = results.map(p => {
-        const label = `${p.codigo} - ${p.nombre} / ${p.proveedor || '—'} / Q.${p.precio_venta}`;
+        const label = `${p.codigo} - ${p.nombre} / ${p.proveedor || '—'} / Precio: Q.${p.precio_venta}`;
         return `<button type="button" data-code="${p.codigo}">${label}</button>`;
       }).join('');
       searchResults.hidden = false;
@@ -642,7 +653,6 @@
       if (product) {
         currentProduct = product;
         productSearch.value = `${product.codigo} - ${product.nombre} / ${product.proveedor || '—'} / Q.${product.precio_venta}`;
-        showProductMeta(product);
         toggleClear();
         searchResults.hidden = true;
       }
@@ -650,19 +660,20 @@
 
     productSearch.addEventListener('input', () => {
       currentProduct = findProduct(productSearch.value);
-      showProductMeta(currentProduct);
       toggleClear();
       renderResults(productSearch.value);
+      searchError.hidden = true;
     });
     clearSearchBtn.addEventListener('click', () => {
       productSearch.value = '';
       currentProduct = null;
-      showProductMeta(null);
       toggleClear();
       renderResults('');
+      searchError.hidden = true;
       productSearch.focus();
     });
 
+    toggleClear();
     loadCatalog();
     updateTotal();
   </script>

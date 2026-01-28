@@ -678,11 +678,29 @@
       renderResults(productSearch.value);
       searchError.hidden = true;
     });
-    productSearch.addEventListener('focus', () => {
+    const keepSearchVisible = () => {
       const nav = document.querySelector('.nav');
       const offset = nav ? nav.offsetHeight + 12 : 12;
       const top = productSearch.getBoundingClientRect().top + window.pageYOffset - offset;
       window.scrollTo({ top, behavior: 'smooth' });
+    };
+    const viewport = window.visualViewport;
+    const attachViewportWatcher = () => {
+      if (!viewport) return;
+      viewport.addEventListener('resize', keepSearchVisible);
+      viewport.addEventListener('scroll', keepSearchVisible);
+    };
+    const detachViewportWatcher = () => {
+      if (!viewport) return;
+      viewport.removeEventListener('resize', keepSearchVisible);
+      viewport.removeEventListener('scroll', keepSearchVisible);
+    };
+    productSearch.addEventListener('focus', () => {
+      keepSearchVisible();
+      attachViewportWatcher();
+    });
+    productSearch.addEventListener('blur', () => {
+      detachViewportWatcher();
     });
     clearSearchBtn.addEventListener('click', () => {
       productSearch.value = '';

@@ -253,6 +253,11 @@
       font-weight:600;
       font-size:16px;
     }
+    .item-card .product-name .inline-provider {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--muted);
+    }
     .item-card .extra {
       margin: 0;
       font-size: 13px;
@@ -434,8 +439,7 @@
       card.innerHTML = `
         <div class="row">
           <div class="product-meta">
-            <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'}</span>
-            <p class="extra">${item.proveedor || '—'}</p>
+            <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'} <span class="inline-provider">· ${item.proveedor || '—'}</span></span>
           </div>
           <button type="button" class="remove-btn">✕</button>
         </div>

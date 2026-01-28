@@ -664,6 +664,12 @@
       renderResults(productSearch.value);
       searchError.hidden = true;
     });
+    productSearch.addEventListener('focus', () => {
+      const nav = document.querySelector('.nav');
+      const offset = nav ? nav.offsetHeight + 12 : 12;
+      const top = productSearch.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
     clearSearchBtn.addEventListener('click', () => {
       productSearch.value = '';
       currentProduct = null;

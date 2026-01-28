@@ -37,10 +37,11 @@ function doPost(e) {
       const tipo = item.tipo === undefined ? 1 : (Number(item.tipo) || 1);
       const cantidad = Number(item.cantidad || 0);
       const valorUnitario = Number(item.valor_unitario || 0);
+      const descuento = Number(item.descuento || 0);
       const comentario = item.comentario && String(item.comentario).trim() ? item.comentario : 'Venta mostrador';
       const facturado = item.facturado !== undefined ? item.facturado : (payload.facturado || 0);
       const credito = item.credito !== undefined ? item.credito : (payload.credito || 0);
-      const costoTotal = cantidad * valorUnitario;
+      const costoTotal = (Math.abs(cantidad) * valorUnitario) - descuento;
       return [
         nextNum + idx,
         fecha,
@@ -48,6 +49,7 @@ function doPost(e) {
         tipo,
         cantidad,
         valorUnitario,
+        descuento,
         costoTotal,
         comentario,
         facturado,
@@ -55,7 +57,7 @@ function doPost(e) {
       ];
     });
 
-    sheet.getRange(lastRow + 1, 1, rows.length, 10).setValues(rows);
+    sheet.getRange(lastRow + 1, 1, rows.length, 11).setValues(rows);
 
     insertCaja(payload, rows);
 
@@ -74,7 +76,13 @@ function jsonResponse(obj, status) {
 function insertCaja(payload, rows) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
   if (!sheet || !rows.length) return;
-  const totalMonto = rows.reduce((sum, row) => sum + (Number(row[6]) || 0), 0);
+  // row: [numero, fecha, codigo, tipo, cantidad, valorUnitario, descuento, costo_total, ...]
+  const totalMonto = rows.reduce((sum, row) => {
+    const cantidad = Number(row[4]) || 0;
+    const valor = Number(row[5]) || 0;
+    const descuento = Number(row[6]) || 0;
+    return sum + (Math.abs(cantidad) * valor) - descuento;
+  }, 0);
   const fecha = payload.fecha ? new Date(payload.fecha) : new Date();
   const concepto = payload.concepto || (payload.items && payload.items[0] && payload.items[0].comentario) || 'Venta múltiple';
   const monto = Math.abs(totalMonto);

@@ -248,17 +248,44 @@
     }
     .item-card .extra {
       margin: 0;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--muted);
     }
     .item-card .controls {
       width: 100%;
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap:10px;
+      display:flex;
+      gap:8px;
+      align-items:flex-end;
+    }
+    .item-card .controls label {
+      flex: 1 1 0;
+      min-width: 0;
+      font-size: 11px;
+      color: var(--muted);
+      gap: 4px;
+      margin: 0;
     }
     .item-card .controls input {
-      height: 40px;
+      height: 36px;
+      font-size: 14px;
+    }
+    .item-card .item-total {
+      flex: 0 0 100px;
+      min-width: 100px;
+      display:flex;
+      flex-direction: column;
+      justify-content:center;
+      gap: 4px;
+      padding: 4px 2px;
+    }
+    .item-card .item-total-label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .item-card .item-total-value {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
     }
     .item-card .remove-btn {
       width: 36px;
@@ -342,7 +369,7 @@
 
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7o_TXKqXypfMslFX-TQaPKBJKNS1L1FNWgu5_b0K-nSWFTK3fP52mjgnYWWrmk2MW/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWYvwTpOgri9qrKq7_r6v-ifOuS2uhPTQnilFGfIduSzO2ajsoe8ldIAiPdJwL_JWw/exec';
     const SHEET_NAME = 'movimientos';
 
     const form = document.getElementById('ventaForm');
@@ -383,21 +410,30 @@
         <div class="row">
           <div class="product-meta">
             <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'}</span>
-            <p class="extra">Proveedor: ${item.proveedor || '—'}</p>
-            <p class="extra">Costo de venta: Q.${item.precio_venta || '—'}</p>
+            <p class="extra">${item.proveedor || '—'} | Precio unitario: <strong>Q.${item.precio_venta || '—'}</strong></p>
           </div>
           <button type="button" class="remove-btn">✕</button>
         </div>
         <div class="controls">
-          <input type="number" class="cantidad" step="0.01" placeholder="Cantidad" value="${item.cantidad || 1}" required>
-          <input type="number" class="valor" step="0.01" placeholder="Valor unitario" value="${item.valor_unitario || item.precio_venta || ''}" required>
+          <label>
+            Cantidad
+            <input type="number" class="cantidad" step="0.01" value="${item.cantidad || 1}" required>
+          </label>
+          <label>
+            Descuento
+            <input type="number" class="descuento" step="0.01" value="${item.descuento || 0}">
+          </label>
+          <div class="item-total">
+            <span class="item-total-label">Total</span>
+            <span class="item-total-value">0</span>
+          </div>
         </div>
       `;
       card.querySelector('.remove-btn').addEventListener('click', () => {
         card.remove();
         updateTotal();
       });
-      ['cantidad', 'valor'].forEach(cls => {
+      ['cantidad', 'descuento'].forEach(cls => {
         card.querySelector('.' + cls).addEventListener('input', updateTotal);
       });
       itemsWrapper.appendChild(card);
@@ -426,10 +462,14 @@
       itemsWrapper.querySelectorAll('.item-card').forEach(row => {
         const qtyRaw = parseFloat(row.querySelector('.cantidad').value) || 0;
         const qtyDisplay = Math.abs(qtyRaw); // siempre mostramos positivo
-        const valor = parseFloat(row.querySelector('.valor').value) || 0;
-        total += qtyDisplay * valor;
+        const valor = parseFloat(row.dataset.precio || '') || 0;
+        const descuento = parseFloat(row.querySelector('.descuento').value) || 0;
+        const itemTotal = (qtyDisplay * valor) - descuento;
+        const totalEl = row.querySelector('.item-total-value');
+        if (totalEl) totalEl.textContent = `Q.${itemTotal.toFixed(2)}`;
+        total += itemTotal;
       });
-      costoTotalEl.textContent = isFinite(total) ? total.toFixed(2) : '0.00';
+      costoTotalEl.textContent =  isFinite(total) ? total.toFixed(2) : '0.00';
       costoTotalEl.style.color = total > 0 ? '#5ef8b0' : (total < 0 ? '#ffb36b' : 'var(--text)');
     };
 
@@ -446,13 +486,14 @@
         const items = rows.map(row => {
           const qtyRaw = Number(row.querySelector('.cantidad').value || 0);
           const cantidad = -Math.abs(qtyRaw); // todas ventas → negativo
-          const valor = Number(row.querySelector('.valor').value || 0);
+          const valor = parseFloat(row.dataset.precio || '') || 0;
+          const descuento = Number(row.querySelector('.descuento').value || 0);
           const codigo = (row.dataset.codigo || '').trim();
           const nombre = (row.dataset.producto || '').trim();
           const comentario = nombre || 'Venta mostrador';
           const proveedor = (row.dataset.proveedor || '').trim();
           const precio_venta = parseFloat(row.dataset.precio || '') || 0;
-          return { codigo, tipo: 1, cantidad, valor_unitario: valor, comentario, proveedor, precio_venta };
+          return { codigo, tipo: 1, cantidad, valor_unitario: valor, descuento, comentario, proveedor, precio_venta };
         });
 
         const payload = {

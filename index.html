@@ -298,6 +298,7 @@
       font-size: 18px;
       font-weight: 700;
       color: var(--text);
+      padding: 6px;
     }
     .divider {
       width: 100%;
@@ -439,10 +440,10 @@
           <button type="button" class="remove-btn">✕</button>
         </div>
         <div class="controls">
-          <div class="item-price">
-            <span class="item-price-label">Precio</span>
+          <label>
+            Precio
             <span class="item-price-value">Q.${item.precio_venta || '0.00'}</span>
-          </div>
+          </label>
           <label>
             Cantidad
             <input type="number" class="cantidad" step="0.01" value="${item.cantidad || 1}" required>
@@ -451,10 +452,10 @@
             Descuento
             <input type="number" class="descuento" step="0.01" value="${item.descuento || 0}">
           </label>
-          <div class="item-total">
-            <span class="item-total-label">Total</span>
+          <label>
+            Total
             <span class="item-total-value">Q.0.00</span>
-          </div>
+          </label>
         </div>
       `;
       card.querySelector('.remove-btn').addEventListener('click', () => {

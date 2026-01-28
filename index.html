@@ -263,6 +263,7 @@
       display:flex;
       gap:8px;
       align-items:flex-end;
+      flex-wrap: nowrap;
     }
     .item-card .controls label {
       flex: 1 1 0;
@@ -275,20 +276,24 @@
     .item-card .controls input {
       height: 36px;
       font-size: 14px;
+      min-width: 0;
     }
+    .item-card .item-price,
     .item-card .item-total {
-      flex: 0 0 100px;
-      min-width: 100px;
+      flex: 0 0 50px;
+      min-width: 50px;
       display:flex;
       flex-direction: column;
       justify-content:center;
       gap: 4px;
       padding: 4px 2px;
     }
+    .item-card .item-price-label,
     .item-card .item-total-label {
       font-size: 12px;
       color: var(--muted);
     }
+    .item-card .item-price-value ,
     .item-card .item-total-value {
       font-size: 15px;
       font-weight: 700;
@@ -429,11 +434,15 @@
         <div class="row">
           <div class="product-meta">
             <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'}</span>
-            <p class="extra">${item.proveedor || '—'} · Precio unitario: <strong>Q.${item.precio_venta || '—'}</strong></p>
+            <p class="extra">${item.proveedor || '—'}</p>
           </div>
           <button type="button" class="remove-btn">✕</button>
         </div>
         <div class="controls">
+          <div class="item-price">
+            <span class="item-price-label">Precio</span>
+            <span class="item-price-value">Q.${item.precio_venta || '0.00'}</span>
+          </div>
           <label>
             Cantidad
             <input type="number" class="cantidad" step="0.01" value="${item.cantidad || 1}" required>
@@ -444,7 +453,7 @@
           </label>
           <div class="item-total">
             <span class="item-total-label">Total</span>
-            <span class="item-total-value">0</span>
+            <span class="item-total-value">Q.0.00</span>
           </div>
         </div>
       `;

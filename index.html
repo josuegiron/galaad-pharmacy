@@ -355,7 +355,7 @@
       background: rgba(7, 10, 20, 0.95);
       border-top: 1px solid var(--stroke);
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 6px;
       padding: 10px 12px 14px;
       z-index: 20;
@@ -602,9 +602,16 @@
     <section id="mas-menu" class="form-wrap view">
       <h2 class="section-title" style="margin-bottom:10px;">Más</h2>
       <div class="module-list">
-        <button type="button" class="module-item" data-view="facturacion">
+        <div class="placeholder">Pronto verás más opciones aquí.</div>
+      </div>
+    </section>
+
+    <section id="facturacion-menu" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Facturación</h2>
+      <div class="module-list">
+        <button type="button" class="module-item" data-view="facturacion-generar">
           <div>
-            Facturación
+            Generar facturación
             <span>Genera archivos y confirma facturación.</span>
           </div>
           <span class="arrow">›</span>
@@ -612,7 +619,7 @@
       </div>
     </section>
 
-    <section id="facturacion" class="form-wrap view">
+    <section id="facturacion-generar" class="form-wrap view">
       <h2 class="section-title" style="margin-bottom:10px;">Facturación</h2>
       <div class="card">
         <label>
@@ -642,6 +649,7 @@
 
   <nav class="tab-bar">
     <button type="button" class="tab-item active" data-view="ventas-menu">Ventas</button>
+    <button type="button" class="tab-item" data-view="facturacion-menu">Facturación</button>
     <button type="button" class="tab-item" data-view="mas-menu">Más</button>
   </nav>
 
@@ -701,12 +709,13 @@
       'ventas-form': 'Registro de venta',
       'ventas-historico': 'Ventas registradas',
       'ventas-resumen': 'Resumen del día',
-      'facturacion': 'Facturación',
+      'facturacion-menu': 'Facturación',
+      'facturacion-generar': 'Generar facturación',
       'mas-menu': 'Más',
     };
 
     const setActiveView = (viewId) => {
-      const rootView = viewId.startsWith('ventas') ? 'ventas-menu' : viewId;
+      const rootView = viewId.startsWith('ventas') ? 'ventas-menu' : viewId.startsWith('facturacion') ? 'facturacion-menu' : viewId;
       views.forEach(view => {
         view.classList.toggle('active', view.id === viewId);
       });

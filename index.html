@@ -475,6 +475,13 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <button type="button" class="module-item" data-view="ventas-resumen">
+          <div>
+            Resumen del día
+            <span>Consolidado por producto con totales.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
       </div>
     </section>
 
@@ -559,6 +566,39 @@
       </div>
     </section>
 
+    <section id="ventas-resumen" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Resumen del día</h2>
+      <div class="card">
+        <label>
+          Fecha
+          <input type="date" id="ventasResumenFecha">
+        </label>
+        <p class="hint" style="margin-top:8px;">Consolidado de ventas por producto.</p>
+      </div>
+      <div class="table-meta">
+        <div id="ventasResumenStatus" class="status-pill">Esperando fecha...</div>
+        <div id="ventasResumenCount">0 productos</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Producto</th>
+              <th>Cantidad total</th>
+              <th>Descuento</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="ventasResumenBody"></tbody>
+        </table>
+      </div>
+      <div class="card summary-card" style="margin-top:12px;">
+        <div>Total general</div>
+        <div><span id="ventasResumenTotal">Q.0.00</span></div>
+      </div>
+    </section>
+
     <section id="mas-menu" class="form-wrap view">
       <h2 class="section-title" style="margin-bottom:10px;">Más</h2>
       <div class="card">
@@ -611,6 +651,11 @@
     const ventasCount = document.getElementById('ventasCount');
     const ventasTotal = document.getElementById('ventasTotal');
     const ventasReload = document.getElementById('ventasReload');
+    const ventasResumenFecha = document.getElementById('ventasResumenFecha');
+    const ventasResumenStatus = document.getElementById('ventasResumenStatus');
+    const ventasResumenBody = document.getElementById('ventasResumenBody');
+    const ventasResumenCount = document.getElementById('ventasResumenCount');
+    const ventasResumenTotal = document.getElementById('ventasResumenTotal');
     const sectionLabel = document.getElementById('sectionLabel');
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
@@ -619,6 +664,7 @@
       'ventas-menu': 'Ventas',
       'ventas-form': 'Registro de venta',
       'ventas-historico': 'Ventas registradas',
+      'ventas-resumen': 'Resumen del día',
       'mas-menu': 'Más',
     };
 
@@ -637,6 +683,11 @@
       } else if (viewId === 'ventas-historico') {
         renderMovimientos();
       }
+      if (viewId === 'ventas-resumen' && !movimientosLoaded) {
+        loadMovimientos();
+      } else if (viewId === 'ventas-resumen') {
+        renderResumen();
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -646,6 +697,7 @@
 
     form.fecha.value = new Date().toISOString().slice(0, 10);
     if (ventasFecha) ventasFecha.value = new Date().toISOString().slice(0, 10);
+    if (ventasResumenFecha) ventasResumenFecha.value = new Date().toISOString().slice(0, 10);
 
     let messageTimer = null;
     const showMessage = (text, isError = false) => {
@@ -910,6 +962,7 @@
         movimientosLoaded = true;
         movimientosLoading = false;
         renderMovimientos();
+        renderResumen();
       } catch (err) {
         movimientosLoading = false;
         if (ventasStatus) ventasStatus.textContent = 'No se pudo leer la hoja.';
@@ -988,6 +1041,65 @@
       ventasCount.textContent = `${rows.length} ventas`;
       ventasTotal.textContent = `Q.${totalSum.toFixed(2)}`;
       ventasStatus.textContent = 'Actualizado';
+    }
+
+    function renderResumen() {
+      if (!ventasResumenBody || !ventasResumenFecha) return;
+      const selectedDate = ventasResumenFecha.value || toLocalISODate(new Date());
+      if (!movimientosLoaded) {
+        ventasResumenStatus.textContent = 'Cargando ventas...';
+        return;
+      }
+      const catalogByCode = new Map(catalog.map(p => [String(p.codigo), p]));
+      const summary = new Map();
+
+      movimientos.forEach(item => {
+        if (Number(item.tipo) !== 1) return;
+        const dateObj = parseSheetDate(item.fechaRaw);
+        if (!dateObj || toLocalISODate(dateObj) !== selectedDate) return;
+        const codigo = String(item.codigo || '').trim();
+        if (!codigo) return;
+        const cantidad = Math.abs(item.cantidad || 0);
+        const valor = isFinite(item.valorUnitario) ? item.valorUnitario : 0;
+        const descuento = isFinite(item.descuento) ? item.descuento : 0;
+        const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
+        const existing = summary.get(codigo) || { cantidad: 0, total: 0, descuento: 0 };
+        existing.cantidad += cantidad;
+        existing.total += total;
+        existing.descuento += isFinite(descuento) ? descuento : 0;
+        summary.set(codigo, existing);
+      });
+
+      const rows = [...summary.entries()].map(([codigo, data]) => {
+        const catalogItem = catalogByCode.get(codigo) || {};
+        const name = catalogItem.nombre || 'Sin nombre';
+        return { codigo, nombre: name, cantidad: data.cantidad, total: data.total, descuento: data.descuento };
+      }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+
+      if (!rows.length) {
+        ventasResumenBody.innerHTML = '<tr><td colspan="4">Sin ventas para esta fecha.</td></tr>';
+        ventasResumenCount.textContent = '0 productos';
+        ventasResumenTotal.textContent = 'Q.0.00';
+        ventasResumenStatus.textContent = 'Sin resultados';
+        return;
+      }
+
+      let totalGeneral = 0;
+      ventasResumenBody.innerHTML = rows.map(row => {
+        totalGeneral += row.total;
+        return `
+          <tr>
+            <td>${row.codigo}</td>
+            <td>${row.nombre}</td>
+            <td>${row.cantidad}</td>
+            <td>Q.${row.descuento.toFixed(2)}</td>
+            <td>Q.${row.total.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('');
+      ventasResumenCount.textContent = `${rows.length} productos`;
+      ventasResumenTotal.textContent = `Q.${totalGeneral.toFixed(2)}`;
+      ventasResumenStatus.textContent = 'Actualizado';
     }
 
     function loadCatalog() {
@@ -1112,6 +1224,17 @@
           loadMovimientos();
         } else {
           renderMovimientos();
+          renderResumen();
+        }
+      });
+    }
+    if (ventasResumenFecha) {
+      ventasResumenFecha.addEventListener('change', () => {
+        if (!movimientosLoaded) {
+          loadMovimientos();
+        } else {
+          renderMovimientos();
+          renderResumen();
         }
       });
     }

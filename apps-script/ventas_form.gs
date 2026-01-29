@@ -254,7 +254,7 @@ function downloadFacturacion(loteIdRaw) {
 
 function createLoteRecord(dateTarget, totalItems, totalMonto) {
   const lotesSheet = getOrCreateSheet(LOTES_SHEET_NAME, [
-    'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'total_items', 'total_monto', 'archivo_nombre', 'archivo_id', 'fecha_confirmacion', 'url',
+    'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'fecha_confirmacion', 'total_items', 'total_monto', 'archivo_nombre', 'archivo_id', 'url',
   ]);
   const lock = LockService.getDocumentLock();
   lock.waitLock(15000);
@@ -266,7 +266,7 @@ function createLoteRecord(dateTarget, totalItems, totalMonto) {
       nextId = (typeof lastValue === 'number' && !isNaN(lastValue)) ? lastValue + 1 : lastRow;
     }
     const now = new Date();
-    lotesSheet.appendRow([nextId, now, dateTarget, dateTarget, 'pendiente', totalItems, totalMonto, '', '', '']);
+    lotesSheet.appendRow([nextId, now, dateTarget, dateTarget, 'pendiente', '', totalItems, totalMonto, '', '', '']);
     return { loteId: nextId, loteRowIndex: lotesSheet.getLastRow() };
   } finally {
     lock.releaseLock();
@@ -284,15 +284,15 @@ function appendLoteItems(rows) {
 
 function updateLoteFile(loteRowIndex, fileName, fileId) {
   const lotesSheet = getOrCreateSheet(LOTES_SHEET_NAME, [
-    'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'total_items', 'total_monto', 'archivo_nombre', 'archivo_id', 'fecha_confirmacion', 'url',
+    'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'fecha_confirmacion', 'total_items', 'total_monto', 'archivo_nombre', 'archivo_id', 'url',
   ]);
   const link = `https://drive.google.com/file/d/${fileId}/view`;
-  lotesSheet.getRange(loteRowIndex, 8, 1, 3).setValues([[fileName, fileId, link]]);
+  lotesSheet.getRange(loteRowIndex, 9, 1, 3).setValues([[fileName, fileId, link]]);
 }
 
 function updateLoteConfirmado(loteId) {
   const lotesSheet = getOrCreateSheet(LOTES_SHEET_NAME, [
-    'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'total_items', 'total_monto', 'archivo_nombre', 'archivo_id', 'fecha_confirmacion',
+    'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'fecha_confirmacion', 'total_items', 'total_monto', 'archivo_nombre', 'archivo_id',
   ]);
   const data = lotesSheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i += 1) {

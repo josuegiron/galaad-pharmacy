@@ -436,6 +436,24 @@
       font-weight: 600;
     }
     .summary-card span { color: var(--muted); font-weight: 500; }
+    .facturacion-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .facturacion-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .meta-sep { opacity: 0.5; }
     @media (max-width: 768px) {
       body { background: #050710; }
       .nav { flex-direction: column; align-items: flex-start; padding: 10px 16px; gap: 6px; }
@@ -629,14 +647,22 @@
         <p class="hint" style="margin-top:8px;">Genera un archivo con ventas no facturadas.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
           <button type="button" class="btn primary" id="facturacionGenerar">Generar archivo</button>
-          <button type="button" class="btn" id="facturacionConfirmar" disabled>Confirmar facturación</button>
         </div>
       </div>
       <div class="card summary-card" style="margin-top:12px;">
-        <div>Lote generado</div>
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <span id="facturacionLote">—</span>
+        <div>
+          <div>Lote generado</div>
+          <div class="facturacion-meta">
+            <span id="facturacionLote">—</span>
+            <span class="meta-sep">|</span>
+            <span id="facturacionFechaLabel">Fecha: —</span>
+            <span class="meta-sep">|</span>
+            <span id="facturacionEstado" class="status-pill">Sin generar</span>
+          </div>
+        </div>
+        <div class="facturacion-actions">
           <a id="facturacionLink" href="#" class="pill" style="display:none; padding:8px 12px;">Abrir archivo</a>
+          <button type="button" class="btn" id="facturacionConfirmar" disabled>Confirmar facturación</button>
         </div>
       </div>
       <div class="message" id="facturacionMessage"></div>
@@ -655,7 +681,7 @@
 
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyPoJdxGd0HtrNYQ8o5T5hjyJUBwYZO91wQXl_lpuXdwtUrvF1tkjBql70kV8xdSTWF/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyadm4pXsD_fGgXtmJUZ_0upByhiygRyNp5Usqwy8y9yk3luB5dOz_-tdmyID8bqkZF/exec';
     const SHEET_NAME = 'movimientos';
 
     const form = document.getElementById('ventaForm');
@@ -700,7 +726,10 @@
     const facturacionLote = document.getElementById('facturacionLote');
     const facturacionLinkEl = document.getElementById('facturacionLink');
     const facturacionMessage = document.getElementById('facturacionMessage');
+    const facturacionFechaLabel = document.getElementById('facturacionFechaLabel');
+    const facturacionEstado = document.getElementById('facturacionEstado');
     const sectionLabel = document.getElementById('sectionLabel');
+    const facturacionGenerarLabel = facturacionGenerar ? facturacionGenerar.textContent.trim() : 'Generar archivo';
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
 
@@ -1323,17 +1352,23 @@
           return;
         }
         facturacionGenerar.disabled = true;
+        facturacionGenerar.textContent = 'Generando...';
+        if (facturacionEstado) facturacionEstado.textContent = 'Generando...';
+        if (facturacionFechaLabel) facturacionFechaLabel.textContent = `Fecha: ${fecha}`;
         showFacturacionMessage('Generando archivo...');
         const url = `${SCRIPT_URL}?action=facturacion_generar&fecha=${encodeURIComponent(fecha)}`;
         jsonpRequest(url, (data) => {
           facturacionGenerar.disabled = false;
+          facturacionGenerar.textContent = facturacionGenerarLabel;
           if (!data || !data.ok) {
+            if (facturacionEstado) facturacionEstado.textContent = 'Error';
             showFacturacionMessage((data && data.error) || 'No se pudo generar.', true);
             return;
           }
           facturacionLoteId = data.lote_id;
           facturacionLink = data.link || null;
           if (facturacionLote) facturacionLote.textContent = `Lote ${data.lote_id}`;
+          if (facturacionEstado) facturacionEstado.textContent = 'Pendiente';
           if (facturacionLinkEl) {
             if (facturacionLink) {
               facturacionLinkEl.href = facturacionLink;
@@ -1355,6 +1390,8 @@
           }
         }, () => {
           facturacionGenerar.disabled = false;
+          facturacionGenerar.textContent = facturacionGenerarLabel;
+          if (facturacionEstado) facturacionEstado.textContent = 'Error';
           showFacturacionMessage('Error al generar el archivo.', true);
         });
       });
@@ -1380,13 +1417,16 @@
         jsonpRequest(url, (data) => {
           if (!data || !data.ok) {
             facturacionConfirmar.disabled = false;
+            if (facturacionEstado) facturacionEstado.textContent = 'Pendiente';
             showFacturacionMessage((data && data.error) || 'No se pudo confirmar.', true);
             return;
           }
           showFacturacionMessage('Facturación confirmada.');
+          if (facturacionEstado) facturacionEstado.textContent = 'Confirmado';
           facturacionConfirmar.disabled = true;
         }, () => {
           facturacionConfirmar.disabled = false;
+          if (facturacionEstado) facturacionEstado.textContent = 'Pendiente';
           showFacturacionMessage('Error al confirmar.', true);
         });
       });

@@ -22,20 +22,25 @@ Code inspection:
 - Infer structure, patterns, and intent from the code.
 - Ask questions ONLY if the information is not present or is ambiguous.
 
-When the workflow applies, you must:
+Before writing, modifying, or proposing any code, you must follow this process:
 
-1. Restate the request in one short sentence.
-2. Identify affected system areas (bullet list, max 3).
-3. Explain key implications briefly (max 3 bullets).
-4. List assumptions or open questions only if necessary.
-5. Propose up to 2 approaches with short trade-offs.
-6. Recommend one approach in one sentence.
+1. Restate the request in your own words to confirm understanding.
+2. Identify which parts of the system would be affected
+   (files, modules, layers, services, frontend/backend, etc.).
+3. Explain the implications of the change:
+   - technical complexity
+   - potential risks or edge cases
+   - impact on existing functionality
+4. List assumptions and open questions that need clarification.
+5. Propose 2–3 possible approaches, explaining:
+   - what would need to be created or changed
+   - trade-offs of each option
+6. Recommend one approach and justify the recommendation.
 
 Rules:
-- Be concise. Avoid long explanations.
-- Use bullet points. No paragraphs unless requested.
-- Do NOT write or change code without explicit approval.
-- Do not ask where things are unless they cannot be found.
-- Prioritize maintainability over speed.
+- Do NOT write or modify code until explicit human approval is given.
+- If the request is ambiguous, stop and ask questions.
+- Prefer clarity, maintainability, and system integrity over speed.
+- Think in terms of system design and long-term impact.
 
-After step 6, ask for confirmation before implementing.
+After step 6, always ask for confirmation before implementing anything.

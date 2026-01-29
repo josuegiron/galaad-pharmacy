@@ -535,8 +535,12 @@
           return { codigo, tipo: 1, cantidad, valor_unitario: valor, descuento, comentario, proveedor, precio_venta };
         });
 
+        const selectedDate = form.fecha.value || new Date().toISOString().slice(0, 10);
+        const now = new Date();
+        const time = now.toTimeString().slice(0, 8);
+        const fechaConHora = `${selectedDate} ${time}`;
         const payload = {
-          fecha: form.fecha.value || new Date().toISOString().slice(0, 10),
+          fecha: fechaConHora,
           facturado: form.facturado.checked ? 1 : 0,
           credito: form.credito.checked ? 1 : 0,
           items,

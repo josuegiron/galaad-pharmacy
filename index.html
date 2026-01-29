@@ -41,19 +41,13 @@
       justify-content: space-between;
     }
     .nav .logo { font-weight: 700; letter-spacing: 0.2px; }
-    .nav .pill {
-      padding: 10px 16px;
-      border-radius: 999px;
-      border: 1px solid var(--stroke);
-      color: var(--text);
-      transition: all 0.2s ease;
+    .nav .section-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
     }
-    .nav .pill.active, .nav .pill:hover {
-      background: linear-gradient(120deg, rgba(233, 255, 112, 0.25), rgba(94, 248, 176, 0.18));
-      border-color: rgba(233, 255, 112, 0.35);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-    }
-    main { width: 100%; max-width: 100%; margin: 0 auto; padding: 0px 0px 0px; }
+    main { width: 100%; max-width: 100%; margin: 0 auto; padding: 0 0 96px; }
     .btn {
       padding: 10px 16px;
       border-radius: 12px;
@@ -318,9 +312,133 @@
       padding: 0;
     }
     .footer { margin-top: 28px; color: var(--muted); font-size: 14px; text-align: center; }
+    .view { display: none; }
+    .view.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .module-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .module-item {
+      width: 100%;
+      text-align: left;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: var(--card);
+      color: var(--text);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .module-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .module-item:hover { border-color: rgba(233, 255, 112, 0.4); transform: translateY(-1px); }
+    .module-item .arrow { color: var(--muted); font-size: 18px; }
+    .tab-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(7, 10, 20, 0.95);
+      border-top: 1px solid var(--stroke);
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      padding: 10px 12px 14px;
+      z-index: 20;
+      backdrop-filter: blur(10px);
+    }
+    .tab-item {
+      border: 1px solid transparent;
+      border-radius: 14px;
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tab-item.active {
+      color: var(--text);
+      border-color: rgba(233, 255, 112, 0.35);
+      background: linear-gradient(140deg, rgba(233, 255, 112, 0.12), rgba(94, 248, 176, 0.12));
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+    .placeholder {
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px dashed var(--stroke);
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 720px;
+    }
+    thead th {
+      text-align: left;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--stroke);
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      white-space: nowrap;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    .table-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 12px 0 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .status-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .summary-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 600;
+    }
+    .summary-card span { color: var(--muted); font-weight: 500; }
     @media (max-width: 768px) {
       body { background: #050710; }
-      .nav { flex-direction: column; align-items: flex-start; padding: 10px 16px; gap: 8px; }
+      .nav { flex-direction: column; align-items: flex-start; padding: 10px 16px; gap: 6px; }
       .form-wrap { padding: 18px; }
       .card { padding: 14px; }
       .item-card .controls {
@@ -336,11 +454,31 @@
 <body>
   <nav class="nav">
     <div class="logo">Inventario</div>
-    <a class="pill active" href="#form">Ventas</a>
+    <div class="section-label" id="sectionLabel">Ventas</div>
   </nav>
 
   <main>
-    <section id="form" class="form-wrap">
+    <section id="ventas-menu" class="form-wrap view active">
+      <h2 class="section-title" style="margin-bottom:10px;">Ventas</h2>
+      <div class="module-list">
+        <button type="button" class="module-item" data-view="ventas-form">
+          <div>
+            Registro de venta
+            <span>Agrega productos y guarda una nueva venta.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+        <button type="button" class="module-item" data-view="ventas-historico">
+          <div>
+            Ventas registradas
+            <span>Histórico de movimientos tipo venta.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="ventas-form" class="form-wrap view">
       <h2 class="section-title" style="margin-bottom:10px;">Registrar venta</h2>
       <form id="ventaForm">
         <div class="card date-card">
@@ -352,10 +490,6 @@
             <label class="checkbox-inline">
               <span>Facturado</span>
               <input type="checkbox" name="facturado" id="facturado">
-            </label>
-            <label class="checkbox-inline">
-              <span>Crédito</span>
-              <input type="checkbox" name="credito" id="credito">
             </label>
           </div>
         </div>
@@ -386,14 +520,65 @@
       <div class="message" id="message"></div>
     </section>
 
+    <section id="ventas-historico" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Ventas registradas</h2>
+      <div class="card">
+        <label>
+          Fecha
+          <input type="date" id="ventasFecha">
+        </label>
+        <p class="hint" style="margin-top:8px;">Filtra los movimientos tipo venta por fecha.</p>
+      </div>
+      <div class="table-meta">
+        <div id="ventasStatus" class="status-pill">Esperando fecha...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="ventasReload">Recargar</button>
+          <div id="ventasCount">0 ventas</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Código</th>
+              <th>Cantidad</th>
+              <th>Valor</th>
+              <th>Descuento</th>
+              <th>Total</th>
+              <th>Descripción</th>
+              <th>Facturado</th>
+            </tr>
+          </thead>
+          <tbody id="ventasBody"></tbody>
+        </table>
+      </div>
+      <div class="card summary-card" style="margin-top:12px;">
+        <div>Total del día</div>
+        <div><span id="ventasTotal">Q.0.00</span></div>
+      </div>
+    </section>
+
+    <section id="mas-menu" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Más</h2>
+      <div class="card">
+        <div class="placeholder">Próximamente más módulos.</div>
+      </div>
+    </section>
+
     <div class="footer">
       
     </div>
   </main>
 
+  <nav class="tab-bar">
+    <button type="button" class="tab-item active" data-view="ventas-menu">Ventas</button>
+    <button type="button" class="tab-item" data-view="mas-menu">Más</button>
+  </nav>
+
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWYvwTpOgri9qrKq7_r6v-ifOuS2uhPTQnilFGfIduSzO2ajsoe8ldIAiPdJwL_JWw/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXwh0KlLsF2ZxehYjXbdYRXwVjf0M5-T4DBUUXUIfNUmoqMt9E5EorgVk5saU0hoA/exec';
     const SHEET_NAME = 'movimientos';
 
     const form = document.getElementById('ventaForm');
@@ -412,10 +597,55 @@
 
     // URL de catálogo publicado como JSON (gviz/tq). Ajusta si cambias la hoja/ID.
     const CATALOG_JSONP_URL = 'https://docs.google.com/spreadsheets/d/1qephLnvRxMWv3772u87nfeOlm3g5KoR5en3Y1xnAIvE/gviz/tq?gid=0&tqx=out:json';
+    const MOVIMIENTOS_JSONP_URL = 'https://docs.google.com/spreadsheets/d/1qephLnvRxMWv3772u87nfeOlm3g5KoR5en3Y1xnAIvE/gviz/tq?gid=1296274109&tqx=out:json';
     let catalog = [];
     let currentProduct = null;
+    let movimientos = [];
+    let movimientosLoaded = false;
+    let movimientosLoading = false;
+    const gvizHandlers = [];
+
+    const ventasFecha = document.getElementById('ventasFecha');
+    const ventasStatus = document.getElementById('ventasStatus');
+    const ventasBody = document.getElementById('ventasBody');
+    const ventasCount = document.getElementById('ventasCount');
+    const ventasTotal = document.getElementById('ventasTotal');
+    const ventasReload = document.getElementById('ventasReload');
+    const sectionLabel = document.getElementById('sectionLabel');
+    const views = [...document.querySelectorAll('.view')];
+    const viewButtons = [...document.querySelectorAll('[data-view]')];
+
+    const viewLabels = {
+      'ventas-menu': 'Ventas',
+      'ventas-form': 'Registro de venta',
+      'ventas-historico': 'Ventas registradas',
+      'mas-menu': 'Más',
+    };
+
+    const setActiveView = (viewId) => {
+      const rootView = viewId.startsWith('ventas') ? 'ventas-menu' : viewId;
+      views.forEach(view => {
+        view.classList.toggle('active', view.id === viewId);
+      });
+      viewButtons.forEach(btn => {
+        if (!btn.classList.contains('tab-item')) return;
+        btn.classList.toggle('active', btn.dataset.view === rootView);
+      });
+      sectionLabel.textContent = viewLabels[viewId] || 'Inventario';
+      if (viewId === 'ventas-historico' && !movimientosLoaded) {
+        loadMovimientos();
+      } else if (viewId === 'ventas-historico') {
+        renderMovimientos();
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    viewButtons.forEach(btn => {
+      btn.addEventListener('click', () => setActiveView(btn.dataset.view));
+    });
 
     form.fecha.value = new Date().toISOString().slice(0, 10);
+    if (ventasFecha) ventasFecha.value = new Date().toISOString().slice(0, 10);
 
     let messageTimer = null;
     const showMessage = (text, isError = false) => {
@@ -542,7 +772,7 @@
         const payload = {
           fecha: fechaConHora,
           facturado: form.facturado.checked ? 1 : 0,
-          credito: form.credito.checked ? 1 : 0,
+          credito: 0,
           items,
         };
 
@@ -560,6 +790,7 @@
         form.fecha.value = new Date().toISOString().slice(0, 10);
         itemsWrapper.innerHTML = '';
         updateTotal();
+        loadMovimientos(true);
       } catch (err) {
         showMessage(err.message || 'No se pudo enviar.', true);
       } finally {
@@ -596,13 +827,173 @@
       }
     }
 
-    function loadCatalog() {
+    function registerGvizHandler(handler) {
+      gvizHandlers.push(handler);
       window.google = window.google || {};
       window.google.visualization = window.google.visualization || {};
       window.google.visualization.Query = window.google.visualization.Query || {};
-      window.google.visualization.Query.setResponse = handleCatalogResponse;
+      if (!window.google.visualization.Query.setResponse || !window.google.visualization.Query.setResponse.__isWrapped) {
+        const original = window.google.visualization.Query.setResponse;
+        window.google.visualization.Query.setResponse = (json) => {
+          const next = gvizHandlers.shift();
+          if (typeof next === 'function') {
+            next(json);
+          } else if (typeof original === 'function') {
+            original(json);
+          }
+        };
+        window.google.visualization.Query.setResponse.__isWrapped = true;
+      }
+    }
+
+    function toLocalISODate(date) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function parseSheetDate(value) {
+      if (!value) return null;
+      if (value instanceof Date) return value;
+      if (typeof value === 'number') return new Date(value);
+      if (typeof value !== 'string') return null;
+      if (value.startsWith('Date(')) {
+        const parts = value.replace('Date(', '').replace(')', '').split(',').map(Number);
+        const [year, month, day, hour = 0, minute = 0, second = 0] = parts;
+        return new Date(year, month, day, hour, minute, second);
+      }
+      if (value.includes('/')) {
+        const [datePart, timePart = '00:00:00'] = value.split(' ');
+        const [dd, mm, yyyy] = datePart.split('/');
+        const [hh = '0', mi = '0', ss = '0'] = timePart.split(':');
+        return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(mi), Number(ss));
+      }
+      if (value.includes('-')) {
+        const [datePart, timePart = '00:00:00'] = value.split(' ');
+        const [yyyy, mm, dd] = datePart.split('-');
+        const [hh = '0', mi = '0', ss = '0'] = timePart.split(':');
+        return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(mi), Number(ss));
+      }
+      return null;
+    }
+
+    function handleMovimientosResponse(json) {
+      try {
+        const cols = json.table.cols.map(col => (col.label || '').toLowerCase());
+        const idxFecha = cols.findIndex(cell => cell.includes('fecha'));
+        const idxCodigo = cols.findIndex(cell => cell.includes('codigo'));
+        const idxTipo = cols.findIndex(cell => cell.includes('tipo'));
+        const idxCantidad = cols.findIndex(cell => cell.includes('cantidad'));
+        const idxValor = cols.findIndex(cell => cell.includes('valor'));
+        const idxDescuento = cols.findIndex(cell => cell.includes('descuento'));
+        const idxTotal = cols.findIndex(cell => cell.includes('costo'));
+        const idxComentario = cols.findIndex(cell => cell.includes('comentario'));
+        const idxFacturado = cols.findIndex(cell => cell.includes('facturado'));
+        const idxCredito = cols.findIndex(cell => cell.includes('credito'));
+
+        movimientos = json.table.rows.map(row => {
+          const cell = (index) => row.c[index] ? (row.c[index].v ?? '') : '';
+          return {
+            fechaRaw: cell(idxFecha),
+            codigo: cell(idxCodigo),
+            tipo: normalizeNumber(cell(idxTipo)),
+            cantidad: normalizeNumber(cell(idxCantidad)),
+            valorUnitario: normalizeNumber(cell(idxValor)),
+            descuento: normalizeNumber(cell(idxDescuento)),
+            total: normalizeNumber(cell(idxTotal)),
+            comentario: cell(idxComentario),
+            facturado: normalizeNumber(cell(idxFacturado)),
+            credito: normalizeNumber(cell(idxCredito)),
+          };
+        });
+        movimientosLoaded = true;
+        movimientosLoading = false;
+        renderMovimientos();
+      } catch (err) {
+        movimientosLoading = false;
+        if (ventasStatus) ventasStatus.textContent = 'No se pudo leer la hoja.';
+        console.log('No se pudo procesar movimientos', err);
+      }
+    }
+
+    function loadMovimientos(force = false) {
+      if (movimientosLoading) return;
+      if (force) movimientosLoaded = false;
+      movimientosLoading = true;
+      if (ventasStatus) ventasStatus.textContent = 'Cargando ventas...';
+      registerGvizHandler(handleMovimientosResponse);
       const script = document.createElement('script');
-      script.src = CATALOG_JSONP_URL;
+      script.src = `${MOVIMIENTOS_JSONP_URL}&_ts=${Date.now()}`;
+      script.onerror = () => {
+        movimientosLoading = false;
+        if (ventasStatus) ventasStatus.textContent = 'Error cargando ventas.';
+      };
+      document.body.appendChild(script);
+    }
+
+    function formatDateTime(value) {
+      const parsed = parseSheetDate(value);
+      if (!parsed) return value || '';
+      const dd = String(parsed.getDate()).padStart(2, '0');
+      const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+      const yyyy = parsed.getFullYear();
+      const hh = String(parsed.getHours()).padStart(2, '0');
+      const mi = String(parsed.getMinutes()).padStart(2, '0');
+      return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+    }
+
+    function renderMovimientos() {
+      if (!ventasBody || !ventasFecha) return;
+      const selectedDate = ventasFecha.value || toLocalISODate(new Date());
+      if (!movimientosLoaded) {
+        ventasStatus.textContent = 'Cargando ventas...';
+        return;
+      }
+      const rows = movimientos.filter(item => {
+        if (Number(item.tipo) !== 1) return false;
+        const dateObj = parseSheetDate(item.fechaRaw);
+        if (!dateObj) return false;
+        return toLocalISODate(dateObj) === selectedDate;
+      });
+
+      if (!rows.length) {
+        ventasBody.innerHTML = '<tr><td colspan="8">Sin ventas para esta fecha.</td></tr>';
+        ventasCount.textContent = '0 ventas';
+        ventasTotal.textContent = 'Q.0.00';
+        ventasStatus.textContent = 'Sin resultados';
+        return;
+      }
+
+      let totalSum = 0;
+      ventasBody.innerHTML = rows.map(item => {
+        const cantidad = Math.abs(item.cantidad || 0);
+        const valor = isFinite(item.valorUnitario) ? item.valorUnitario : 0;
+        const descuento = isFinite(item.descuento) ? item.descuento : 0;
+        const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
+        totalSum += total;
+        return `
+          <tr>
+            <td>${formatDateTime(item.fechaRaw)}</td>
+            <td>${item.codigo || ''}</td>
+            <td>${cantidad}</td>
+            <td>Q.${valor.toFixed(2)}</td>
+            <td>Q.${descuento.toFixed(2)}</td>
+            <td>Q.${total.toFixed(2)}</td>
+            <td>${item.comentario || ''}</td>
+            <td>${Number(item.facturado) === 1 ? 'Si' : 'No'}</td>
+          </tr>
+        `;
+      }).join('');
+      ventasCount.textContent = `${rows.length} ventas`;
+      ventasTotal.textContent = `Q.${totalSum.toFixed(2)}`;
+      ventasStatus.textContent = 'Actualizado';
+    }
+
+    function loadCatalog() {
+      registerGvizHandler(handleCatalogResponse);
+      const script = document.createElement('script');
+      script.src = `${CATALOG_JSONP_URL}&_ts=${Date.now()}`;
       script.defer = true;
       document.body.appendChild(script);
     }
@@ -714,6 +1105,21 @@
       searchError.hidden = true;
       productSearch.focus();
     });
+
+    if (ventasFecha) {
+      ventasFecha.addEventListener('change', () => {
+        if (!movimientosLoaded) {
+          loadMovimientos();
+        } else {
+          renderMovimientos();
+        }
+      });
+    }
+    if (ventasReload) {
+      ventasReload.addEventListener('click', () => {
+        loadMovimientos(true);
+      });
+    }
 
     toggleClear();
     loadCatalog();

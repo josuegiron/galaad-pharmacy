@@ -23,7 +23,8 @@ function doPost(e) {
     const sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
     if (!sheet) throw new Error(`No se encontró la hoja "${SHEET_NAME}".`);
 
-    // Número correlativo: toma el último valor numérico en la columna A.
+    const lock = LockService.getDocumentLock();
+    lock.waitLock(15000);
     const lastRow = sheet.getLastRow();
     let nextNum = 1;
     if (lastRow >= 2) {
@@ -58,6 +59,7 @@ function doPost(e) {
     });
 
     sheet.getRange(lastRow + 1, 1, rows.length, 11).setValues(rows);
+    lock.releaseLock();
 
     insertCaja(payload, rows);
 
@@ -77,18 +79,20 @@ function insertCaja(payload, rows) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
   if (!sheet || !rows.length) return;
   // row: [numero, fecha, codigo, tipo, cantidad, valorUnitario, descuento, costo_total, ...]
-  const totalMonto = rows.reduce((sum, row) => {
+  const lastRow = sheet.getLastRow();
+  const nextId = Math.max(1, lastRow);
+  const cajaRows = rows.map((row, idx) => {
+    const numero = row[0];
+    const fecha = row[1];
     const cantidad = Number(row[4]) || 0;
     const valor = Number(row[5]) || 0;
     const descuento = Number(row[6]) || 0;
-    return sum + (Math.abs(cantidad) * valor) - descuento;
-  }, 0);
-  const fecha = payload.fecha ? new Date(payload.fecha) : new Date();
-  const concepto = payload.concepto || (payload.items && payload.items[0] && payload.items[0].comentario) || 'Venta múltiple';
-  const monto = Math.abs(totalMonto);
-  const nextRow = sheet.getLastRow() + 1;
-  const id = Math.max(1, nextRow - 1);
-  sheet.appendRow([id, fecha, 1, monto, concepto]);
+    const monto = (Math.abs(cantidad) * valor) - descuento;
+    const concepto = row[8] || payload.concepto || 'Venta';
+    const id = nextId + idx;
+    return [id, fecha, 1, monto, concepto, numero];
+  });
+  sheet.getRange(lastRow + 1, 1, cajaRows.length, 6).setValues(cajaRows);
 }
 
 function parsePayload(e) {

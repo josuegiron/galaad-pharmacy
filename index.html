@@ -601,9 +601,38 @@
 
     <section id="mas-menu" class="form-wrap view">
       <h2 class="section-title" style="margin-bottom:10px;">Más</h2>
-      <div class="card">
-        <div class="placeholder">Próximamente más módulos.</div>
+      <div class="module-list">
+        <button type="button" class="module-item" data-view="facturacion">
+          <div>
+            Facturación
+            <span>Genera archivos y confirma facturación.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
       </div>
+    </section>
+
+    <section id="facturacion" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Facturación</h2>
+      <div class="card">
+        <label>
+          Fecha
+          <input type="date" id="facturacionFecha">
+        </label>
+        <p class="hint" style="margin-top:8px;">Genera un archivo con ventas no facturadas.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <button type="button" class="btn primary" id="facturacionGenerar">Generar archivo</button>
+          <button type="button" class="btn" id="facturacionConfirmar" disabled>Confirmar facturación</button>
+        </div>
+      </div>
+      <div class="card summary-card" style="margin-top:12px;">
+        <div>Lote generado</div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span id="facturacionLote">—</span>
+          <a id="facturacionLink" href="#" class="pill" style="display:none; padding:8px 12px;">Abrir archivo</a>
+        </div>
+      </div>
+      <div class="message" id="facturacionMessage"></div>
     </section>
 
     <div class="footer">
@@ -618,7 +647,7 @@
 
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXwh0KlLsF2ZxehYjXbdYRXwVjf0M5-T4DBUUXUIfNUmoqMt9E5EorgVk5saU0hoA/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyPoJdxGd0HtrNYQ8o5T5hjyJUBwYZO91wQXl_lpuXdwtUrvF1tkjBql70kV8xdSTWF/exec';
     const SHEET_NAME = 'movimientos';
 
     const form = document.getElementById('ventaForm');
@@ -656,6 +685,13 @@
     const ventasResumenBody = document.getElementById('ventasResumenBody');
     const ventasResumenCount = document.getElementById('ventasResumenCount');
     const ventasResumenTotal = document.getElementById('ventasResumenTotal');
+    const facturacionFecha = document.getElementById('facturacionFecha');
+    const facturacionGenerar = document.getElementById('facturacionGenerar');
+    const facturacionDescargar = document.getElementById('facturacionDescargar');
+    const facturacionConfirmar = document.getElementById('facturacionConfirmar');
+    const facturacionLote = document.getElementById('facturacionLote');
+    const facturacionLinkEl = document.getElementById('facturacionLink');
+    const facturacionMessage = document.getElementById('facturacionMessage');
     const sectionLabel = document.getElementById('sectionLabel');
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
@@ -665,6 +701,7 @@
       'ventas-form': 'Registro de venta',
       'ventas-historico': 'Ventas registradas',
       'ventas-resumen': 'Resumen del día',
+      'facturacion': 'Facturación',
       'mas-menu': 'Más',
     };
 
@@ -698,6 +735,7 @@
     form.fecha.value = new Date().toISOString().slice(0, 10);
     if (ventasFecha) ventasFecha.value = new Date().toISOString().slice(0, 10);
     if (ventasResumenFecha) ventasResumenFecha.value = new Date().toISOString().slice(0, 10);
+    if (facturacionFecha) facturacionFecha.value = new Date().toISOString().slice(0, 10);
 
     let messageTimer = null;
     const showMessage = (text, isError = false) => {
@@ -1102,6 +1140,34 @@
       ventasResumenStatus.textContent = 'Actualizado';
     }
 
+    function showFacturacionMessage(text, isError = false) {
+      if (!facturacionMessage) return;
+      facturacionMessage.textContent = text;
+      facturacionMessage.classList.toggle('error', isError);
+      facturacionMessage.classList.toggle('success', !isError);
+      facturacionMessage.style.display = 'block';
+      setTimeout(() => {
+        facturacionMessage.style.display = 'none';
+      }, 5000);
+    }
+
+    function jsonpRequest(url, onSuccess, onError) {
+      const cbName = `jsonp_cb_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      const script = document.createElement('script');
+      window[cbName] = (data) => {
+        delete window[cbName];
+        script.remove();
+        onSuccess(data);
+      };
+      script.onerror = () => {
+        delete window[cbName];
+        script.remove();
+        if (onError) onError(new Error('No se pudo cargar el recurso.'));
+      };
+      script.src = `${url}${url.includes('?') ? '&' : '?'}callback=${cbName}`;
+      document.body.appendChild(script);
+    }
+
     function loadCatalog() {
       registerGvizHandler(handleCatalogResponse);
       const script = document.createElement('script');
@@ -1236,6 +1302,84 @@
           renderMovimientos();
           renderResumen();
         }
+      });
+    }
+    let facturacionLoteId = null;
+    let facturacionLink = null;
+    if (facturacionGenerar) {
+      facturacionGenerar.addEventListener('click', () => {
+        const fecha = facturacionFecha ? facturacionFecha.value : '';
+        if (!fecha) {
+          showFacturacionMessage('Selecciona una fecha.', true);
+          return;
+        }
+        facturacionGenerar.disabled = true;
+        showFacturacionMessage('Generando archivo...');
+        const url = `${SCRIPT_URL}?action=facturacion_generar&fecha=${encodeURIComponent(fecha)}`;
+        jsonpRequest(url, (data) => {
+          facturacionGenerar.disabled = false;
+          if (!data || !data.ok) {
+            showFacturacionMessage((data && data.error) || 'No se pudo generar.', true);
+            return;
+          }
+          facturacionLoteId = data.lote_id;
+          facturacionLink = data.link || null;
+          if (facturacionLote) facturacionLote.textContent = `Lote ${data.lote_id}`;
+          if (facturacionLinkEl) {
+            if (facturacionLink) {
+              facturacionLinkEl.href = facturacionLink;
+              facturacionLinkEl.style.display = 'inline-flex';
+              facturacionLinkEl.setAttribute('target', '_blank');
+              facturacionLinkEl.setAttribute('rel', 'noopener');
+            } else {
+              facturacionLinkEl.style.display = 'none';
+            }
+          }
+          if (facturacionConfirmar) facturacionConfirmar.disabled = false;
+          if (facturacionDescargar) {
+            facturacionDescargar.disabled = !facturacionLink;
+          }
+          if (facturacionLink) {
+            showFacturacionMessage('Archivo generado. Usa "Descargar archivo".');
+          } else {
+            showFacturacionMessage('Archivo generado.');
+          }
+        }, () => {
+          facturacionGenerar.disabled = false;
+          showFacturacionMessage('Error al generar el archivo.', true);
+        });
+      });
+    }
+    if (facturacionDescargar) {
+      facturacionDescargar.addEventListener('click', () => {
+        if (!facturacionLink) {
+          showFacturacionMessage('No hay enlace disponible.', true);
+          return;
+        }
+        window.open(facturacionLink, '_blank', 'noopener');
+      });
+    }
+    if (facturacionConfirmar) {
+      facturacionConfirmar.addEventListener('click', () => {
+        if (!facturacionLoteId) {
+          showFacturacionMessage('No hay lote para confirmar.', true);
+          return;
+        }
+        facturacionConfirmar.disabled = true;
+        showFacturacionMessage('Confirmando facturación...');
+        const url = `${SCRIPT_URL}?action=facturacion_confirmar&lote_id=${encodeURIComponent(facturacionLoteId)}`;
+        jsonpRequest(url, (data) => {
+          if (!data || !data.ok) {
+            facturacionConfirmar.disabled = false;
+            showFacturacionMessage((data && data.error) || 'No se pudo confirmar.', true);
+            return;
+          }
+          showFacturacionMessage('Facturación confirmada.');
+          facturacionConfirmar.disabled = true;
+        }, () => {
+          facturacionConfirmar.disabled = false;
+          showFacturacionMessage('Error al confirmar.', true);
+        });
       });
     }
     if (ventasReload) {

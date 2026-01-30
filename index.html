@@ -65,6 +65,16 @@
       border: none;
       box-shadow: 0 12px 35px rgba(94, 248, 176, 0.25);
     }
+    .btn.compact {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 10px;
+    }
+    .btn.danger {
+      border-color: rgba(255, 122, 122, 0.45);
+      color: var(--danger);
+      background: rgba(255, 122, 122, 0.08);
+    }
     .btn.full-width {
       width: 100%;
       justify-content: center;
@@ -347,6 +357,7 @@
     }
     .module-item:hover { border-color: rgba(233, 255, 112, 0.4); transform: translateY(-1px); }
     .module-item .arrow { color: var(--muted); font-size: 18px; }
+    [hidden] { display: none !important; }
     .tab-bar {
       position: fixed;
       bottom: 0;
@@ -376,6 +387,39 @@
       border-color: rgba(233, 255, 112, 0.35);
       background: linear-gradient(140deg, rgba(233, 255, 112, 0.12), rgba(94, 248, 176, 0.12));
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 7, 16, 0.72);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+    }
+    .modal-backdrop.active {
+      display: flex;
+    }
+    .modal {
+      width: min(420px, 92vw);
+      background: #101625;
+      border: 1px solid var(--stroke);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
     }
     .placeholder {
       padding: 16px;
@@ -420,6 +464,20 @@
       color: var(--muted);
       font-size: 13px;
     }
+    .table-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .table-link:hover { border-color: rgba(233, 255, 112, 0.4); }
     .status-pill {
       padding: 6px 10px;
       border-radius: 999px;
@@ -573,12 +631,13 @@
               <th>Total</th>
               <th>Descripción</th>
               <th>Facturado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="ventasBody"></tbody>
         </table>
       </div>
-      <div class="card summary-card" style="margin-top:12px;">
+      <div class="card summary-card" id="facturacionLoteCard" style="margin-top:12px;" hidden>
         <div>Total del día</div>
         <div><span id="ventasTotal">Q.0.00</span></div>
       </div>
@@ -634,6 +693,13 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <button type="button" class="module-item" data-view="facturacion-lotes">
+          <div>
+            Lotes generados
+            <span>Listado de lotes de facturación.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
       </div>
     </section>
 
@@ -668,6 +734,44 @@
       <div class="message" id="facturacionMessage"></div>
     </section>
 
+    <section id="facturacion-lotes" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Lotes generados</h2>
+      <div class="card">
+        <label>
+          Fecha
+          <input type="date" id="lotesFecha">
+        </label>
+        <p class="hint" style="margin-top:8px;">Filtra por fecha del lote.</p>
+      </div>
+      <div class="table-meta">
+        <div id="lotesStatus" class="status-pill">Esperando fecha...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="lotesReload">Recargar</button>
+          <div id="lotesCount">0 lotes</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Lote</th>
+              <th>Creado</th>
+              <th>Desde</th>
+              <th>Hasta</th>
+              <th>Estado</th>
+              <th>Confirmado</th>
+              <th>Items</th>
+              <th>Total</th>
+              <th>Archivo</th>
+              <th>Nota</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="lotesBody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <div class="footer">
       
     </div>
@@ -679,9 +783,31 @@
     <button type="button" class="tab-item" data-view="mas-menu">Más</button>
   </nav>
 
+  <div class="modal-backdrop" id="editModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+      <h3 id="editTitle">Editar movimiento</h3>
+      <label>
+        Cantidad
+        <input type="number" id="editCantidad" step="0.01" min="0">
+      </label>
+      <label>
+        Descuento
+        <input type="number" id="editDescuento" step="0.01" min="0">
+      </label>
+      <label class="checkbox-inline">
+        <span>Facturado</span>
+        <input type="checkbox" id="editFacturado">
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="editCancel">Cancelar</button>
+        <button type="button" class="btn primary" id="editSave">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyadm4pXsD_fGgXtmJUZ_0upByhiygRyNp5Usqwy8y9yk3luB5dOz_-tdmyID8bqkZF/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtP9-p5x9ZgEn6quRePwQbrBmk4ElLB3E3zvli-z66QW129J0c98Qy1AF7k83X1f7U/exec';
     const SHEET_NAME = 'movimientos';
 
     const form = document.getElementById('ventaForm');
@@ -728,7 +854,19 @@
     const facturacionMessage = document.getElementById('facturacionMessage');
     const facturacionFechaLabel = document.getElementById('facturacionFechaLabel');
     const facturacionEstado = document.getElementById('facturacionEstado');
+    const facturacionLoteCard = document.getElementById('facturacionLoteCard');
     const sectionLabel = document.getElementById('sectionLabel');
+    const lotesFecha = document.getElementById('lotesFecha');
+    const lotesStatus = document.getElementById('lotesStatus');
+    const lotesBody = document.getElementById('lotesBody');
+    const lotesCount = document.getElementById('lotesCount');
+    const lotesReload = document.getElementById('lotesReload');
+    const editModal = document.getElementById('editModal');
+    const editCantidad = document.getElementById('editCantidad');
+    const editDescuento = document.getElementById('editDescuento');
+    const editFacturado = document.getElementById('editFacturado');
+    const editCancel = document.getElementById('editCancel');
+    const editSave = document.getElementById('editSave');
     const facturacionGenerarLabel = facturacionGenerar ? facturacionGenerar.textContent.trim() : 'Generar archivo';
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
@@ -740,8 +878,11 @@
       'ventas-resumen': 'Resumen del día',
       'facturacion-menu': 'Facturación',
       'facturacion-generar': 'Generar facturación',
+      'facturacion-lotes': 'Lotes generados',
       'mas-menu': 'Más',
     };
+
+    if (facturacionLoteCard) facturacionLoteCard.hidden = true;
 
     const setActiveView = (viewId) => {
       const rootView = viewId.startsWith('ventas') ? 'ventas-menu' : viewId.startsWith('facturacion') ? 'facturacion-menu' : viewId;
@@ -753,15 +894,16 @@
         btn.classList.toggle('active', btn.dataset.view === rootView);
       });
       sectionLabel.textContent = viewLabels[viewId] || 'Inventario';
-      if (viewId === 'ventas-historico' && !movimientosLoaded) {
-        loadMovimientos();
-      } else if (viewId === 'ventas-historico') {
-        renderMovimientos();
+      if (viewId === 'ventas-historico') {
+        loadMovimientos(true);
       }
       if (viewId === 'ventas-resumen' && !movimientosLoaded) {
         loadMovimientos();
       } else if (viewId === 'ventas-resumen') {
         renderResumen();
+      }
+      if (viewId === 'facturacion-lotes') {
+        loadLotes();
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -774,8 +916,25 @@
     if (ventasFecha) ventasFecha.value = new Date().toISOString().slice(0, 10);
     if (ventasResumenFecha) ventasResumenFecha.value = new Date().toISOString().slice(0, 10);
     if (facturacionFecha) facturacionFecha.value = new Date().toISOString().slice(0, 10);
+    if (lotesFecha) lotesFecha.value = new Date().toISOString().slice(0, 10);
 
     let messageTimer = null;
+    const setButtonLoading = (btn, isLoading) => {
+      if (!btn) return;
+      if (isLoading) {
+        if (!btn.dataset.originalLabel) {
+          btn.dataset.originalLabel = btn.textContent;
+        }
+        btn.textContent = 'Cargando...';
+        btn.disabled = true;
+      } else {
+        if (btn.dataset.originalLabel) {
+          btn.textContent = btn.dataset.originalLabel;
+          delete btn.dataset.originalLabel;
+        }
+        btn.disabled = false;
+      }
+    };
     const showMessage = (text, isError = false) => {
       messageEl.textContent = text;
       messageEl.classList.toggle('error', isError);
@@ -873,8 +1032,7 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       messageEl.style.display = 'none';
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Enviando...';
+      setButtonLoading(submitBtn, true);
       try {
         const endpoint = SCRIPT_URL;
         const rows = [...itemsWrapper.querySelectorAll('.item-card')];
@@ -922,8 +1080,7 @@
       } catch (err) {
         showMessage(err.message || 'No se pudo enviar.', true);
       } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Guardar venta';
+        setButtonLoading(submitBtn, false);
       }
     });
 
@@ -991,6 +1148,10 @@
         const [year, month, day, hour = 0, minute = 0, second = 0] = parts;
         return new Date(year, month, day, hour, minute, second);
       }
+      if (value.includes('T') && value.includes('-')) {
+        const parsed = new Date(value);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      }
       if (value.includes('/')) {
         const [datePart, timePart = '00:00:00'] = value.split(' ');
         const [dd, mm, yyyy] = datePart.split('/');
@@ -1009,6 +1170,7 @@
     function handleMovimientosResponse(json) {
       try {
         const cols = json.table.cols.map(col => (col.label || '').toLowerCase());
+        const idxNumero = cols.findIndex(cell => cell.includes('numero'));
         const idxFecha = cols.findIndex(cell => cell.includes('fecha'));
         const idxCodigo = cols.findIndex(cell => cell.includes('codigo'));
         const idxTipo = cols.findIndex(cell => cell.includes('tipo'));
@@ -1023,6 +1185,7 @@
         movimientos = json.table.rows.map(row => {
           const cell = (index) => row.c[index] ? (row.c[index].v ?? '') : '';
           return {
+            numero: cell(idxNumero),
             fechaRaw: cell(idxFecha),
             codigo: cell(idxCodigo),
             tipo: normalizeNumber(cell(idxTipo)),
@@ -1037,11 +1200,19 @@
         });
         movimientosLoaded = true;
         movimientosLoading = false;
+        if (movimientosLoadingButton) {
+          setButtonLoading(movimientosLoadingButton, false);
+          movimientosLoadingButton = null;
+        }
         renderMovimientos();
         renderResumen();
       } catch (err) {
         movimientosLoading = false;
         if (ventasStatus) ventasStatus.textContent = 'No se pudo leer la hoja.';
+        if (movimientosLoadingButton) {
+          setButtonLoading(movimientosLoadingButton, false);
+          movimientosLoadingButton = null;
+        }
         console.log('No se pudo procesar movimientos', err);
       }
     }
@@ -1057,19 +1228,109 @@
       script.onerror = () => {
         movimientosLoading = false;
         if (ventasStatus) ventasStatus.textContent = 'Error cargando ventas.';
+        if (movimientosLoadingButton) {
+          setButtonLoading(movimientosLoadingButton, false);
+          movimientosLoadingButton = null;
+        }
       };
       document.body.appendChild(script);
     }
 
     function formatDateTime(value) {
       const parsed = parseSheetDate(value);
-      if (!parsed) return value || '';
+      if (!parsed || isNaN(parsed.getTime())) return value || '';
       const dd = String(parsed.getDate()).padStart(2, '0');
       const mm = String(parsed.getMonth() + 1).padStart(2, '0');
       const yyyy = parsed.getFullYear();
       const hh = String(parsed.getHours()).padStart(2, '0');
       const mi = String(parsed.getMinutes()).padStart(2, '0');
       return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+    }
+
+    function formatDate(value) {
+      const parsed = parseSheetDate(value);
+      if (!parsed || isNaN(parsed.getTime())) return value || '';
+      const dd = String(parsed.getDate()).padStart(2, '0');
+      const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+      const yyyy = parsed.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    let lotesLoading = false;
+    let lotesData = [];
+    let lotesLoadingButton = null;
+
+    function loadLotes() {
+      if (lotesLoading || !lotesStatus) return;
+      lotesLoading = true;
+      lotesStatus.textContent = 'Cargando lotes...';
+      const fecha = lotesFecha ? lotesFecha.value : '';
+      const query = fecha ? `&fecha=${encodeURIComponent(fecha)}` : '';
+      const url = `${SCRIPT_URL}?action=facturacion_lotes${query}`;
+      jsonpRequest(url, (data) => {
+        lotesLoading = false;
+        if (lotesLoadingButton) {
+          setButtonLoading(lotesLoadingButton, false);
+          lotesLoadingButton = null;
+        }
+        if (!data || !data.ok) {
+          lotesStatus.textContent = 'No se pudo cargar.';
+          lotesData = [];
+          renderLotes();
+          return;
+        }
+        lotesData = Array.isArray(data.items) ? data.items : [];
+        renderLotes();
+      }, () => {
+        lotesLoading = false;
+        lotesStatus.textContent = 'Error cargando lotes.';
+        if (lotesLoadingButton) {
+          setButtonLoading(lotesLoadingButton, false);
+          lotesLoadingButton = null;
+        }
+      });
+    }
+
+    function renderLotes() {
+      if (!lotesBody || !lotesStatus || !lotesCount) return;
+      if (!lotesData.length) {
+        lotesBody.innerHTML = '<tr><td colspan="10">Sin lotes para esta fecha.</td></tr>';
+        lotesCount.textContent = '0 lotes';
+        lotesStatus.textContent = 'Sin resultados';
+        return;
+      }
+      lotesBody.innerHTML = lotesData.map(item => {
+        const total = parseFloat(item.total_monto) || 0;
+        const items = Number(item.total_items || 0);
+        const confirmacion = item.fecha_actualizacion ? formatDateTime(item.fecha_actualizacion) : '—';
+        const estado = String(item.estado || '').toLowerCase();
+        const isPending = estado === 'pendiente';
+        const nota = item.nota ? String(item.nota) : '—';
+        const actions = `
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${item.url ? `<a class="table-link" href="${item.url}" target="_blank" rel="noopener">Abrir</a>` : ''}
+            ${isPending ? `<button type="button" class="btn compact" data-action="lote-confirmar" data-lote="${item.lote_id}">Confirmar</button>` : ''}
+            ${isPending ? `<button type="button" class="btn compact danger" data-action="lote-denegar" data-lote="${item.lote_id}">Denegar</button>` : ''}
+          </div>
+        `;
+        return `
+          <tr>
+            <td>${item.lote_id || ''}</td>
+            <td>${formatDateTime(item.fecha_creacion)}</td>
+            <td>${formatDate(item.fecha_desde)}</td>
+            <td>${formatDate(item.fecha_hasta)}</td>
+            <td>${item.estado || ''}</td>
+            <td>${confirmacion}</td>
+            <td>${items}</td>
+            <td>Q.${total.toFixed(2)}</td>
+            <td>${item.archivo_nombre || '—'}</td>
+            <td>${nota}</td>
+            <td>${isPending || item.url ? actions : '—'}</td>
+          </tr>
+        `;
+      }).join('');
+      lotesCount.textContent = `${lotesData.length} lotes`;
+      lotesStatus.textContent = 'Actualizado';
     }
 
     function renderMovimientos() {
@@ -1087,7 +1348,7 @@
       });
 
       if (!rows.length) {
-        ventasBody.innerHTML = '<tr><td colspan="8">Sin ventas para esta fecha.</td></tr>';
+        ventasBody.innerHTML = '<tr><td colspan="9">Sin ventas para esta fecha.</td></tr>';
         ventasCount.textContent = '0 ventas';
         ventasTotal.textContent = 'Q.0.00';
         ventasStatus.textContent = 'Sin resultados';
@@ -1100,6 +1361,9 @@
         const valor = isFinite(item.valorUnitario) ? item.valorUnitario : 0;
         const descuento = isFinite(item.descuento) ? item.descuento : 0;
         const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
+        const isFacturado = Number(item.facturado) === 1;
+        const canDelete = !isFacturado && item.numero !== '' && item.numero !== null && item.numero !== undefined;
+        const canEdit = canDelete;
         totalSum += total;
         return `
           <tr>
@@ -1111,6 +1375,14 @@
             <td>Q.${total.toFixed(2)}</td>
             <td>${item.comentario || ''}</td>
             <td>${Number(item.facturado) === 1 ? 'Si' : 'No'}</td>
+            <td>
+              ${canEdit || canDelete ? `
+                <div style="display:flex; gap:6px; flex-wrap:nowrap;">
+                  ${canEdit ? `<button type="button" class="btn compact" data-action="editar" data-numero="${item.numero}" data-cantidad="${cantidad}" data-descuento="${descuento}" data-facturado="${Number(item.facturado) === 1 ? 1 : 0}">Editar</button>` : ''}
+                  ${canDelete ? `<button type="button" class="btn compact danger" data-action="eliminar" data-numero="${item.numero}">Eliminar</button>` : ''}
+                </div>
+              ` : '—'}
+            </td>
           </tr>
         `;
       }).join('');
@@ -1342,6 +1614,43 @@
         }
       });
     }
+    if (lotesFecha) {
+      lotesFecha.addEventListener('change', () => {
+        loadLotes();
+      });
+    }
+    if (lotesReload) {
+      lotesReload.addEventListener('click', () => {
+        if (lotesLoading) return;
+        lotesLoadingButton = lotesReload;
+        setButtonLoading(lotesReload, true);
+        loadLotes();
+      });
+    }
+    if (lotesBody) {
+      lotesBody.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action][data-lote]');
+        if (!btn) return;
+        const loteId = btn.getAttribute('data-lote');
+        const action = btn.getAttribute('data-action');
+        if (!loteId || !action) return;
+        const actionName = action === 'lote-denegar' ? 'denegar' : 'confirmar';
+        setButtonLoading(btn, true);
+        if (lotesStatus) lotesStatus.textContent = 'Actualizando...';
+        const url = `${SCRIPT_URL}?action=facturacion_${actionName}&lote_id=${encodeURIComponent(loteId)}`;
+        jsonpRequest(url, (data) => {
+          if (!data || !data.ok) {
+            if (lotesStatus) lotesStatus.textContent = 'No se pudo actualizar.';
+            setButtonLoading(btn, false);
+            return;
+          }
+          loadLotes();
+        }, () => {
+          if (lotesStatus) lotesStatus.textContent = 'Error al actualizar.';
+          setButtonLoading(btn, false);
+        });
+      });
+    }
     let facturacionLoteId = null;
     let facturacionLink = null;
     if (facturacionGenerar) {
@@ -1351,20 +1660,20 @@
           showFacturacionMessage('Selecciona una fecha.', true);
           return;
         }
-        facturacionGenerar.disabled = true;
-        facturacionGenerar.textContent = 'Generando...';
+        if (facturacionLoteCard) facturacionLoteCard.hidden = true;
+        setButtonLoading(facturacionGenerar, true);
         if (facturacionEstado) facturacionEstado.textContent = 'Generando...';
         if (facturacionFechaLabel) facturacionFechaLabel.textContent = `Fecha: ${fecha}`;
         showFacturacionMessage('Generando archivo...');
         const url = `${SCRIPT_URL}?action=facturacion_generar&fecha=${encodeURIComponent(fecha)}`;
         jsonpRequest(url, (data) => {
-          facturacionGenerar.disabled = false;
-          facturacionGenerar.textContent = facturacionGenerarLabel;
+          setButtonLoading(facturacionGenerar, false);
           if (!data || !data.ok) {
             if (facturacionEstado) facturacionEstado.textContent = 'Error';
             showFacturacionMessage((data && data.error) || 'No se pudo generar.', true);
             return;
           }
+          if (facturacionLoteCard) facturacionLoteCard.hidden = false;
           facturacionLoteId = data.lote_id;
           facturacionLink = data.link || null;
           if (facturacionLote) facturacionLote.textContent = `Lote ${data.lote_id}`;
@@ -1389,8 +1698,7 @@
             showFacturacionMessage('Archivo generado.');
           }
         }, () => {
-          facturacionGenerar.disabled = false;
-          facturacionGenerar.textContent = facturacionGenerarLabel;
+          setButtonLoading(facturacionGenerar, false);
           if (facturacionEstado) facturacionEstado.textContent = 'Error';
           showFacturacionMessage('Error al generar el archivo.', true);
         });
@@ -1411,21 +1719,22 @@
           showFacturacionMessage('No hay lote para confirmar.', true);
           return;
         }
-        facturacionConfirmar.disabled = true;
+        setButtonLoading(facturacionConfirmar, true);
         showFacturacionMessage('Confirmando facturación...');
         const url = `${SCRIPT_URL}?action=facturacion_confirmar&lote_id=${encodeURIComponent(facturacionLoteId)}`;
         jsonpRequest(url, (data) => {
           if (!data || !data.ok) {
-            facturacionConfirmar.disabled = false;
+            setButtonLoading(facturacionConfirmar, false);
             if (facturacionEstado) facturacionEstado.textContent = 'Pendiente';
             showFacturacionMessage((data && data.error) || 'No se pudo confirmar.', true);
             return;
           }
           showFacturacionMessage('Facturación confirmada.');
           if (facturacionEstado) facturacionEstado.textContent = 'Confirmado';
+          setButtonLoading(facturacionConfirmar, false);
           facturacionConfirmar.disabled = true;
         }, () => {
-          facturacionConfirmar.disabled = false;
+          setButtonLoading(facturacionConfirmar, false);
           if (facturacionEstado) facturacionEstado.textContent = 'Pendiente';
           showFacturacionMessage('Error al confirmar.', true);
         });
@@ -1433,7 +1742,94 @@
     }
     if (ventasReload) {
       ventasReload.addEventListener('click', () => {
+        if (movimientosLoading) return;
+        movimientosLoadingButton = ventasReload;
+        setButtonLoading(ventasReload, true);
         loadMovimientos(true);
+      });
+    }
+    let movimientosLoadingButton = null;
+    if (ventasBody) {
+      ventasBody.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action="eliminar"][data-numero]');
+        if (btn) {
+          const numero = btn.getAttribute('data-numero');
+          if (!numero) return;
+          const confirmed = window.confirm('¿Eliminar este movimiento?');
+          if (!confirmed) return;
+          setButtonLoading(btn, true);
+          if (ventasStatus) ventasStatus.textContent = 'Eliminando...';
+          const url = `${SCRIPT_URL}?action=movimiento_eliminar&numero=${encodeURIComponent(numero)}`;
+          jsonpRequest(url, (data) => {
+            if (!data || !data.ok) {
+              if (ventasStatus) ventasStatus.textContent = 'No se pudo eliminar.';
+              setButtonLoading(btn, false);
+              return;
+            }
+            loadMovimientos(true);
+          }, () => {
+            if (ventasStatus) ventasStatus.textContent = 'Error al eliminar.';
+            setButtonLoading(btn, false);
+          });
+          return;
+        }
+        const editBtn = event.target.closest('button[data-action="editar"][data-numero]');
+        if (!editBtn || !editModal) return;
+        const numero = editBtn.getAttribute('data-numero');
+        if (!numero) return;
+        const cantidad = editBtn.getAttribute('data-cantidad') || '0';
+        const descuento = editBtn.getAttribute('data-descuento') || '0';
+        const facturado = editBtn.getAttribute('data-facturado') || '0';
+        editModal.dataset.numero = numero;
+        editCantidad.value = cantidad;
+        editDescuento.value = descuento;
+        if (editFacturado) editFacturado.checked = facturado === '1';
+        editModal.classList.add('active');
+      });
+    }
+
+    const closeEditModal = () => {
+      if (!editModal) return;
+      editModal.classList.remove('active');
+      editModal.dataset.numero = '';
+      if (editSave) setButtonLoading(editSave, false);
+    };
+
+    if (editCancel) {
+      editCancel.addEventListener('click', () => {
+        closeEditModal();
+      });
+    }
+
+    if (editModal) {
+      editModal.addEventListener('click', (event) => {
+        if (event.target === editModal) closeEditModal();
+      });
+    }
+
+    if (editSave) {
+      editSave.addEventListener('click', () => {
+        const numero = editModal ? editModal.dataset.numero : '';
+        if (!numero) return;
+        const cantidad = Number(editCantidad.value || 0);
+        const descuento = Number(editDescuento.value || 0);
+        if (!isFinite(cantidad) || !isFinite(descuento)) return;
+        const facturado = editFacturado && editFacturado.checked ? 1 : 0;
+        setButtonLoading(editSave, true);
+        if (ventasStatus) ventasStatus.textContent = 'Actualizando...';
+        const url = `${SCRIPT_URL}?action=movimiento_actualizar&numero=${encodeURIComponent(numero)}&cantidad=${encodeURIComponent(cantidad)}&descuento=${encodeURIComponent(descuento)}&facturado=${encodeURIComponent(facturado)}`;
+        jsonpRequest(url, (data) => {
+          if (!data || !data.ok) {
+            if (ventasStatus) ventasStatus.textContent = 'No se pudo actualizar.';
+            setButtonLoading(editSave, false);
+            return;
+          }
+          closeEditModal();
+          loadMovimientos(true);
+        }, () => {
+          if (ventasStatus) ventasStatus.textContent = 'Error al actualizar.';
+          setButtonLoading(editSave, false);
+        });
       });
     }
 

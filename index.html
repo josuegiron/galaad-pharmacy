@@ -98,7 +98,41 @@
       width: 100%;
       justify-content: center;
     }
-    .section-title { font-size: 22px; margin: 0 0 10px; letter-spacing: -0.2px; }
+    .section-title { font-size: 22px; margin: 0; letter-spacing: -0.2px; }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .help-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .help-btn:hover {
+      border-color: rgba(233, 255, 112, 0.4);
+      transform: translateY(-1px);
+    }
+    .help-body {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .help-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
     .card {
       background: var(--card);
@@ -621,7 +655,10 @@
 
   <main>
     <section id="ventas-menu" class="form-wrap view active">
-      <h2 class="section-title" style="margin-bottom:10px;">Ventas</h2>
+      <div class="section-head">
+        <h2 class="section-title">Ventas</h2>
+        <button type="button" class="help-btn" data-help="ventas-menu" aria-label="Ayuda de ventas">?</button>
+      </div>
       <div class="module-list">
         <button type="button" class="module-item" data-view="ventas-form">
           <div>
@@ -655,7 +692,10 @@
     </section>
 
     <section id="ventas-form" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Registrar venta</h2>
+      <div class="section-head">
+        <h2 class="section-title">Registrar venta</h2>
+        <button type="button" class="help-btn" data-help="ventas-form" aria-label="Ayuda de registro de venta">?</button>
+      </div>
       <form id="ventaForm">
         <div class="card date-card">
           <label class="date-field">
@@ -697,7 +737,10 @@
     </section>
 
     <section id="ventas-historico" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Ventas registradas</h2>
+      <div class="section-head">
+        <h2 class="section-title">Ventas registradas</h2>
+        <button type="button" class="help-btn" data-help="ventas-historico" aria-label="Ayuda de ventas registradas">?</button>
+      </div>
       <div class="card">
         <label>
           Fecha
@@ -737,7 +780,10 @@
     </section>
 
     <section id="ventas-resumen" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Resumen del día</h2>
+      <div class="section-head">
+        <h2 class="section-title">Resumen del día</h2>
+        <button type="button" class="help-btn" data-help="ventas-resumen" aria-label="Ayuda de resumen de ventas">?</button>
+      </div>
       <div class="card">
         <label>
           Fecha
@@ -770,7 +816,10 @@
     </section>
 
     <section id="ventas-transacciones" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Transacciones de ventas</h2>
+      <div class="section-head">
+        <h2 class="section-title">Transacciones de ventas</h2>
+        <button type="button" class="help-btn" data-help="ventas-transacciones" aria-label="Ayuda de transacciones de ventas">?</button>
+      </div>
       <div class="card">
         <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
           <label>
@@ -831,7 +880,10 @@
 
 
     <section id="caja-menu" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Caja</h2>
+      <div class="section-head">
+        <h2 class="section-title">Caja</h2>
+        <button type="button" class="help-btn" data-help="caja-menu" aria-label="Ayuda de caja">?</button>
+      </div>
       <div class="module-list">
         <button type="button" class="module-item" data-view="caja-view">
           <div>
@@ -851,7 +903,10 @@
     </section>
 
     <section id="caja-transacciones" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Transacciones de compra</h2>
+      <div class="section-head">
+        <h2 class="section-title">Transacciones de compra</h2>
+        <button type="button" class="help-btn" data-help="caja-transacciones" aria-label="Ayuda de transacciones de compra">?</button>
+      </div>
       <div class="card">
         <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
           <label>
@@ -911,7 +966,10 @@
     </section>
 
     <section id="inventario-menu" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Inventario</h2>
+      <div class="section-head">
+        <h2 class="section-title">Inventario</h2>
+        <button type="button" class="help-btn" data-help="inventario-menu" aria-label="Ayuda de inventario">?</button>
+      </div>
       <div class="module-list">
         <button type="button" class="module-item" data-view="inventario-productos">
           <div>
@@ -959,7 +1017,10 @@
     </section>
 
     <section id="inventario-productos" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Productos</h2>
+      <div class="section-head">
+        <h2 class="section-title">Productos</h2>
+        <button type="button" class="help-btn" data-help="inventario-productos" aria-label="Ayuda de productos">?</button>
+      </div>
       <div class="card">
         <label>
           Buscar
@@ -996,7 +1057,10 @@
     </section>
 
     <section id="inventario-compras-crear" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Registrar compra</h2>
+      <div class="section-head">
+        <h2 class="section-title">Registrar compra</h2>
+        <button type="button" class="help-btn" data-help="inventario-compras-crear" aria-label="Ayuda de registro de compra">?</button>
+      </div>
       <form id="compraForm">
         <div class="card date-card">
           <label class="date-field">
@@ -1038,7 +1102,10 @@
     </section>
 
     <section id="inventario-compras-listado" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Compras registradas</h2>
+      <div class="section-head">
+        <h2 class="section-title">Compras registradas</h2>
+        <button type="button" class="help-btn" data-help="inventario-compras-listado" aria-label="Ayuda de compras registradas">?</button>
+      </div>
       <div class="card" style="margin-top:16px;">
         <label>
           Fecha
@@ -1078,7 +1145,10 @@
     </section>
 
     <section id="inventario-ajustes-crear" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Ajustes de inventario</h2>
+      <div class="section-head">
+        <h2 class="section-title">Ajustes de inventario</h2>
+        <button type="button" class="help-btn" data-help="inventario-ajustes-crear" aria-label="Ayuda de ajustes de inventario">?</button>
+      </div>
       <form id="ajusteForm">
         <div class="card date-card">
           <label class="date-field">
@@ -1111,7 +1181,10 @@
     </section>
 
     <section id="inventario-ajustes-listado" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Ajustes del día</h2>
+      <div class="section-head">
+        <h2 class="section-title">Ajustes del día</h2>
+        <button type="button" class="help-btn" data-help="inventario-ajustes-listado" aria-label="Ayuda de ajustes del día">?</button>
+      </div>
       <div class="card" style="margin-top:16px;">
         <label>
           Fecha
@@ -1146,7 +1219,10 @@
     </section>
 
     <section id="caja-view" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Caja</h2>
+      <div class="section-head">
+        <h2 class="section-title">Caja</h2>
+        <button type="button" class="help-btn" data-help="caja-view" aria-label="Ayuda de movimientos de caja">?</button>
+      </div>
       <div class="card">
         <label>
           Fecha
@@ -1207,7 +1283,10 @@
     </section>
 
     <section id="caja-cierres" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Cierres de caja</h2>
+      <div class="section-head">
+        <h2 class="section-title">Cierres de caja</h2>
+        <button type="button" class="help-btn" data-help="caja-cierres" aria-label="Ayuda de cierres de caja">?</button>
+      </div>
       <div class="card">
         <div style="display:grid; gap:10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
           <label>
@@ -1247,7 +1326,10 @@
     </section>
 
     <section id="facturacion-menu" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Facturación</h2>
+      <div class="section-head">
+        <h2 class="section-title">Facturación</h2>
+        <button type="button" class="help-btn" data-help="facturacion-menu" aria-label="Ayuda de facturación">?</button>
+      </div>
       <div class="module-list">
         <button type="button" class="module-item" data-view="facturacion-generar">
           <div>
@@ -1267,7 +1349,10 @@
     </section>
 
     <section id="facturacion-generar" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Facturación</h2>
+      <div class="section-head">
+        <h2 class="section-title">Facturación</h2>
+        <button type="button" class="help-btn" data-help="facturacion-generar" aria-label="Ayuda de generar facturación">?</button>
+      </div>
       <div class="card">
         <label>
           Fecha
@@ -1298,7 +1383,10 @@
     </section>
 
     <section id="facturacion-lotes" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Lotes generados</h2>
+      <div class="section-head">
+        <h2 class="section-title">Lotes generados</h2>
+        <button type="button" class="help-btn" data-help="facturacion-lotes" aria-label="Ayuda de lotes generados">?</button>
+      </div>
       <div class="card">
         <label>
           Fecha
@@ -1482,6 +1570,16 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="helpModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+      <h3 id="helpModalTitle">Ayuda</h3>
+      <div id="helpModalBody" class="help-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="helpModalClose">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtP9-p5x9ZgEn6quRePwQbrBmk4ElLB3E3zvli-z66QW129J0c98Qy1AF7k83X1f7U/exec';
@@ -1654,6 +1752,11 @@
     const ajusteModalComentario = document.getElementById('ajusteModalComentario');
     const ajusteModalCancel = document.getElementById('ajusteModalCancel');
     const ajusteModalSave = document.getElementById('ajusteModalSave');
+    const helpModal = document.getElementById('helpModal');
+    const helpModalTitle = document.getElementById('helpModalTitle');
+    const helpModalBody = document.getElementById('helpModalBody');
+    const helpModalClose = document.getElementById('helpModalClose');
+    const helpButtons = [...document.querySelectorAll('.help-btn')];
     const facturacionGenerarLabel = facturacionGenerar ? facturacionGenerar.textContent.trim() : 'Generar archivo';
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
@@ -1677,6 +1780,181 @@
       'caja-view': 'Movimientos de caja',
       'caja-cierres': 'Cierres de caja',
       'caja-transacciones': 'Transacciones de compra',
+    };
+
+    const helpContent = {
+      'ventas-menu': {
+        title: 'Ventas',
+        desc: 'Accesos principales para gestionar ventas.',
+        bullets: [
+          'Crear una nueva venta con productos del catálogo.',
+          'Ver detalle del día y resumen por producto.',
+          'Consultar ventas históricas por transacción.',
+        ],
+      },
+      'ventas-form': {
+        title: 'Registrar venta',
+        desc: 'Registra una venta con productos del catálogo.',
+        bullets: [
+          'Busca productos por código o nombre.',
+          'El total se calcula automáticamente.',
+          'Marca facturado si aplica.',
+        ],
+      },
+      'ventas-historico': {
+        title: 'Ventas registradas',
+        desc: 'Listado de items de venta por fecha.',
+        bullets: [
+          'Filtra por fecha para ver el día.',
+          'Edita o elimina según reglas de confirmación.',
+        ],
+      },
+      'ventas-resumen': {
+        title: 'Resumen del día',
+        desc: 'Consolidado por producto de las ventas del día.',
+        bullets: [
+          'Muestra cantidad, descuento y total por producto.',
+        ],
+      },
+      'ventas-transacciones': {
+        title: 'Transacciones de ventas',
+        desc: 'Ventas agrupadas por transacción.',
+        bullets: [
+          'Filtra por rango de fechas.',
+          'Abre el detalle de cada transacción.',
+        ],
+      },
+      'facturacion-menu': {
+        title: 'Facturación',
+        desc: 'Gestión de facturación de ventas.',
+        bullets: [
+          'Genera lote con ventas no facturadas.',
+          'Consulta lotes y estados.',
+        ],
+      },
+      'facturacion-generar': {
+        title: 'Generar facturación',
+        desc: 'Genera archivo de facturación del día.',
+        bullets: [
+          'Selecciona la fecha para crear el lote.',
+          'Confirma el lote cuando sea válido.',
+        ],
+      },
+      'facturacion-lotes': {
+        title: 'Lotes generados',
+        desc: 'Histórico de lotes de facturación.',
+        bullets: [
+          'Filtra por fecha del lote.',
+          'Revisa estado, archivo y nota.',
+        ],
+      },
+      'inventario-menu': {
+        title: 'Inventario',
+        desc: 'Accesos a catálogo, compras y ajustes.',
+        bullets: [
+          'Administra productos y precios.',
+          'Registra compras y ajustes de stock.',
+        ],
+      },
+      'inventario-productos': {
+        title: 'Productos',
+        desc: 'Catálogo de productos con costos y stock.',
+        bullets: [
+          'Busca, crea y edita productos.',
+          'Ajusta stock desde acciones.',
+        ],
+      },
+      'inventario-compras-crear': {
+        title: 'Registrar compra',
+        desc: 'Registra compras de inventario.',
+        bullets: [
+          'Selecciona productos del catálogo.',
+          'Marca crédito cuando aplique.',
+        ],
+      },
+      'inventario-compras-listado': {
+        title: 'Compras registradas',
+        desc: 'Detalle de compras por fecha.',
+        bullets: [
+          'Filtra por fecha del día.',
+          'Edita o elimina según reglas.',
+        ],
+      },
+      'inventario-ajustes-crear': {
+        title: 'Ajustes de inventario',
+        desc: 'Registra ajustes positivos o negativos de stock.',
+        bullets: [
+          'Solo afecta inventario, no caja.',
+          'Requiere confirmación al guardar.',
+        ],
+      },
+      'inventario-ajustes-listado': {
+        title: 'Ajustes del día',
+        desc: 'Listado de ajustes por fecha.',
+        bullets: [
+          'Filtra ajustes por fecha.',
+        ],
+      },
+      'caja-menu': {
+        title: 'Caja',
+        desc: 'Accesos a movimientos y cierres de caja.',
+        bullets: [
+          'Registra entradas y salidas.',
+          'Consulta cierres diarios.',
+        ],
+      },
+      'caja-view': {
+        title: 'Movimientos de caja',
+        desc: 'Control diario de caja.',
+        bullets: [
+          'Agrega movimientos manuales.',
+          'Cierra el día cuando esté conciliado.',
+        ],
+      },
+      'caja-cierres': {
+        title: 'Cierres de caja',
+        desc: 'Histórico de cierres diarios.',
+        bullets: [
+          'Filtra por rango de fechas.',
+        ],
+      },
+      'caja-transacciones': {
+        title: 'Transacciones de compra',
+        desc: 'Compras agrupadas por transacción.',
+        bullets: [
+          'Filtra por rango de fechas.',
+          'Revisa detalle por ID.',
+        ],
+      },
+    };
+
+    const defaultHelpContent = {
+      title: 'Ayuda',
+      desc: 'No hay información disponible para esta opción.',
+      bullets: [],
+    };
+
+    const openHelp = (key) => {
+      if (!helpModal || !helpModalTitle || !helpModalBody) return;
+      const info = helpContent[key] || defaultHelpContent;
+      helpModalTitle.textContent = info.title;
+      let bodyHtml = `<p>${info.desc}</p>`;
+      if (info.bullets && info.bullets.length) {
+        bodyHtml += '<ul class="help-list">';
+        info.bullets.forEach((item) => {
+          bodyHtml += `<li>${item}</li>`;
+        });
+        bodyHtml += '</ul>';
+      }
+      helpModalBody.innerHTML = bodyHtml;
+      helpModal.classList.add('active');
+      helpModal.setAttribute('aria-hidden', 'false');
+    };
+
+    const closeHelp = () => {
+      if (!helpModal) return;
+      helpModal.classList.remove('active');
+      helpModal.setAttribute('aria-hidden', 'true');
     };
 
     if (facturacionLoteCard) facturacionLoteCard.hidden = true;
@@ -1753,6 +2031,20 @@
     viewButtons.forEach(btn => {
       btn.addEventListener('click', () => setActiveView(btn.dataset.view));
     });
+    helpButtons.forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openHelp(btn.dataset.help);
+      });
+    });
+    if (helpModalClose) {
+      helpModalClose.addEventListener('click', closeHelp);
+    }
+    if (helpModal) {
+      helpModal.addEventListener('click', (event) => {
+        if (event.target === helpModal) closeHelp();
+      });
+    }
 
     const today = toLocalISODate(new Date());
     const monthStart = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));

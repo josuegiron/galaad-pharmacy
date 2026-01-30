@@ -535,6 +535,9 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       white-space: nowrap;
     }
+    tbody tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.03);
+    }
     tbody tr:last-child td { border-bottom: none; }
     .table-meta {
       display: flex;
@@ -1404,10 +1407,6 @@
         <p class="hint" style="margin-top:8px;">Filtra movimientos de caja por fecha.</p>
       </div>
       <div class="card summary-card summary-list" style="margin-top:12px;">
-        <div class="summary-row">
-          <div class="summary-label">Total de movimientos</div>
-          <div class="summary-value"><span id="cajaMovimientos">0</span></div>
-        </div>
         <div class="summary-row">
           <div class="summary-label">Saldo inicial</div>
           <div class="summary-value"><span id="cajaSaldoInicial">Q.0.00</span></div>
@@ -3224,6 +3223,11 @@
       if (cajaLoading || !cajaStatus) return;
       cajaLoading = true;
       cajaStatus.textContent = 'Cargando caja...';
+      if (cajaSaldoInicial) cajaSaldoInicial.textContent = 'Cargando...';
+      if (cajaEntradas) cajaEntradas.textContent = 'Cargando...';
+      if (cajaSalidas) cajaSalidas.textContent = 'Cargando...';
+      if (cajaSaldoFinal) cajaSaldoFinal.textContent = 'Cargando...';
+      if (cajaMovimientos) cajaMovimientos.textContent = 'Cargando...';
       const fecha = cajaFecha ? cajaFecha.value : '';
       const query = fecha ? `&fecha=${encodeURIComponent(fecha)}` : '';
       const url = `${SCRIPT_URL}?action=caja_listar${query}`;
@@ -3262,6 +3266,10 @@
       const fecha = cajaFecha && cajaFecha.value ? cajaFecha.value : toLocalISODate(new Date());
       const cajaUrl = `${SCRIPT_URL}?action=caja_listar&fecha=${encodeURIComponent(fecha)}`;
       const creditosUrl = `${SCRIPT_URL}?action=transacciones_compra_listar`;
+
+      cajaResumenDisponible.textContent = 'Cargando...';
+      cajaResumenDeuda.textContent = 'Cargando...';
+      cajaResumenCreditos.textContent = 'Cargando...';
 
       jsonpRequest(cajaUrl, (data) => {
         if (!data || !data.ok) {

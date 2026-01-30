@@ -937,6 +937,13 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <button type="button" class="module-item" data-view="caja-pagos">
+          <div>
+            Administrar pagos
+            <span>Lista y edita pagos no confirmados.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
         <button type="button" class="module-item" data-view="caja-cierres">
           <div>
             Cierres diarios
@@ -1053,6 +1060,7 @@
               <th>Crédito</th>
               <th>Saldo</th>
               <th>Detalle</th>
+              <th>Pagos</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -1080,6 +1088,53 @@
             <tbody id="cajaCredDetailBody"></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <section id="caja-pagos" class="form-wrap view">
+      <div class="section-head">
+        <h2 class="section-title">Administrar pagos</h2>
+        <button type="button" class="help-btn" data-help="caja-pagos" aria-label="Ayuda de pagos">?</button>
+      </div>
+      <div class="card">
+        <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+          <label>
+            Desde
+            <input type="date" id="cajaPagosDesde">
+          </label>
+          <label>
+            Hasta
+            <input type="date" id="cajaPagosHasta">
+          </label>
+        </div>
+        <label class="inline" style="margin-top:10px;">
+          <input type="checkbox" id="cajaPagosPendientes">
+          Solo pagos pendientes
+        </label>
+        <p class="hint" style="margin-top:8px;">Edita solo pagos no confirmados (se confirman al cerrar el día).</p>
+      </div>
+      <div class="table-meta">
+        <div id="cajaPagosStatus" class="status-pill">Esperando rango...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="cajaPagosReload">Recargar</button>
+          <div id="cajaPagosCount">0 pagos</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Compra</th>
+              <th>Monto</th>
+              <th>Nota</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cajaPagosBody"></tbody>
+        </table>
       </div>
     </section>
 
@@ -1715,6 +1770,56 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="pagoModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pagoModalTitle">
+      <h3 id="pagoModalTitle">Editar pago</h3>
+      <div class="hint" id="pagoModalDetalle">Pago</div>
+      <label>
+        Fecha
+        <input type="date" id="pagoModalFecha">
+      </label>
+      <label>
+        Monto
+        <input type="number" id="pagoModalMonto" step="0.01" min="0">
+      </label>
+      <label>
+        Nota (opcional)
+        <input type="text" id="pagoModalNota" placeholder="Comentario del pago">
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="pagoModalCancel">Cancelar</button>
+        <button type="button" class="btn primary" id="pagoModalSave">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="pagosCreditoModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pagosCreditoTitle" style="width: min(720px, 94vw);">
+      <h3 id="pagosCreditoTitle">Pagos de compra</h3>
+      <div class="hint" id="pagosCreditoDetalle">Compra</div>
+      <div class="status-pill" id="pagosCreditoStatus">Cargando pagos...</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Monto</th>
+              <th>Nota</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="pagosCreditoBody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div id="pagosCreditoCount">0 pagos</div>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="pagosCreditoClose">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="helpModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
       <h3 id="helpModalTitle">Ayuda</h3>
@@ -1874,6 +1979,13 @@
     const cajaCredDetailTitle = document.getElementById('cajaCredDetailTitle');
     const cajaCredDetailBody = document.getElementById('cajaCredDetailBody');
     const cajaCredDetailClose = document.getElementById('cajaCredDetailClose');
+    const cajaPagosDesde = document.getElementById('cajaPagosDesde');
+    const cajaPagosHasta = document.getElementById('cajaPagosHasta');
+    const cajaPagosPendientes = document.getElementById('cajaPagosPendientes');
+    const cajaPagosStatus = document.getElementById('cajaPagosStatus');
+    const cajaPagosBody = document.getElementById('cajaPagosBody');
+    const cajaPagosCount = document.getElementById('cajaPagosCount');
+    const cajaPagosReload = document.getElementById('cajaPagosReload');
     const cajaModal = document.getElementById('cajaModal');
     const cajaTipo = document.getElementById('cajaTipo');
     const cajaMonto = document.getElementById('cajaMonto');
@@ -1920,6 +2032,21 @@
     const creditoModalCaja = document.getElementById('creditoModalCaja');
     const creditoModalCancel = document.getElementById('creditoModalCancel');
     const creditoModalSave = document.getElementById('creditoModalSave');
+    const pagoModal = document.getElementById('pagoModal');
+    const pagoModalTitle = document.getElementById('pagoModalTitle');
+    const pagoModalDetalle = document.getElementById('pagoModalDetalle');
+    const pagoModalFecha = document.getElementById('pagoModalFecha');
+    const pagoModalMonto = document.getElementById('pagoModalMonto');
+    const pagoModalNota = document.getElementById('pagoModalNota');
+    const pagoModalCancel = document.getElementById('pagoModalCancel');
+    const pagoModalSave = document.getElementById('pagoModalSave');
+    const pagosCreditoModal = document.getElementById('pagosCreditoModal');
+    const pagosCreditoTitle = document.getElementById('pagosCreditoTitle');
+    const pagosCreditoDetalle = document.getElementById('pagosCreditoDetalle');
+    const pagosCreditoStatus = document.getElementById('pagosCreditoStatus');
+    const pagosCreditoBody = document.getElementById('pagosCreditoBody');
+    const pagosCreditoCount = document.getElementById('pagosCreditoCount');
+    const pagosCreditoClose = document.getElementById('pagosCreditoClose');
     const helpModal = document.getElementById('helpModal');
     const helpModalTitle = document.getElementById('helpModalTitle');
     const helpModalBody = document.getElementById('helpModalBody');
@@ -1949,6 +2076,7 @@
       'caja-cierres': 'Cierres diarios',
       'caja-transacciones': 'Historico de compras',
       'caja-cuentas': 'Cuentas por pagar',
+      'caja-pagos': 'Administrar pagos',
     };
 
     const helpContent = {
@@ -2108,6 +2236,15 @@
           'Registrar pagos y revisar saldo pendiente.',
         ],
       },
+      'caja-pagos': {
+        title: 'Administrar pagos',
+        desc: 'Listado de pagos de compras a crédito.',
+        bullets: [
+          'Filtrar por rango de fechas.',
+          'Editar pagos no confirmados.',
+          'Se confirman al cerrar el día.',
+        ],
+      },
     };
 
     const defaultHelpContent = {
@@ -2184,6 +2321,9 @@
       if (viewId === 'caja-cuentas') {
         loadCuentasPorPagar();
       }
+      if (viewId === 'caja-pagos') {
+        loadPagosCredito();
+      }
       if (viewId === 'inventario-productos') {
         loadProductos();
       }
@@ -2255,6 +2395,8 @@
     if (cajaTransHasta) cajaTransHasta.value = monthEnd;
     if (cajaCredDesde) cajaCredDesde.value = monthStart;
     if (cajaCredHasta) cajaCredHasta.value = monthEnd;
+    if (cajaPagosDesde) cajaPagosDesde.value = monthStart;
+    if (cajaPagosHasta) cajaPagosHasta.value = monthEnd;
 
     let messageTimer = null;
     const setButtonLoading = (btn, isLoading) => {
@@ -2991,6 +3133,9 @@
     let ventasTransLoading = false;
     let cajaTransLoading = false;
     let cajaCredLoading = false;
+    let cajaPagosLoading = false;
+    let pagosCreditoLoading = false;
+    let pagosCreditoData = [];
     let productosLoading = false;
     let productosLoaded = false;
     let productosData = [];
@@ -2999,6 +3144,8 @@
     let cajaData = [];
     let cajaMeta = { saldoInicial: 0, cerrado: false };
     let cajaLoadingButton = null;
+    let cajaPagosData = [];
+    let cajaPagosLoadingButton = null;
 
     function loadLotes() {
       if (lotesLoading || !lotesStatus) return;
@@ -3370,7 +3517,7 @@
     function renderCuentasPorPagar(items) {
       if (!cajaCredBody || !cajaCredStatus || !cajaCredCount) return;
       if (!items.length) {
-        cajaCredBody.innerHTML = '<tr><td colspan="8">Sin transacciones.</td></tr>';
+        cajaCredBody.innerHTML = '<tr><td colspan="9">Sin transacciones.</td></tr>';
         cajaCredCount.textContent = '0 transacciones';
         cajaCredStatus.textContent = 'Sin resultados';
         return;
@@ -3381,6 +3528,7 @@
         const saldo = Number(item.saldo || 0);
         const saldoLabel = credito ? `Q.${isFinite(saldo) ? saldo.toFixed(2) : '0.00'}` : '—';
         const creditoLabel = credito ? 'Si' : 'No';
+        const pagosBtn = `<button type="button" class="btn compact" data-action="compra-credito-pagos" data-id="${item.id}">Ver pagos</button>`;
         const pagarBtn = credito && saldo > 0
           ? `<button type="button" class="btn compact" data-action="compra-credito-pagar" data-id="${item.id}" data-saldo="${saldo}">Pagar</button>`
           : '—';
@@ -3393,6 +3541,7 @@
             <td>${creditoLabel}</td>
             <td>${saldoLabel}</td>
             <td><button type="button" class="btn compact" data-action="compra-transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
+            <td>${pagosBtn}</td>
             <td>${pagarBtn}</td>
           </tr>
         `;
@@ -3488,6 +3637,137 @@
         if (cajaCredReload) setButtonLoading(cajaCredReload, false);
         cajaCredStatus.textContent = 'Error cargando transacciones.';
       });
+    }
+
+    function loadPagosCredito() {
+      if (cajaPagosLoading || !cajaPagosStatus) return;
+      cajaPagosLoading = true;
+      cajaPagosStatus.textContent = 'Cargando pagos...';
+      const desde = cajaPagosDesde ? cajaPagosDesde.value : '';
+      const hasta = cajaPagosHasta ? cajaPagosHasta.value : '';
+      const pendientes = cajaPagosPendientes && cajaPagosPendientes.checked ? 1 : 0;
+      const params = [];
+      if (desde) params.push(`fecha_desde=${encodeURIComponent(desde)}`);
+      if (hasta) params.push(`fecha_hasta=${encodeURIComponent(hasta)}`);
+      if (pendientes) params.push(`pendientes=${encodeURIComponent(pendientes)}`);
+      const query = params.length ? `&${params.join('&')}` : '';
+      const url = `${SCRIPT_URL}?action=pagos_credito_listar${query}`;
+      jsonpRequest(url, (data) => {
+        cajaPagosLoading = false;
+        if (cajaPagosReload) setButtonLoading(cajaPagosReload, false);
+        if (!data || !data.ok) {
+          cajaPagosStatus.textContent = 'No se pudo cargar.';
+          cajaPagosData = [];
+          renderPagosCredito();
+          return;
+        }
+        cajaPagosData = Array.isArray(data.items) ? data.items : [];
+        renderPagosCredito();
+      }, () => {
+        cajaPagosLoading = false;
+        if (cajaPagosReload) setButtonLoading(cajaPagosReload, false);
+        cajaPagosStatus.textContent = 'Error cargando pagos.';
+      });
+    }
+
+    function renderPagosCredito() {
+      if (!cajaPagosBody || !cajaPagosStatus || !cajaPagosCount) return;
+      if (!cajaPagosData.length) {
+        cajaPagosBody.innerHTML = '<tr><td colspan="7">Sin pagos para este filtro.</td></tr>';
+        cajaPagosCount.textContent = '0 pagos';
+        cajaPagosStatus.textContent = 'Sin resultados';
+        return;
+      }
+      cajaPagosBody.innerHTML = cajaPagosData.map(item => {
+        const monto = Number(item.monto || 0);
+        const confirmado = Number(item.confirmado || 0) === 1;
+        const estadoLabel = confirmado ? 'Confirmado' : 'Pendiente';
+        const dateObj = parseSheetDate(item.fecha);
+        const fechaIso = dateObj ? toLocalISODate(dateObj) : '';
+        const nota = item.nota ? String(item.nota) : '';
+        const actions = confirmado
+          ? '—'
+          : `<button type="button" class="btn compact" data-action="pago-editar" data-id="${item.id}" data-transaccion="${item.transaccion_id}" data-fecha="${fechaIso}" data-monto="${monto}" data-nota="${nota}">Editar</button>`;
+        return `
+          <tr>
+            <td>${item.id || ''}</td>
+            <td>${formatDate(item.fecha)}</td>
+            <td>${item.transaccion_id || ''}</td>
+            <td>Q.${isFinite(monto) ? monto.toFixed(2) : '0.00'}</td>
+            <td>${nota || '—'}</td>
+            <td>${estadoLabel}</td>
+            <td>${actions}</td>
+          </tr>
+        `;
+      }).join('');
+      cajaPagosCount.textContent = `${cajaPagosData.length} pagos`;
+      cajaPagosStatus.textContent = 'Actualizado';
+    }
+
+    // Carga y muestra pagos de una compra desde cuentas por pagar.
+    function renderPagosCreditoModal() {
+      if (!pagosCreditoBody || !pagosCreditoStatus || !pagosCreditoCount) return;
+      if (!pagosCreditoData.length) {
+        pagosCreditoBody.innerHTML = '<tr><td colspan="5">Sin pagos para esta compra.</td></tr>';
+        pagosCreditoCount.textContent = '0 pagos';
+        pagosCreditoStatus.textContent = 'Sin resultados';
+        return;
+      }
+      pagosCreditoBody.innerHTML = pagosCreditoData.map(item => {
+        const monto = Number(item.monto || 0);
+        const confirmado = Number(item.confirmado || 0) === 1;
+        const estadoLabel = confirmado ? 'Confirmado' : 'Pendiente';
+        const nota = item.nota ? String(item.nota) : '';
+        return `
+          <tr>
+            <td>${item.id || ''}</td>
+            <td>${formatDate(item.fecha)}</td>
+            <td>Q.${isFinite(monto) ? monto.toFixed(2) : '0.00'}</td>
+            <td>${nota || '—'}</td>
+            <td>${estadoLabel}</td>
+          </tr>
+        `;
+      }).join('');
+      pagosCreditoCount.textContent = `${pagosCreditoData.length} pagos`;
+      pagosCreditoStatus.textContent = 'Actualizado';
+    }
+
+    function loadPagosCreditoTransaccion(transaccionId) {
+      if (pagosCreditoLoading || !pagosCreditoStatus) return;
+      pagosCreditoLoading = true;
+      pagosCreditoStatus.textContent = 'Cargando pagos...';
+      const url = `${SCRIPT_URL}?action=pagos_credito_listar&transaccion_id=${encodeURIComponent(transaccionId)}`;
+      jsonpRequest(url, (data) => {
+        pagosCreditoLoading = false;
+        if (!data || !data.ok) {
+          pagosCreditoStatus.textContent = 'No se pudo cargar.';
+          pagosCreditoData = [];
+          renderPagosCreditoModal();
+          return;
+        }
+        pagosCreditoData = Array.isArray(data.items) ? data.items : [];
+        renderPagosCreditoModal();
+      }, () => {
+        pagosCreditoLoading = false;
+        pagosCreditoStatus.textContent = 'Error cargando pagos.';
+      });
+    }
+
+    function openPagosCreditoModal(transaccionId) {
+      if (!pagosCreditoModal || !pagosCreditoTitle || !pagosCreditoDetalle) return;
+      pagosCreditoModal.dataset.transaccionId = transaccionId || '';
+      pagosCreditoTitle.textContent = `Pagos de compra #${transaccionId || ''}`;
+      pagosCreditoDetalle.textContent = `Compra #${transaccionId || ''}`;
+      pagosCreditoData = [];
+      renderPagosCreditoModal();
+      pagosCreditoModal.classList.add('active');
+      if (transaccionId) loadPagosCreditoTransaccion(transaccionId);
+    }
+
+    function closePagosCreditoModal() {
+      if (!pagosCreditoModal) return;
+      pagosCreditoModal.classList.remove('active');
+      pagosCreditoModal.dataset.transaccionId = '';
     }
 
     function loadProductos() {
@@ -3684,6 +3964,67 @@
         if (creditoModalSave) setButtonLoading(creditoModalSave, false);
         if (cajaTransStatus) cajaTransStatus.textContent = 'Error registrando el pago.';
         if (cajaCredStatus) cajaCredStatus.textContent = 'Error registrando el pago.';
+      });
+    }
+
+    function openPagoModal(data = {}) {
+      if (!pagoModal || !pagoModalTitle || !pagoModalDetalle || !pagoModalFecha || !pagoModalMonto || !pagoModalNota) return;
+      pagoModal.dataset.id = data.id || '';
+      pagoModal.dataset.transaccionId = data.transaccionId || '';
+      pagoModalTitle.textContent = `Editar pago #${data.id || ''}`;
+      pagoModalDetalle.textContent = `Compra #${data.transaccionId || ''}`;
+      pagoModalFecha.value = data.fecha || toLocalISODate(new Date());
+      pagoModalMonto.value = data.monto !== undefined ? Number(data.monto || 0).toFixed(2) : '';
+      pagoModalNota.value = data.nota || '';
+      pagoModal.classList.add('active');
+    }
+
+    function closePagoModal() {
+      if (!pagoModal) return;
+      pagoModal.classList.remove('active');
+      pagoModal.dataset.id = '';
+      pagoModal.dataset.transaccionId = '';
+      if (pagoModalSave) setButtonLoading(pagoModalSave, false);
+    }
+
+    function savePagoEditado() {
+      if (!pagoModal || !pagoModalMonto || !pagoModalFecha) return;
+      const id = pagoModal.dataset.id || '';
+      if (!id) return;
+      const fecha = pagoModalFecha.value || toLocalISODate(new Date());
+      const monto = Number(pagoModalMonto.value || 0);
+      if (!isFinite(monto) || monto <= 0) {
+        window.alert('Monto inválido.');
+        return;
+      }
+      const nota = pagoModalNota ? String(pagoModalNota.value || '').trim() : '';
+      if (!window.confirm('¿Guardar cambios en el pago?')) return;
+      if (pagoModalSave) setButtonLoading(pagoModalSave, true);
+      if (cajaPagosStatus) cajaPagosStatus.textContent = 'Actualizando pago...';
+      const params = [
+        'action=pagos_credito_actualizar',
+        `id=${encodeURIComponent(id)}`,
+        `fecha=${encodeURIComponent(fecha)}`,
+        `monto=${encodeURIComponent(monto)}`,
+        `nota=${encodeURIComponent(nota)}`,
+      ];
+      const url = `${SCRIPT_URL}?${params.join('&')}`;
+      jsonpRequest(url, (data) => {
+        if (pagoModalSave) setButtonLoading(pagoModalSave, false);
+        if (!data || !data.ok) {
+          if (cajaPagosStatus) cajaPagosStatus.textContent = data && data.error ? data.error : 'No se pudo actualizar el pago.';
+          return;
+        }
+        closePagoModal();
+        if (cajaPagosStatus) cajaPagosStatus.textContent = 'Pago actualizado.';
+        loadPagosCredito();
+        loadTransacciones('compra');
+        loadCuentasPorPagar();
+        loadCajaResumen();
+        loadCaja(true);
+      }, () => {
+        if (pagoModalSave) setButtonLoading(pagoModalSave, false);
+        if (cajaPagosStatus) cajaPagosStatus.textContent = 'Error actualizando el pago.';
       });
     }
 
@@ -4320,6 +4661,13 @@
     }
     if (cajaCredBody) {
       cajaCredBody.addEventListener('click', (event) => {
+        const pagosBtn = event.target.closest('button[data-action="compra-credito-pagos"][data-id]');
+        if (pagosBtn) {
+          const transaccionId = pagosBtn.getAttribute('data-id');
+          if (!transaccionId) return;
+          openPagosCreditoModal(transaccionId);
+          return;
+        }
         const payBtn = event.target.closest('button[data-action="compra-credito-pagar"][data-id]');
         if (payBtn) {
           const transaccionId = payBtn.getAttribute('data-id');
@@ -4333,6 +4681,19 @@
         const transaccionId = btn.getAttribute('data-id');
         if (!transaccionId) return;
         showCompraDetalle(transaccionId, 'cuentas');
+      });
+    }
+    if (cajaPagosBody) {
+      cajaPagosBody.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action="pago-editar"][data-id]');
+        if (!btn) return;
+        openPagoModal({
+          id: btn.getAttribute('data-id'),
+          transaccionId: btn.getAttribute('data-transaccion'),
+          fecha: btn.getAttribute('data-fecha'),
+          monto: btn.getAttribute('data-monto'),
+          nota: btn.getAttribute('data-nota'),
+        });
       });
     }
     if (cajaTransDesde) {
@@ -4373,6 +4734,31 @@
         if (cajaCredLoading) return;
         setButtonLoading(cajaCredReload, true);
         loadCuentasPorPagar();
+      });
+    }
+    if (cajaPagosDesde) {
+      cajaPagosDesde.addEventListener('change', () => {
+        if (cajaPagosLoading) return;
+        loadPagosCredito();
+      });
+    }
+    if (cajaPagosHasta) {
+      cajaPagosHasta.addEventListener('change', () => {
+        if (cajaPagosLoading) return;
+        loadPagosCredito();
+      });
+    }
+    if (cajaPagosPendientes) {
+      cajaPagosPendientes.addEventListener('change', () => {
+        if (cajaPagosLoading) return;
+        loadPagosCredito();
+      });
+    }
+    if (cajaPagosReload) {
+      cajaPagosReload.addEventListener('click', () => {
+        if (cajaPagosLoading) return;
+        setButtonLoading(cajaPagosReload, true);
+        loadPagosCredito();
       });
     }
     if (comprasFecha) {
@@ -4532,6 +4918,35 @@
     if (creditoModalSave) {
       creditoModalSave.addEventListener('click', () => {
         saveCreditoPago();
+      });
+    }
+    if (pagoModalCancel) {
+      pagoModalCancel.addEventListener('click', () => {
+        closePagoModal();
+      });
+    }
+    if (pagoModal) {
+      pagoModal.addEventListener('click', (event) => {
+        if (event.target === pagoModal) {
+          closePagoModal();
+        }
+      });
+    }
+    if (pagoModalSave) {
+      pagoModalSave.addEventListener('click', () => {
+        savePagoEditado();
+      });
+    }
+    if (pagosCreditoClose) {
+      pagosCreditoClose.addEventListener('click', () => {
+        closePagosCreditoModal();
+      });
+    }
+    if (pagosCreditoModal) {
+      pagosCreditoModal.addEventListener('click', (event) => {
+        if (event.target === pagosCreditoModal) {
+          closePagosCreditoModal();
+        }
       });
     }
     if (productosBody) {

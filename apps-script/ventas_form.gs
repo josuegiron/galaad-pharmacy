@@ -25,7 +25,7 @@ const PRODUCTOS_HEADERS = [
   'codigo', 'nombre', 'afecto', 'proveedor', 'costo_unitario', 'precio_venta', 'activo', 'stock_actual',
 ];
 const PAGOS_CREDITO_HEADERS = [
-  'id', 'transaccion_id', 'fecha', 'monto', 'nota', 'timestamp',
+  'id', 'transaccion_id', 'fecha', 'monto', 'nota', 'timestamp', 'confirmado',
 ];
 const FACTURACION_FOLDER_ID = '1AK9CZlEeh6oLlnf6PcV_cp5uZMPH2Qqa';
 const FACTURACION_TEMPLATE_ID = '16gxGia3t367ImiAW_2t0dhJ2Zy7D5E5HGooSWAemQ9s';
@@ -92,6 +92,16 @@ function doGet(e) {
     if (action === 'credito_pagar') {
       const payload = e && e.parameter ? e.parameter : {};
       const result = createPagoCredito(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'pagos_credito_listar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = listPagosCredito(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'pagos_credito_actualizar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = updatePagoCredito(payload);
       return callback ? jsonpResponse(result, callback) : jsonResponse(result);
     }
     if (action === 'caja_crear') {
@@ -196,6 +206,12 @@ function doPost(e) {
     }
     if (action === 'credito_pagar') {
       return jsonResponse(createPagoCredito(payload));
+    }
+    if (action === 'pagos_credito_listar') {
+      return jsonResponse(listPagosCredito(payload));
+    }
+    if (action === 'pagos_credito_actualizar') {
+      return jsonResponse(updatePagoCredito(payload));
     }
     const items = payload.items || [];
     if (!items.length) throw new Error('No hay items para registrar.');
@@ -1155,6 +1171,7 @@ function closeCaja(payload) {
   const cierresSheet = getCierresSheet();
   const row = [dateTarget, saldoInicial, totalEntradas, totalSalidas, saldoFinal, new Date(), ''];
   cierresSheet.appendRow(row);
+  confirmPagosCreditoForDate(dateTarget);
   return {
     ok: true,
     fecha: dateTarget,
@@ -1459,7 +1476,7 @@ function createPagoCredito(payload) {
   const saldo = total - pagado;
   if (saldo <= 0) throw new Error('La transacción ya está pagada.');
   if (monto > saldo) throw new Error('El monto supera el saldo pendiente.');
-  if (registrarCaja === 1) assertDateNotClosed(fecha);
+  assertDateNotClosed(fecha);
 
   const sheet = getPagosCreditoSheet();
   const lock = LockService.getDocumentLock();
@@ -1478,6 +1495,7 @@ function createPagoCredito(payload) {
     row[3] = monto;
     row[4] = nota;
     row[5] = new Date();
+    if (row.length > 6) row[6] = 0;
     sheet.appendRow(row);
     if (registrarCaja === 1) {
       createCaja({
@@ -1487,6 +1505,7 @@ function createPagoCredito(payload) {
         concepto: `Pago crédito compra #${transaccionId}`,
         referencia: String(transaccionId),
         tipo_descripcion: 'pagos',
+        pago_id: nextId,
       });
     }
     const saldoRestante = saldo - monto;
@@ -1502,6 +1521,276 @@ function createPagoCredito(payload) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function listPagosCredito(payload) {
+  const sheet = getPagosCreditoSheet();
+  if (!sheet) return { ok: true, items: [] };
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, items: [] };
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxId = headers.indexOf('id');
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  const idxFecha = headers.indexOf('fecha');
+  const idxMonto = headers.indexOf('monto');
+  const idxNota = headers.indexOf('nota');
+  const idxTimestamp = headers.indexOf('timestamp');
+  const idxConfirmado = headers.indexOf('confirmado');
+  const requiredIdx = [idxId, idxTransaccionId, idxFecha, idxMonto];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en pagos_credito.');
+  }
+  const fromRaw = payload && (payload.fecha_desde || payload.desde);
+  const toRaw = payload && (payload.fecha_hasta || payload.hasta);
+  const fromDate = parseDateValue(fromRaw);
+  const toDate = parseDateValue(toRaw);
+  const fromTime = fromDate ? new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate()).getTime() : null;
+  const toTime = toDate ? new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate()).getTime() : null;
+  const confirmadoFiltro = payload && payload.confirmado !== undefined ? Number(payload.confirmado) : null;
+  const soloPendientes = payload && payload.pendientes !== undefined ? Number(payload.pendientes) === 1 : false;
+  // Soporta filtrar pagos por transaccion_id para consultas desde cuentas por pagar.
+  const transaccionFiltro = payload && payload.transaccion_id !== undefined ? String(payload.transaccion_id) : null;
+
+  const items = data.slice(1).map(row => ({
+    id: row[idxId],
+    transaccion_id: row[idxTransaccionId],
+    fecha: row[idxFecha],
+    monto: row[idxMonto],
+    nota: idxNota >= 0 ? row[idxNota] : '',
+    timestamp: idxTimestamp >= 0 ? row[idxTimestamp] : '',
+    confirmado: idxConfirmado >= 0 ? row[idxConfirmado] : 0,
+  })).filter(item => {
+    if (transaccionFiltro !== null && String(item.transaccion_id) !== transaccionFiltro) return false;
+    if (confirmadoFiltro !== null) {
+      if (Number(item.confirmado || 0) !== confirmadoFiltro) return false;
+    }
+    if (soloPendientes && Number(item.confirmado || 0) === 1) return false;
+    if (!fromTime && !toTime) return true;
+    const dateValue = parseDateValue(item.fecha);
+    if (!dateValue) return false;
+    const dayTime = new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate()).getTime();
+    if (fromTime && dayTime < fromTime) return false;
+    if (toTime && dayTime > toTime) return false;
+    return true;
+  });
+
+  items.sort((a, b) => {
+    const dateA = parseDateValue(a.fecha) || new Date(0);
+    const dateB = parseDateValue(b.fecha) || new Date(0);
+    if (dateB.getTime() !== dateA.getTime()) {
+      return dateB.getTime() - dateA.getTime();
+    }
+    return Number(b.id || 0) - Number(a.id || 0);
+  });
+  return { ok: true, items: items };
+}
+
+function getPagoCreditoMetaById(pagoId) {
+  const sheet = getPagosCreditoSheet();
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return null;
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxId = headers.indexOf('id');
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  const idxFecha = headers.indexOf('fecha');
+  const idxMonto = headers.indexOf('monto');
+  const idxNota = headers.indexOf('nota');
+  const idxTimestamp = headers.indexOf('timestamp');
+  const idxConfirmado = headers.indexOf('confirmado');
+  if (idxId < 0) return null;
+  for (let i = 1; i < data.length; i += 1) {
+    if (Number(data[i][idxId] || 0) === Number(pagoId)) {
+      return {
+        rowIndex: i + 1,
+        id: data[i][idxId],
+        transaccion_id: idxTransaccionId >= 0 ? data[i][idxTransaccionId] : '',
+        fecha: idxFecha >= 0 ? data[i][idxFecha] : '',
+        monto: idxMonto >= 0 ? data[i][idxMonto] : 0,
+        nota: idxNota >= 0 ? data[i][idxNota] : '',
+        timestamp: idxTimestamp >= 0 ? data[i][idxTimestamp] : '',
+        confirmado: idxConfirmado >= 0 ? data[i][idxConfirmado] : 0,
+      };
+    }
+  }
+  return null;
+}
+
+function findCajaRowForPago(data) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!sheet) return null;
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return null;
+  const headers = rows[0].map(h => String(h).toLowerCase());
+  const idxPagoId = headers.indexOf('pago_id');
+  const idxFecha = headers.indexOf('fecha');
+  const idxMonto = headers.indexOf('monto');
+  const idxReferencia = headers.indexOf('referencia');
+  const idxConciliado = headers.indexOf('conciliado');
+  const idxTipoDescripcion = headers.indexOf('tipo_descripcion');
+  if (idxFecha < 0 || idxMonto < 0) return null;
+  if (idxPagoId >= 0) {
+    for (let i = 1; i < rows.length; i += 1) {
+      if (Number(rows[i][idxPagoId] || 0) === Number(data.pagoId)) {
+        return { rowIndex: i + 1, idxFecha: idxFecha, idxMonto: idxMonto, idxConciliado: idxConciliado, idxPagoId: idxPagoId };
+      }
+    }
+  }
+  if (idxReferencia < 0 || idxTipoDescripcion < 0) return null;
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  const oldKey = data.fechaOld
+    ? Utilities.formatDate(data.fechaOld, tz, 'yyyy-MM-dd')
+    : '';
+  const montoOld = Number(data.montoOld || 0);
+  for (let i = 1; i < rows.length; i += 1) {
+    const tipoDescripcion = String(rows[i][idxTipoDescripcion] || '').toLowerCase();
+    if (tipoDescripcion !== 'pagos') continue;
+    if (String(rows[i][idxReferencia] || '') !== String(data.transaccionId || '')) continue;
+    const rowMonto = Number(rows[i][idxMonto] || 0);
+    if (isFinite(montoOld) && isFinite(rowMonto) && rowMonto !== montoOld) continue;
+    if (oldKey) {
+      const rowDate = parseDateValue(rows[i][idxFecha]);
+      if (!rowDate) continue;
+      const rowKey = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+      if (rowKey !== oldKey) continue;
+    }
+    return { rowIndex: i + 1, idxFecha: idxFecha, idxMonto: idxMonto, idxConciliado: idxConciliado, idxPagoId: idxPagoId };
+  }
+  return null;
+}
+
+function updateCajaFromPago(data) {
+  const match = findCajaRowForPago(data);
+  if (!match) return;
+  if (!data.skipConciliado && match.idxConciliado >= 0) {
+    const cajaSheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+    const conciliado = Number(cajaSheet.getRange(match.rowIndex, match.idxConciliado + 1).getValue() || 0);
+    if (conciliado === 1) throw new Error('Movimiento conciliado.');
+  }
+  const cajaSheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!cajaSheet) return;
+  cajaSheet.getRange(match.rowIndex, match.idxFecha + 1).setValue(data.fecha);
+  cajaSheet.getRange(match.rowIndex, match.idxMonto + 1).setValue(data.monto);
+  if (match.idxPagoId >= 0) {
+    cajaSheet.getRange(match.rowIndex, match.idxPagoId + 1).setValue(data.pagoId);
+  }
+}
+
+function updateTransaccionEstadoByPagos(transaccionId) {
+  const meta = getTransaccionMetaById(transaccionId);
+  if (!meta) return;
+  if (String(meta.estado || '').toLowerCase() === 'anulada') return;
+  const total = Number(meta.total || 0);
+  const pagosMap = getPagosCreditoMap();
+  const pagado = Number(pagosMap[String(transaccionId)] || 0);
+  if (total > 0 && pagado >= total) {
+    updateTransaccionEstado(transaccionId, 'pagada');
+    return;
+  }
+  const summary = getTransaccionSummary(transaccionId);
+  if (summary && summary.allConfirmados) {
+    updateTransaccionEstado(transaccionId, 'confirmada');
+  } else {
+    updateTransaccionEstado(transaccionId, 'pendiente');
+  }
+}
+
+function updatePagoCredito(payload) {
+  const pagoId = Number(payload.id || 0);
+  if (!pagoId) throw new Error('ID requerido.');
+  const sheet = getPagosCreditoSheet();
+  const meta = getPagoCreditoMetaById(pagoId);
+  if (!meta) throw new Error('Pago no encontrado.');
+  if (Number(meta.confirmado || 0) === 1) throw new Error('Pago confirmado.');
+  const fechaActual = parseDateValue(meta.fecha);
+  if (fechaActual && isDateClosed(fechaActual)) throw new Error('Día ya conciliado y cuadrado.');
+
+  const monto = payload.monto !== undefined ? Number(payload.monto || 0) : Number(meta.monto || 0);
+  if (!isFinite(monto) || monto <= 0) throw new Error('Monto inválido.');
+  const nota = payload.nota !== undefined ? String(payload.nota || '').trim() : String(meta.nota || '');
+  const fecha = payload.fecha ? parseDateValue(payload.fecha) : fechaActual;
+  if (!fecha) throw new Error('Fecha inválida.');
+  if (isDateClosed(fecha)) throw new Error('Día ya conciliado y cuadrado.');
+  const transaccionId = Number(meta.transaccion_id || 0);
+  if (transaccionId) {
+    const transaccionMeta = getTransaccionMetaById(transaccionId);
+    if (transaccionMeta) {
+      const total = Number(transaccionMeta.total || 0);
+      const pagosMap = getPagosCreditoMap();
+      const pagado = Number(pagosMap[String(transaccionId)] || 0);
+      const pagadoNuevo = pagado - Number(meta.monto || 0) + monto;
+      if (total > 0 && pagadoNuevo > total) {
+        throw new Error('El monto supera el saldo pendiente.');
+      }
+    }
+  }
+  const cajaMatch = findCajaRowForPago({
+    pagoId: pagoId,
+    transaccionId: meta.transaccion_id,
+    fechaOld: fechaActual,
+    montoOld: Number(meta.monto || 0),
+  });
+  if (cajaMatch && cajaMatch.idxConciliado >= 0) {
+    const cajaSheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+    if (cajaSheet) {
+      const conciliado = Number(cajaSheet.getRange(cajaMatch.rowIndex, cajaMatch.idxConciliado + 1).getValue() || 0);
+      if (conciliado === 1) throw new Error('Movimiento conciliado.');
+    }
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxFecha = headers.indexOf('fecha');
+  const idxMonto = headers.indexOf('monto');
+  const idxNota = headers.indexOf('nota');
+  const idxTimestamp = headers.indexOf('timestamp');
+  if (idxFecha < 0 || idxMonto < 0) throw new Error('Columnas requeridas faltantes en pagos_credito.');
+  sheet.getRange(meta.rowIndex, idxFecha + 1).setValue(fecha);
+  sheet.getRange(meta.rowIndex, idxMonto + 1).setValue(monto);
+  if (idxNota >= 0) sheet.getRange(meta.rowIndex, idxNota + 1).setValue(nota);
+  if (idxTimestamp >= 0) sheet.getRange(meta.rowIndex, idxTimestamp + 1).setValue(new Date());
+
+  updateCajaFromPago({
+    pagoId: pagoId,
+    transaccionId: meta.transaccion_id,
+    fechaOld: fechaActual,
+    montoOld: Number(meta.monto || 0),
+    fecha: fecha,
+    monto: monto,
+    skipConciliado: true,
+  });
+  updateTransaccionEstadoByPagos(Number(meta.transaccion_id || 0));
+  return { ok: true, id: pagoId };
+}
+
+function confirmPagosCreditoForDate(dateTarget) {
+  const sheet = getPagosCreditoSheet();
+  if (!sheet) return { updated: 0 };
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { updated: 0 };
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxFecha = headers.indexOf('fecha');
+  const idxConfirmado = headers.indexOf('confirmado');
+  if (idxFecha < 0 || idxConfirmado < 0) return { updated: 0 };
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  const targetKey = Utilities.formatDate(dateTarget, tz, 'yyyy-MM-dd');
+  const confirmadoRange = sheet.getRange(2, idxConfirmado + 1, data.length - 1, 1).getValues();
+  let updated = false;
+  let count = 0;
+  for (let i = 1; i < data.length; i += 1) {
+    const rowDate = parseDateValue(data[i][idxFecha]);
+    if (!rowDate) continue;
+    const rowKey = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+    if (rowKey !== targetKey) continue;
+    if (Number(confirmadoRange[i - 1][0] || 0) !== 1) {
+      confirmadoRange[i - 1][0] = 1;
+      updated = true;
+      count += 1;
+    }
+  }
+  if (updated) {
+    sheet.getRange(2, idxConfirmado + 1, confirmadoRange.length, 1).setValues(confirmadoRange);
+  }
+  return { updated: count };
 }
 
 function listProductos(payload) {
@@ -1672,7 +1961,8 @@ function deleteProducto(payload) {
 function createCaja(payload) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
   if (!sheet) throw new Error('No se encontró la hoja "caja".');
-  const headers = ensureHeader(sheet, 'timestamp');
+  let headers = ensureHeader(sheet, 'timestamp');
+  headers = ensureHeader(sheet, 'pago_id');
   const idxId = headers.indexOf('id');
   const idxFecha = headers.indexOf('fecha');
   const idxTipo = headers.indexOf('tipo');
@@ -1681,6 +1971,7 @@ function createCaja(payload) {
   const idxReferencia = headers.indexOf('referencia');
   const idxConciliado = headers.indexOf('conciliado');
   const idxTipoDescripcion = headers.indexOf('tipo_descripcion');
+  const idxPagoId = headers.indexOf('pago_id');
   const idxTimestamp = headers.indexOf('timestamp');
   const requiredIdx = [idxId, idxFecha, idxTipo, idxMonto, idxConcepto, idxReferencia, idxConciliado, idxTipoDescripcion];
   if (requiredIdx.some(idx => idx < 0)) {
@@ -1715,6 +2006,7 @@ function createCaja(payload) {
     row[idxReferencia] = referencia;
     row[idxConciliado] = '';
     row[idxTipoDescripcion] = tipoDescripcion || 'otros';
+    if (idxPagoId >= 0 && payload.pago_id) row[idxPagoId] = payload.pago_id;
     if (idxTimestamp >= 0) row[idxTimestamp] = new Date();
     sheet.getRange(lastRow + 1, 1, 1, row.length).setValues([row]);
     return { ok: true, id: nextId };

@@ -74,3 +74,17 @@ Process:
 Rules:
 - Do NOT write or modify code without explicit approval.
 - Be concise. Bullets over paragraphs.
+
+=== CODING & DOCUMENTATION RULES ===
+
+When writing code:
+- Always add clear, concise documentation in the code.
+- Document intent, decisions, and non-obvious behavior.
+- Do NOT comment trivial or self-evident code.
+- Use comments or docstrings to explain *why*, not *what*.
+- Write comments assuming another engineer will maintain this code.
+
+Documentation must be:
+- Minimal but sufficient
+- Clear and precise
+- Focused on reasoning, constraints, and side effects

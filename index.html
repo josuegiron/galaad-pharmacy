@@ -1785,145 +1785,146 @@
     const helpContent = {
       'ventas-menu': {
         title: 'Ventas',
-        desc: 'Accesos principales para gestionar ventas.',
+        desc: 'Administra todo lo relacionado con ventas del mostrador.',
         bullets: [
-          'Crear una nueva venta con productos del catálogo.',
-          'Ver detalle del día y resumen por producto.',
-          'Consultar ventas históricas por transacción.',
+          'Crear nuevas ventas con productos del catálogo.',
+          'Ver el detalle diario y el resumen por producto.',
+          'Consultar el histórico de ventas por fecha.',
         ],
       },
       'ventas-form': {
         title: 'Registrar venta',
         desc: 'Registra una venta con productos del catálogo.',
         bullets: [
-          'Busca productos por código o nombre.',
-          'El total se calcula automáticamente.',
-          'Marca facturado si aplica.',
+          'Buscar por código o nombre y agregar productos.',
+          'Definir cantidad y descuento por item.',
+          'Marcar como facturada si aplica (elije esto solo si se hace una factura manual en FEL).',
         ],
       },
       'ventas-historico': {
         title: 'Ventas registradas',
-        desc: 'Listado de items de venta por fecha.',
+        desc: 'Detalle de los items vendidos en una fecha.',
         bullets: [
-          'Filtra por fecha para ver el día.',
-          'Edita o elimina según reglas de confirmación.',
+          'Filtrar por día.',
+          'Editar o eliminar items no confirmados (no facturados).',
         ],
       },
       'ventas-resumen': {
         title: 'Resumen del día',
-        desc: 'Consolidado por producto de las ventas del día.',
+        desc: 'Resumen por producto de las ventas del día.',
         bullets: [
-          'Muestra cantidad, descuento y total por producto.',
+          'Ver cantidad total, descuentos y total por producto.',
         ],
       },
       'ventas-transacciones': {
-        title: 'Transacciones de ventas',
-        desc: 'Ventas agrupadas por transacción.',
+        title: 'Historico de ventas',
+        desc: 'Historico de ventas por fecha.',
         bullets: [
-          'Filtra por rango de fechas.',
-          'Abre el detalle de cada transacción.',
+          'Filtrar por rango de fechas.',
+          'Abrir detalle para ver items y estado.',
         ],
       },
       'facturacion-menu': {
         title: 'Facturación',
         desc: 'Gestión de facturación de ventas.',
         bullets: [
-          'Genera lote con ventas no facturadas.',
-          'Consulta lotes y estados.',
+          'Generar un lote con ventas no facturadas.',
+          'Consultar lotes y estados.',
         ],
       },
       'facturacion-generar': {
         title: 'Generar facturación',
-        desc: 'Genera archivo de facturación del día.',
+        desc: 'Crea el archivo de facturación del día y confirma. Pasos:',
         bullets: [
-          'Selecciona la fecha para crear el lote.',
-          'Confirma el lote cuando sea válido.',
+          'Elegir la fecha y generar el lote.',
+          'Descarga el archivo y cargarlo al sistema en línea FEL',
+          'Confirmar cuando se facturó el lote en FEL.',
         ],
       },
       'facturacion-lotes': {
         title: 'Lotes generados',
-        desc: 'Histórico de lotes de facturación.',
+        desc: 'Historico de lotes de facturación.',
         bullets: [
-          'Filtra por fecha del lote.',
-          'Revisa estado, archivo y nota.',
+          'Filtrar por fecha.',
+          'Ver estado, archivo y notas.',
         ],
       },
       'inventario-menu': {
         title: 'Inventario',
-        desc: 'Accesos a catálogo, compras y ajustes.',
+        desc: 'Centro de catálogo, compras y ajustes.',
         bullets: [
-          'Administra productos y precios.',
-          'Registra compras y ajustes de stock.',
+          'Gestionar productos y stock.',
+          'Registrar compras y ajustes.',
         ],
       },
       'inventario-productos': {
         title: 'Productos',
-        desc: 'Catálogo de productos con costos y stock.',
+        desc: 'Catálogo completo con precios y stock.',
         bullets: [
-          'Busca, crea y edita productos.',
-          'Ajusta stock desde acciones.',
+          'Buscar, crear y editar productos.',
+          'Ajustar stock desde acciones.',
         ],
       },
       'inventario-compras-crear': {
         title: 'Registrar compra',
         desc: 'Registra compras de inventario.',
         bullets: [
-          'Selecciona productos del catálogo.',
-          'Marca crédito cuando aplique.',
+          'Agregar productos y cantidades.',
+          'Marcar credito si aplica (marca esta opción cuando el proveedor te da el producto a crédito).',
         ],
       },
       'inventario-compras-listado': {
         title: 'Compras registradas',
-        desc: 'Detalle de compras por fecha.',
+        desc: 'Detalle de items comprados por fecha.',
         bullets: [
-          'Filtra por fecha del día.',
-          'Edita o elimina según reglas.',
+          'Filtrar por día.',
+          'Editar o eliminar items no confirmados.',
         ],
       },
       'inventario-ajustes-crear': {
         title: 'Ajustes de inventario',
-        desc: 'Registra ajustes positivos o negativos de stock.',
+        desc: 'Aumenta o reduce stock manualmente.',
         bullets: [
-          'Solo afecta inventario, no caja.',
-          'Requiere confirmación al guardar.',
+          'Usar cantidad positiva o negativa.',
+          'El ajuste no afecta caja.',
         ],
       },
       'inventario-ajustes-listado': {
         title: 'Ajustes del día',
         desc: 'Listado de ajustes por fecha.',
         bullets: [
-          'Filtra ajustes por fecha.',
+          'Filtrar por día y revisar cambios.',
         ],
       },
       'caja-menu': {
         title: 'Caja',
-        desc: 'Accesos a movimientos y cierres de caja.',
+        desc: 'Control diario de caja.',
         bullets: [
-          'Registra entradas y salidas.',
-          'Consulta cierres diarios.',
+          'Registrar entradas y salidas.',
+          'Cerrar el día cuando esté conciliado.',
         ],
       },
       'caja-view': {
         title: 'Movimientos de caja',
-        desc: 'Control diario de caja.',
+        desc: 'Detalle de movimientos del día.',
         bullets: [
-          'Agrega movimientos manuales.',
-          'Cierra el día cuando esté conciliado.',
+          'Agregar movimientos manuales.',
+          'Revisar saldos y totales.',
         ],
       },
       'caja-cierres': {
         title: 'Cierres de caja',
-        desc: 'Histórico de cierres diarios.',
+        desc: 'Historico de cierres diarios.',
         bullets: [
-          'Filtra por rango de fechas.',
+          'Filtrar por rango de fechas.',
         ],
       },
       'caja-transacciones': {
         title: 'Transacciones de compra',
         desc: 'Compras agrupadas por transacción.',
         bullets: [
-          'Filtra por rango de fechas.',
-          'Revisa detalle por ID.',
+          'Filtrar por rango de fechas.',
+          'Ver detalle por ID.',
         ],
       },
     };

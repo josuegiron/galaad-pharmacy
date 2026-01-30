@@ -5,10 +5,14 @@
  */
 const SHEET_NAME = 'movimientos';
 const CAJA_SHEET_NAME = 'caja';
+const TRANSACCIONES_SHEET_NAME = 'transacciones';
 const LOTES_SHEET_NAME = 'lotes_facturacion';
 const LOTES_ITEMS_SHEET_NAME = 'lotes_items';
 const CIERRES_SHEET_NAME = 'cierres_caja';
 const PRODUCTOS_SHEET_NAME = 'productos';
+const TRANSACCIONES_HEADERS = [
+  'id', 'tipo', 'fecha', 'total', 'estado', 'usuario', 'timestamp', 'referencia_externa', 'nota',
+];
 const LOTES_HEADERS = [
   'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'fecha_actualizacion',
   'total_items', 'total_monto', 'archivo_nombre', 'archivo_id', 'url', 'nota',
@@ -69,6 +73,11 @@ function doGet(e) {
     if (action === 'cierres_listar') {
       const payload = e && e.parameter ? e.parameter : {};
       const result = listCierres(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'transacciones_listar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = listTransacciones(payload);
       return callback ? jsonpResponse(result, callback) : jsonResponse(result);
     }
     if (action === 'caja_crear') {
@@ -147,6 +156,9 @@ function doPost(e) {
     if (action === 'cierres_listar') {
       return jsonResponse(listCierres(payload));
     }
+    if (action === 'transacciones_listar') {
+      return jsonResponse(listTransacciones(payload));
+    }
     if (action === 'caja_actualizar') {
       return jsonResponse(updateCaja(payload));
     }
@@ -173,7 +185,8 @@ function doPost(e) {
     });
     const sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
     if (!sheet) throw new Error(`No se encontró la hoja "${SHEET_NAME}".`);
-    const headers = ensureHeader(sheet, 'timestamp');
+    let headers = ensureHeader(sheet, 'transaccion_id');
+    headers = ensureHeader(sheet, 'timestamp');
     const idxNumero = headers.indexOf('numero') >= 0 ? headers.indexOf('numero') : 0;
     const idxFecha = headers.indexOf('fecha') >= 0 ? headers.indexOf('fecha') : 1;
     const idxCodigo = headers.indexOf('codigo_producto') >= 0 ? headers.indexOf('codigo_producto') : 2;
@@ -183,13 +196,70 @@ function doPost(e) {
     const idxDescuento = headers.indexOf('descuento') >= 0 ? headers.indexOf('descuento') : 6;
     const idxTotal = headers.indexOf('costo_total') >= 0 ? headers.indexOf('costo_total') : 7;
     const idxComentario = headers.indexOf('comentario') >= 0 ? headers.indexOf('comentario') : 8;
-    const idxFacturado = headers.indexOf('facturado') >= 0 ? headers.indexOf('facturado') : 9;
+    const idxConfirmado = headers.indexOf('confirmado') >= 0 ? headers.indexOf('confirmado') : 9;
     const idxCredito = headers.indexOf('credito') >= 0 ? headers.indexOf('credito') : 10;
+    const idxTransaccionId = headers.indexOf('transaccion_id');
     const idxTimestamp = headers.indexOf('timestamp');
 
     let rows = [];
     let nextNum = 1;
     const timestamp = new Date();
+    const tipoNumerico = getTipoNumericoFromItems(items);
+    const tipoTextoFromItems = normalizeTransaccionTipo(tipoNumerico);
+    const tipoTextoFromPayload = normalizeTransaccionTipo(payload.tipo);
+    const creditoFlag = getCreditoFlag(items, payload);
+    const referenciaExterna = payload.referencia_externa || payload.referencia || '';
+    const nota = payload.nota || '';
+    const usuario = payload.usuario || '';
+    let transaccionId = Number(payload.transaccion_id || 0);
+    const transaccionIds = {};
+    items.forEach((item) => {
+      if (item.transaccion_id) transaccionIds[String(item.transaccion_id)] = true;
+    });
+    const transaccionIdKeys = Object.keys(transaccionIds);
+    if (!transaccionId && transaccionIdKeys.length) {
+      if (transaccionIdKeys.length > 1) {
+        throw new Error('Todos los items deben pertenecer a la misma transacción.');
+      }
+      transaccionId = Number(transaccionIdKeys[0]);
+    }
+    let transaccionMeta = transaccionId ? getTransaccionMetaById(transaccionId) : null;
+    if (transaccionId && !transaccionMeta) throw new Error('Transacción no encontrada.');
+    if (transaccionMeta && String(transaccionMeta.estado || '').toLowerCase() === 'anulada') {
+      throw new Error('Transacción anulada.');
+    }
+    const tipoTexto = transaccionMeta
+      ? normalizeTransaccionTipo(transaccionMeta.tipo)
+      : (tipoTextoFromPayload || tipoTextoFromItems);
+    if (!tipoTexto) throw new Error('Tipo de transacción inválido.');
+    if (tipoTextoFromItems && tipoTextoFromItems !== tipoTexto) {
+      throw new Error('Los items no coinciden con el tipo de transacción.');
+    }
+    if (tipoTextoFromPayload && tipoTextoFromPayload !== tipoTexto) {
+      throw new Error('El tipo del payload no coincide con la transacción.');
+    }
+    if (transaccionIdKeys.length && transaccionId) {
+      if (transaccionIdKeys.some(id => Number(id) !== transaccionId)) {
+        throw new Error('Todos los items deben pertenecer a la misma transacción.');
+      }
+    }
+    if (transaccionMeta) {
+      const summary = getTransaccionSummary(transaccionId);
+      if (summary && summary.count > 0 && summary.credito !== creditoFlag) {
+        throw new Error('La transacción ya tiene un crédito distinto.');
+      }
+    } else {
+      const fechaTransaccion = payload.fecha ? new Date(payload.fecha) : (items[0].fecha ? new Date(items[0].fecha) : new Date());
+      const created = createTransaccionRecord({
+        tipo: tipoTexto,
+        fecha: fechaTransaccion,
+        usuario: usuario,
+        referencia_externa: referenciaExterna,
+        nota: nota,
+      });
+      transaccionId = created.id;
+      transaccionMeta = getTransaccionMetaById(transaccionId);
+    }
     const lock = LockService.getDocumentLock();
     lock.waitLock(15000);
     try {
@@ -207,7 +277,13 @@ function doPost(e) {
         const valorUnitario = Number(item.valor_unitario || 0);
         const descuento = Number(item.descuento || 0);
         const comentario = item.comentario && String(item.comentario).trim() ? item.comentario : 'Venta mostrador';
-        const facturado = item.facturado !== undefined ? item.facturado : (payload.facturado || 0);
+        const confirmado = item.confirmado !== undefined
+          ? item.confirmado
+          : (item.facturado !== undefined
+            ? item.facturado
+            : (payload.confirmado !== undefined
+              ? payload.confirmado
+              : (payload.facturado || 0)));
         const credito = item.credito !== undefined ? item.credito : (payload.credito || 0);
         const costoTotal = (Math.abs(cantidad) * valorUnitario) - descuento;
         const row = new Array(headers.length).fill('');
@@ -220,8 +296,9 @@ function doPost(e) {
         row[idxDescuento] = descuento;
         row[idxTotal] = costoTotal;
         row[idxComentario] = comentario;
-        row[idxFacturado] = facturado;
+        row[idxConfirmado] = confirmado;
         row[idxCredito] = credito;
+        if (idxTransaccionId >= 0) row[idxTransaccionId] = transaccionId;
         if (idxTimestamp >= 0) row[idxTimestamp] = timestamp;
         return row;
       });
@@ -231,9 +308,9 @@ function doPost(e) {
       lock.releaseLock();
     }
 
-    insertCaja(payload, rows);
+    syncTransaccionAndCaja(transaccionId);
 
-    return jsonResponse({ ok: true, inserted: rows.length, first_numero: nextNum });
+    return jsonResponse({ ok: true, inserted: rows.length, first_numero: nextNum, transaccion_id: transaccionId });
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message || String(err) }, 400);
   }
@@ -250,13 +327,277 @@ function jsonpResponse(obj, callback) {
   return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
-function insertCaja(payload, rows) {
+function normalizeTransaccionTipo(value) {
+  if (value === undefined || value === null) return '';
+  const raw = String(value).toLowerCase().trim();
+  if (raw === 'venta' || raw === 'compra') return raw;
+  const num = Number(value);
+  if (num === 1) return 'venta';
+  if (num === 2) return 'compra';
+  return '';
+}
+
+function getTipoNumericoFromItems(items) {
+  let tipo = null;
+  items.forEach((item) => {
+    const current = item.tipo === undefined ? 1 : (Number(item.tipo) || 1);
+    if (tipo === null) {
+      tipo = current;
+      return;
+    }
+    if (tipo !== current) {
+      throw new Error('Todos los items deben tener el mismo tipo.');
+    }
+  });
+  return tipo === null ? 1 : tipo;
+}
+
+function getCreditoFlag(items, payload) {
+  let credito = payload.credito !== undefined ? Number(payload.credito) : null;
+  if (credito === null && items.length) {
+    credito = items[0].credito !== undefined ? Number(items[0].credito) : 0;
+  }
+  credito = Number(credito) === 1 ? 1 : 0;
+  items.forEach((item) => {
+    if (item.credito === undefined) return;
+    const itemCredito = Number(item.credito) === 1 ? 1 : 0;
+    if (itemCredito !== credito) {
+      throw new Error('Todos los items deben tener el mismo crédito.');
+    }
+  });
+  return credito;
+}
+
+function getTransaccionesSheet() {
+  const sheet = getOrCreateSheet(TRANSACCIONES_SHEET_NAME, TRANSACCIONES_HEADERS);
+  ensureTransaccionesHeaders(sheet, TRANSACCIONES_HEADERS);
+  return sheet;
+}
+
+function ensureTransaccionesHeaders(sheet, headers) {
+  if (!sheet) return;
+  const lastCol = Math.max(sheet.getLastColumn(), headers.length);
+  const row = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const normalized = row.map(h => String(h).toLowerCase());
+  let changed = false;
+  headers.forEach((header) => {
+    if (!normalized.includes(header)) {
+      row.push(header);
+      normalized.push(header);
+      changed = true;
+    }
+  });
+  if (changed) {
+    sheet.getRange(1, 1, 1, row.length).setValues([row]);
+  }
+}
+
+function createTransaccionRecord(data) {
+  const sheet = getTransaccionesSheet();
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(15000);
+  try {
+    const lastRow = sheet.getLastRow();
+    let nextId = 1;
+    if (lastRow >= 2) {
+      const lastValue = sheet.getRange(lastRow, 1).getValue();
+      nextId = (typeof lastValue === 'number' && !isNaN(lastValue)) ? lastValue + 1 : lastRow;
+    }
+    const row = new Array(sheet.getLastColumn()).fill('');
+    row[0] = nextId;
+    row[1] = data.tipo;
+    row[2] = data.fecha || new Date();
+    row[3] = 0;
+    row[4] = 'pendiente';
+    row[5] = data.usuario || '';
+    row[6] = new Date();
+    row[7] = data.referencia_externa || '';
+    row[8] = data.nota || '';
+    sheet.appendRow(row);
+    return { id: nextId, rowIndex: sheet.getLastRow() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getTransaccionMetaById(transaccionId) {
+  const sheet = getTransaccionesSheet();
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return null;
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxId = headers.indexOf('id');
+  const idxTipo = headers.indexOf('tipo');
+  const idxFecha = headers.indexOf('fecha');
+  const idxTotal = headers.indexOf('total');
+  const idxEstado = headers.indexOf('estado');
+  const idxUsuario = headers.indexOf('usuario');
+  const idxTimestamp = headers.indexOf('timestamp');
+  const idxReferencia = headers.indexOf('referencia_externa');
+  const idxNota = headers.indexOf('nota');
+  if (idxId < 0) return null;
+  for (let i = 1; i < data.length; i += 1) {
+    if (Number(data[i][idxId] || 0) === Number(transaccionId)) {
+      return {
+        rowIndex: i + 1,
+        id: data[i][idxId],
+        tipo: idxTipo >= 0 ? data[i][idxTipo] : '',
+        fecha: idxFecha >= 0 ? data[i][idxFecha] : '',
+        total: idxTotal >= 0 ? data[i][idxTotal] : 0,
+        estado: idxEstado >= 0 ? data[i][idxEstado] : '',
+        usuario: idxUsuario >= 0 ? data[i][idxUsuario] : '',
+        timestamp: idxTimestamp >= 0 ? data[i][idxTimestamp] : '',
+        referencia_externa: idxReferencia >= 0 ? data[i][idxReferencia] : '',
+        nota: idxNota >= 0 ? data[i][idxNota] : '',
+      };
+    }
+  }
+  return null;
+}
+
+function updateTransaccionTotal(transaccionId, total) {
+  const sheet = getTransaccionesSheet();
+  const meta = getTransaccionMetaById(transaccionId);
+  if (!meta) return;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxTotal = headers.indexOf('total');
+  const idxTimestamp = headers.indexOf('timestamp');
+  if (idxTotal >= 0) sheet.getRange(meta.rowIndex, idxTotal + 1).setValue(total);
+  if (idxTimestamp >= 0) sheet.getRange(meta.rowIndex, idxTimestamp + 1).setValue(new Date());
+}
+
+function updateTransaccionEstado(transaccionId, estado) {
+  const sheet = getTransaccionesSheet();
+  const meta = getTransaccionMetaById(transaccionId);
+  if (!meta) return;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxEstado = headers.indexOf('estado');
+  const idxTimestamp = headers.indexOf('timestamp');
+  if (idxEstado >= 0) sheet.getRange(meta.rowIndex, idxEstado + 1).setValue(estado);
+  if (idxTimestamp >= 0) sheet.getRange(meta.rowIndex, idxTimestamp + 1).setValue(new Date());
+}
+
+function deleteTransaccionRecord(transaccionId) {
+  const sheet = getTransaccionesSheet();
+  const meta = getTransaccionMetaById(transaccionId);
+  if (!meta) return;
+  sheet.deleteRow(meta.rowIndex);
+}
+
+function getTransaccionSummary(transaccionId) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) {
+    return { total: 0, count: 0, hasConfirmado: false, allConfirmados: false, credito: 0, tipo: 0, fecha: null };
+  }
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  const idxTotal = headers.indexOf('costo_total');
+  const idxConfirmado = headers.indexOf('confirmado');
+  const idxCredito = headers.indexOf('credito');
+  const idxTipo = headers.indexOf('tipo');
+  const idxFecha = headers.indexOf('fecha');
+  if (idxTransaccionId < 0) return null;
+  let total = 0;
+  let count = 0;
+  let hasConfirmado = false;
+  let credito = 0;
+  let tipo = 0;
+  let fecha = null;
+  let allConfirmados = true;
+  for (let i = 1; i < data.length; i += 1) {
+    if (Number(data[i][idxTransaccionId] || 0) !== Number(transaccionId)) continue;
+    count += 1;
+    total += Number(data[i][idxTotal] || 0);
+    if (Number(data[i][idxConfirmado] || 0) === 1) {
+      hasConfirmado = true;
+    } else {
+      allConfirmados = false;
+    }
+    if (Number(data[i][idxCredito] || 0) === 1) credito = 1;
+    if (!tipo) tipo = Number(data[i][idxTipo] || 0);
+    if (!fecha) fecha = data[i][idxFecha];
+  }
+  if (!count) allConfirmados = false;
+  return {
+    total: total,
+    count: count,
+    hasConfirmado: hasConfirmado,
+    allConfirmados: allConfirmados,
+    credito: credito,
+    tipo: tipo,
+    fecha: fecha,
+  };
+}
+
+function confirmTransaccionesFromMovimientos(numeros) {
+  if (!numeros.length) return;
+  const movimientosSheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
+  if (!movimientosSheet) return;
+  const data = movimientosSheet.getDataRange().getValues();
+  if (data.length < 2) return;
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxNumero = headers.indexOf('numero');
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  if (idxNumero < 0 || idxTransaccionId < 0) return;
+  const numeroSet = {};
+  numeros.forEach(val => { if (val !== '' && val !== null) numeroSet[String(val)] = true; });
+  const transaccionIds = {};
+  for (let i = 1; i < data.length; i += 1) {
+    const numero = String(data[i][idxNumero] || '');
+    if (!numeroSet[numero]) continue;
+    const transaccionId = Number(data[i][idxTransaccionId] || 0);
+    if (transaccionId) transaccionIds[transaccionId] = true;
+  }
+  Object.keys(transaccionIds).forEach((id) => {
+    const transaccionId = Number(id);
+    const summary = getTransaccionSummary(transaccionId);
+    if (!summary || !summary.count) return;
+    const meta = getTransaccionMetaById(transaccionId);
+    if (meta && String(meta.estado || '').toLowerCase() === 'anulada') return;
+    if (!summary.allConfirmados) {
+      return;
+    }
+    updateTransaccionEstado(transaccionId, 'confirmada');
+  });
+}
+
+function syncTransaccionAndCaja(transaccionId) {
+  const summary = getTransaccionSummary(transaccionId);
+  if (!summary) return;
+  if (!summary.count) {
+    deleteTransaccionRecord(transaccionId);
+    deleteCajaByTransaccionId(transaccionId);
+    return;
+  }
+  updateTransaccionTotal(transaccionId, summary.total);
+  if (summary.credito === 1) {
+    deleteCajaByTransaccionId(transaccionId);
+    return;
+  }
+  const meta = getTransaccionMetaById(transaccionId);
+  const tipoTexto = normalizeTransaccionTipo(meta && meta.tipo ? meta.tipo : summary.tipo);
+  if (!tipoTexto) return;
+  const fecha = (meta && meta.fecha) ? meta.fecha : (summary.fecha || new Date());
+  const conceptoBase = tipoTexto === 'compra' ? 'Compra' : 'Venta';
+  upsertCajaByTransaccionId({
+    transaccionId: transaccionId,
+    tipoTexto: tipoTexto,
+    fecha: fecha,
+    monto: summary.total,
+    concepto: `${conceptoBase} #${transaccionId}`,
+  });
+}
+
+function upsertCajaByTransaccionId(data) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
-  if (!sheet || !rows.length) return;
-  const headers = ensureHeader(sheet, 'timestamp');
-  // row: [numero, fecha, codigo, tipo, cantidad, valorUnitario, descuento, costo_total, ...]
-  const lastRow = sheet.getLastRow();
-  const nextId = Math.max(1, lastRow);
+  if (!sheet) return;
+  let headers = ensureHeader(sheet, 'referencia');
+  headers = ensureHeader(sheet, 'tipo_descripcion');
+  headers = ensureHeader(sheet, 'timestamp');
+  const idxId = headers.indexOf('id');
+  const idxFecha = headers.indexOf('fecha');
+  const idxTipo = headers.indexOf('tipo');
   let idxMonto = headers.indexOf('monto');
   if (idxMonto < 0 && headers.length >= 4) idxMonto = 3;
   let idxConcepto = headers.indexOf('concepto');
@@ -265,40 +606,59 @@ function insertCaja(payload, rows) {
   if (idxReferencia < 0 && headers.length >= 6) idxReferencia = 5;
   let idxTipoDescripcion = headers.indexOf('tipo_descripcion');
   const idxTimestamp = headers.indexOf('timestamp');
-  const timestamp = new Date();
-  const cajaRows = rows.map((row, idx) => {
-    const numero = row[0];
-    const fecha = row[1];
-    const codigo = row[2] || '';
-    const tipo = Number(row[3] || 1);
-    const cantidad = Number(row[4]) || 0;
-    const valor = Number(row[5]) || 0;
-    const descuento = Number(row[6]) || 0;
-    const monto = (Math.abs(cantidad) * valor) - descuento;
-    const producto = row[8] || payload.concepto || 'Producto';
-    const isCredito = Number(payload.credito || 0) === 1;
-    if (tipo === 2 && isCredito) return null;
-    const concepto = tipo === 2
-      ? `Por compra de ${Math.abs(cantidad)} * ${producto} (${codigo})`
-      : `Por venta de ${Math.abs(cantidad)} * ${producto} (${codigo})`;
-    const id = nextId + idx;
-    const rowData = [];
-    rowData[0] = id;
-    rowData[1] = fecha;
-    rowData[2] = tipo;
-    if (idxMonto >= 0) rowData[idxMonto] = monto;
-    if (idxConcepto >= 0) rowData[idxConcepto] = concepto;
-    if (idxReferencia >= 0) rowData[idxReferencia] = numero;
-    if (idxTipoDescripcion >= 0) rowData[idxTipoDescripcion] = tipo === 2 ? 'compra' : 'venta';
-    if (idxTimestamp >= 0) rowData[idxTimestamp] = timestamp;
-    return rowData;
-  }).filter(row => row);
-  if (!cajaRows.length) return;
-  sheet.getRange(lastRow + 1, 1, cajaRows.length, sheet.getLastColumn()).setValues(cajaRows.map(row => {
-    const filled = new Array(sheet.getLastColumn()).fill('');
-    row.forEach((val, index) => { filled[index] = val; });
-    return filled;
-  }));
+  const requiredIdx = [idxId, idxFecha, idxTipo, idxMonto, idxConcepto, idxReferencia, idxTipoDescripcion];
+  if (requiredIdx.some(idx => idx < 0)) return;
+  const dataRange = sheet.getDataRange().getValues();
+  let rowIndex = -1;
+  for (let i = 1; i < dataRange.length; i += 1) {
+    if (String(dataRange[i][idxReferencia] || '') === String(data.transaccionId)) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+  const tipoNum = data.tipoTexto === 'compra' ? 2 : 1;
+  if (rowIndex < 0) {
+    const lastRow = sheet.getLastRow();
+    let nextId = 1;
+    if (lastRow >= 2) {
+      const lastValue = sheet.getRange(lastRow, 1).getValue();
+      nextId = (typeof lastValue === 'number' && !isNaN(lastValue)) ? lastValue + 1 : lastRow;
+    }
+    const row = new Array(sheet.getLastColumn()).fill('');
+    row[idxId] = nextId;
+    row[idxFecha] = data.fecha;
+    row[idxTipo] = tipoNum;
+    row[idxMonto] = data.monto;
+    row[idxConcepto] = data.concepto;
+    row[idxReferencia] = data.transaccionId;
+    row[idxTipoDescripcion] = data.tipoTexto;
+    if (idxTimestamp >= 0) row[idxTimestamp] = new Date();
+    sheet.getRange(lastRow + 1, 1, 1, row.length).setValues([row]);
+    return;
+  }
+  sheet.getRange(rowIndex, idxFecha + 1).setValue(data.fecha);
+  sheet.getRange(rowIndex, idxTipo + 1).setValue(tipoNum);
+  sheet.getRange(rowIndex, idxMonto + 1).setValue(data.monto);
+  sheet.getRange(rowIndex, idxConcepto + 1).setValue(data.concepto);
+  sheet.getRange(rowIndex, idxReferencia + 1).setValue(data.transaccionId);
+  sheet.getRange(rowIndex, idxTipoDescripcion + 1).setValue(data.tipoTexto);
+  if (idxTimestamp >= 0) sheet.getRange(rowIndex, idxTimestamp + 1).setValue(new Date());
+}
+
+function deleteCajaByTransaccionId(transaccionId) {
+  const cajaSheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!cajaSheet) return;
+  const data = cajaSheet.getDataRange().getValues();
+  if (data.length < 2) return;
+  const headers = data[0].map(h => String(h).toLowerCase());
+  let idxReferencia = headers.indexOf('referencia');
+  if (idxReferencia < 0 && data[0].length >= 6) idxReferencia = 5;
+  if (idxReferencia < 0) return;
+  for (let i = data.length - 1; i >= 1; i -= 1) {
+    if (String(data[i][idxReferencia] || '') === String(transaccionId)) {
+      cajaSheet.deleteRow(i + 1);
+    }
+  }
 }
 
 function generateFacturacion(payload) {
@@ -323,9 +683,9 @@ function generateFacturacion(payload) {
   const idxValor = headers.indexOf('valor_unitario');
   const idxDescuento = headers.indexOf('descuento');
   const idxTotal = headers.indexOf('costo_total');
-  const idxFacturado = headers.indexOf('facturado');
+  const idxConfirmado = headers.indexOf('confirmado');
 
-  const requiredIdx = [idxNumero, idxFecha, idxCodigo, idxTipo, idxCantidad, idxValor, idxDescuento, idxTotal, idxFacturado];
+  const requiredIdx = [idxNumero, idxFecha, idxCodigo, idxTipo, idxCantidad, idxValor, idxDescuento, idxTotal, idxConfirmado];
   if (requiredIdx.some(idx => idx < 0)) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
   }
@@ -337,10 +697,10 @@ function generateFacturacion(payload) {
 
   data.slice(1).forEach(row => {
     const tipo = Number(row[idxTipo] || 0);
-    const facturado = Number(row[idxFacturado] || 0);
+    const confirmado = Number(row[idxConfirmado] || 0);
     const codigo = String(row[idxCodigo] || '').trim();
     const numero = row[idxNumero];
-    if (!codigo || tipo !== 1 || facturado !== 0) return;
+    if (!codigo || tipo !== 1 || confirmado !== 0) return;
     const rowDate = parseDateValue(row[idxFecha]);
     if (!rowDate) return;
     const rowKey = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
@@ -413,13 +773,14 @@ function confirmFacturacion(payload) {
   if (!rows.length) throw new Error('No se encontraron items para el lote.');
 
   const numeros = rows.map(row => row[1]).filter(val => val !== '' && val !== null);
-  const alreadyFacturados = findMovimientosFacturados(numeros);
-  if (alreadyFacturados.length) {
-    const note = `Rechazado: movimientos ya facturados (${alreadyFacturados.join(', ')}).`;
+  const alreadyConfirmados = findMovimientosConfirmados(numeros);
+  if (alreadyConfirmados.length) {
+    const note = `Rechazado: movimientos ya confirmados (${alreadyConfirmados.join(', ')}).`;
     updateLoteRechazado(loteId, note);
-    return { ok: true, lote_id: loteId, estado: 'rechazado', already_facturados: alreadyFacturados };
+    return { ok: true, lote_id: loteId, estado: 'rechazado', already_confirmados: alreadyConfirmados };
   }
-  markMovimientosFacturados(numeros);
+  markMovimientosConfirmados(numeros);
+  confirmTransaccionesFromMovimientos(numeros);
   updateLoteConfirmado(loteId);
   return { ok: true, lote_id: loteId, items: rows.length };
 }
@@ -447,30 +808,43 @@ function deleteMovimiento(payload) {
   const headers = data[0].map(h => String(h).toLowerCase());
   const idxNumero = headers.indexOf('numero');
   const idxFecha = headers.indexOf('fecha');
-  const idxFacturado = headers.indexOf('facturado');
+  const idxConfirmado = headers.indexOf('confirmado');
   const idxCredito = headers.indexOf('credito');
-  if (idxNumero < 0 || idxFecha < 0 || idxFacturado < 0 || idxCredito < 0) {
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  if (idxNumero < 0 || idxFecha < 0 || idxConfirmado < 0 || idxCredito < 0) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
   }
   let rowIndex = -1;
-  let facturado = 0;
+  let confirmado = 0;
   let credito = 0;
   let rowDate = null;
+  let transaccionId = 0;
   for (let i = 1; i < data.length; i += 1) {
     if (String(data[i][idxNumero] || '') === numero) {
       rowIndex = i + 1;
-      facturado = Number(data[i][idxFacturado] || 0);
+      confirmado = Number(data[i][idxConfirmado] || 0);
       credito = Number(data[i][idxCredito] || 0);
       rowDate = data[i][idxFecha];
+      if (idxTransaccionId >= 0) transaccionId = Number(data[i][idxTransaccionId] || 0);
       break;
     }
   }
   if (rowIndex < 0) throw new Error('Movimiento no encontrado.');
   if (isDateClosed(rowDate)) throw new Error('Día ya conciliado y cuadrado.');
-  if (facturado === 1) throw new Error('No se puede eliminar un movimiento facturado.');
+  if (transaccionId) {
+    const summary = getTransaccionSummary(transaccionId);
+    if (summary && summary.hasConfirmado) {
+      throw new Error('No se puede eliminar una transacción con movimientos confirmados.');
+    }
+  }
+  if (confirmado === 1) throw new Error('No se puede eliminar un movimiento confirmado.');
   movimientosSheet.deleteRow(rowIndex);
-  if (credito !== 1) deleteCajaByNumero(numero);
-  return { ok: true, numero: numero };
+  if (transaccionId) {
+    syncTransaccionAndCaja(transaccionId);
+  } else if (credito !== 1) {
+    deleteCajaByNumero(numero);
+  }
+  return { ok: true, numero: numero, transaccion_id: transaccionId || '' };
 }
 
 function updateMovimiento(payload) {
@@ -479,7 +853,9 @@ function updateMovimiento(payload) {
   if (!numero) throw new Error('Numero requerido.');
   const cantidadRaw = payload && payload.cantidad !== undefined ? payload.cantidad : null;
   const descuentoRaw = payload && payload.descuento !== undefined ? payload.descuento : null;
-  const facturadoRaw = payload && payload.facturado !== undefined ? payload.facturado : undefined;
+  const confirmadoRaw = payload && payload.confirmado !== undefined
+    ? payload.confirmado
+    : (payload && payload.facturado !== undefined ? payload.facturado : undefined);
   const valorUnitarioRaw = payload && payload.valor_unitario !== undefined ? payload.valor_unitario : undefined;
   const cantidadInput = Number(cantidadRaw);
   const descuentoInput = Number(descuentoRaw);
@@ -497,36 +873,45 @@ function updateMovimiento(payload) {
   const idxValor = headers.indexOf('valor_unitario');
   const idxDescuento = headers.indexOf('descuento');
   const idxTotal = headers.indexOf('costo_total');
-  const idxFacturado = headers.indexOf('facturado');
+  const idxConfirmado = headers.indexOf('confirmado');
   const idxTipo = headers.indexOf('tipo');
   const idxCredito = headers.indexOf('credito');
-  if (idxNumero < 0 || idxFecha < 0 || idxCantidad < 0 || idxValor < 0 || idxDescuento < 0 || idxTotal < 0 || idxFacturado < 0 || idxTipo < 0 || idxCredito < 0) {
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  if (idxNumero < 0 || idxFecha < 0 || idxCantidad < 0 || idxValor < 0 || idxDescuento < 0 || idxTotal < 0 || idxConfirmado < 0 || idxTipo < 0 || idxCredito < 0) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
   }
   let rowIndex = -1;
-  let facturado = 0;
+  let confirmado = 0;
   let valorUnitario = 0;
   let tipo = 0;
   let credito = 0;
   let rowDate = null;
+  let transaccionId = 0;
   for (let i = 1; i < data.length; i += 1) {
     if (String(data[i][idxNumero] || '') === numero) {
       rowIndex = i + 1;
-      facturado = Number(data[i][idxFacturado] || 0);
+      confirmado = Number(data[i][idxConfirmado] || 0);
       valorUnitario = Number(data[i][idxValor] || 0);
       tipo = Number(data[i][idxTipo] || 0);
       credito = Number(data[i][idxCredito] || 0);
       rowDate = data[i][idxFecha];
+      if (idxTransaccionId >= 0) transaccionId = Number(data[i][idxTransaccionId] || 0);
       break;
     }
   }
   if (rowIndex < 0) throw new Error('Movimiento no encontrado.');
   if (isDateClosed(rowDate)) throw new Error('Día ya conciliado y cuadrado.');
-  if (facturado === 1) throw new Error('No se puede editar un movimiento facturado.');
-  let nextFacturado = facturado;
-  if (facturadoRaw !== undefined) {
-    nextFacturado = Number(facturadoRaw) === 1 ? 1 : 0;
-    if (nextFacturado === 1 && isNumeroInLoteConfirmado(numero)) {
+  if (transaccionId) {
+    const summary = getTransaccionSummary(transaccionId);
+    if (summary && summary.hasConfirmado) {
+      throw new Error('No se puede editar una transacción con movimientos confirmados.');
+    }
+  }
+  if (confirmado === 1) throw new Error('No se puede editar un movimiento confirmado.');
+  let nextConfirmado = confirmado;
+  if (confirmadoRaw !== undefined) {
+    nextConfirmado = Number(confirmadoRaw) === 1 ? 1 : 0;
+    if (nextConfirmado === 1 && isNumeroInLoteConfirmado(numero)) {
       throw new Error('Movimiento pertenece a lote confirmado.');
     }
   }
@@ -541,11 +926,15 @@ function updateMovimiento(payload) {
   const costoTotal = (Math.abs(cantidad) * nextValorUnitario) - descuento;
   movimientosSheet.getRange(rowIndex, idxCantidad + 1, 1, 3).setValues([[cantidad, nextValorUnitario, descuento]]);
   movimientosSheet.getRange(rowIndex, idxTotal + 1).setValue(costoTotal);
-  if (facturadoRaw !== undefined) {
-    movimientosSheet.getRange(rowIndex, idxFacturado + 1).setValue(nextFacturado);
+  if (confirmadoRaw !== undefined) {
+    movimientosSheet.getRange(rowIndex, idxConfirmado + 1).setValue(nextConfirmado);
   }
-  if (credito !== 1) updateCajaMontoByNumero(numero, costoTotal);
-  return { ok: true, numero: numero, total: costoTotal, facturado: nextFacturado };
+  if (transaccionId) {
+    syncTransaccionAndCaja(transaccionId);
+  } else if (credito !== 1) {
+    updateCajaMontoByNumero(numero, costoTotal);
+  }
+  return { ok: true, numero: numero, total: costoTotal, confirmado: nextConfirmado, transaccion_id: transaccionId || '' };
 }
 
 function assertDateNotClosed(dateValue) {
@@ -625,6 +1014,48 @@ function getLastCierreBefore(dateValue) {
   return latest;
 }
 
+function confirmComprasForDate(dateTarget) {
+  const movimientosSheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
+  if (!movimientosSheet) throw new Error(`No se encontró la hoja "${SHEET_NAME}".`);
+  const data = movimientosSheet.getDataRange().getValues();
+  if (data.length < 2) return { numerosConfirmados: [], pendientes: false };
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxNumero = headers.indexOf('numero');
+  const idxFecha = headers.indexOf('fecha');
+  const idxTipo = headers.indexOf('tipo');
+  const idxConfirmado = headers.indexOf('confirmado');
+  if (idxNumero < 0 || idxFecha < 0 || idxTipo < 0 || idxConfirmado < 0) {
+    throw new Error('Columnas requeridas faltantes en movimientos.');
+  }
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  const targetKey = Utilities.formatDate(dateTarget, tz, 'yyyy-MM-dd');
+  const confirmadoRange = movimientosSheet.getRange(2, idxConfirmado + 1, data.length - 1, 1).getValues();
+  let updated = false;
+  let pendientes = false;
+  const numerosConfirmados = [];
+  for (let i = 1; i < data.length; i += 1) {
+    const rowDate = parseDateValue(data[i][idxFecha]);
+    if (!rowDate) continue;
+    const rowKey = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+    if (rowKey !== targetKey) continue;
+    const tipo = Number(data[i][idxTipo] || 0);
+    let confirmado = Number(data[i][idxConfirmado] || 0);
+    if (tipo === 2 && confirmado !== 1) {
+      confirmado = 1;
+      data[i][idxConfirmado] = 1;
+      confirmadoRange[i - 1][0] = 1;
+      updated = true;
+      const numero = data[i][idxNumero];
+      if (numero !== '' && numero !== null) numerosConfirmados.push(numero);
+    }
+    if (confirmado !== 1) pendientes = true;
+  }
+  if (updated) {
+    movimientosSheet.getRange(2, idxConfirmado + 1, confirmadoRange.length, 1).setValues(confirmadoRange);
+  }
+  return { numerosConfirmados: numerosConfirmados, pendientes: pendientes };
+}
+
 function closeCaja(payload) {
   const dateRaw = payload && payload.fecha ? payload.fecha : null;
   if (!dateRaw) throw new Error('Fecha requerida.');
@@ -635,6 +1066,14 @@ function closeCaja(payload) {
   previousDate.setDate(previousDate.getDate() - 1);
   if (!getCierreByDate(previousDate)) {
     throw new Error('Debe cerrar el día anterior antes de cerrar este día.');
+  }
+
+  const cierreConfirm = confirmComprasForDate(dateTarget);
+  if (cierreConfirm.numerosConfirmados.length) {
+    confirmTransaccionesFromMovimientos(cierreConfirm.numerosConfirmados);
+  }
+  if (cierreConfirm.pendientes) {
+    throw new Error('No se puede cerrar el día: hay movimientos sin confirmar.');
   }
 
   const cajaSheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
@@ -781,6 +1220,67 @@ function listCierres(payload) {
     const dateA = parseDateValue(a.fecha) || new Date(0);
     const dateB = parseDateValue(b.fecha) || new Date(0);
     return dateB.getTime() - dateA.getTime();
+  });
+  return { ok: true, items: items };
+}
+
+function listTransacciones(payload) {
+  const sheet = getTransaccionesSheet();
+  if (!sheet) return { ok: true, items: [] };
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, items: [] };
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxId = headers.indexOf('id');
+  const idxTipo = headers.indexOf('tipo');
+  const idxFecha = headers.indexOf('fecha');
+  const idxTotal = headers.indexOf('total');
+  const idxEstado = headers.indexOf('estado');
+  const idxUsuario = headers.indexOf('usuario');
+  const idxReferencia = headers.indexOf('referencia_externa');
+  const idxNota = headers.indexOf('nota');
+  const requiredIdx = [idxId, idxTipo, idxFecha, idxTotal, idxEstado, idxUsuario];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en transacciones.');
+  }
+  const rawTipo = payload && payload.tipo !== undefined ? payload.tipo : '';
+  const tipoFilter = rawTipo ? normalizeTransaccionTipo(rawTipo) : '';
+  if (rawTipo && !tipoFilter) throw new Error('Tipo de transacción inválido.');
+  let fromRaw = payload && (payload.fecha_desde || payload.desde);
+  let toRaw = payload && (payload.fecha_hasta || payload.hasta);
+  if (payload && payload.fecha) {
+    fromRaw = payload.fecha;
+    toRaw = payload.fecha;
+  }
+  const fromDate = parseDateValue(fromRaw);
+  const toDate = parseDateValue(toRaw);
+  const fromTime = fromDate ? new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate()).getTime() : null;
+  const toTime = toDate ? new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate()).getTime() : null;
+  const items = data.slice(1).map(row => ({
+    id: row[idxId],
+    tipo: row[idxTipo],
+    fecha: row[idxFecha],
+    total: row[idxTotal],
+    estado: row[idxEstado],
+    usuario: row[idxUsuario],
+    referencia_externa: idxReferencia >= 0 ? row[idxReferencia] : '',
+    nota: idxNota >= 0 ? row[idxNota] : '',
+  })).filter(item => {
+    if (tipoFilter && normalizeTransaccionTipo(item.tipo) !== tipoFilter) return false;
+    if (!fromTime && !toTime) return true;
+    const dateValue = parseDateValue(item.fecha);
+    if (!dateValue) return false;
+    const dayTime = new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate()).getTime();
+    if (fromTime && dayTime < fromTime) return false;
+    if (toTime && dayTime > toTime) return false;
+    return true;
+  });
+  items.sort((a, b) => {
+    const dateA = parseDateValue(a.fecha) || new Date(0);
+    const dateB = parseDateValue(b.fecha) || new Date(0);
+    if (dateB.getTime() !== dateA.getTime()) {
+      return dateB.getTime() - dateA.getTime();
+    }
+    return Number(b.id || 0) - Number(a.id || 0);
   });
   return { ok: true, items: items };
 }
@@ -1245,7 +1745,7 @@ function updateLoteRechazado(loteId, nota) {
   }
 }
 
-function findMovimientosFacturados(numeros) {
+function findMovimientosConfirmados(numeros) {
   if (!numeros.length) return [];
   const movimientosSheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
   if (!movimientosSheet) throw new Error(`No se encontró la hoja "${SHEET_NAME}".`);
@@ -1253,8 +1753,8 @@ function findMovimientosFacturados(numeros) {
   if (data.length < 2) return [];
   const headers = data[0].map(h => String(h).toLowerCase());
   const idxNumero = headers.indexOf('numero');
-  const idxFacturado = headers.indexOf('facturado');
-  if (idxNumero < 0 || idxFacturado < 0) {
+  const idxConfirmado = headers.indexOf('confirmado');
+  if (idxNumero < 0 || idxConfirmado < 0) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
   }
   const numeroSet = {};
@@ -1265,8 +1765,8 @@ function findMovimientosFacturados(numeros) {
   for (let i = 1; i < data.length; i += 1) {
     const numero = String(data[i][idxNumero] || '');
     if (!numeroSet[numero]) continue;
-    const facturado = Number(data[i][idxFacturado] || 0);
-    if (facturado === 1) found[numero] = true;
+    const confirmado = Number(data[i][idxConfirmado] || 0);
+    if (confirmado === 1) found[numero] = true;
   }
   return Object.keys(found);
 }
@@ -1392,26 +1892,32 @@ function ensureHeader(sheet, headerName) {
   return normalized;
 }
 
-function markMovimientosFacturados(numeros) {
+function markMovimientosConfirmados(numeros) {
   if (!numeros.length) return;
   const movimientosSheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
   if (!movimientosSheet) throw new Error(`No se encontró la hoja "${SHEET_NAME}".`);
   const lastRow = movimientosSheet.getLastRow();
   if (lastRow < 2) return;
-  const numerosRange = movimientosSheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  const facturadoRange = movimientosSheet.getRange(2, 10, lastRow - 1, 1).getValues();
+  const headers = movimientosSheet.getRange(1, 1, 1, movimientosSheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxNumero = headers.indexOf('numero');
+  const idxConfirmado = headers.indexOf('confirmado');
+  if (idxNumero < 0 || idxConfirmado < 0) {
+    throw new Error('Columnas requeridas faltantes en movimientos.');
+  }
+  const numerosRange = movimientosSheet.getRange(2, idxNumero + 1, lastRow - 1, 1).getValues();
+  const confirmadoRange = movimientosSheet.getRange(2, idxConfirmado + 1, lastRow - 1, 1).getValues();
   const numeroSet = {};
   numeros.forEach(val => { numeroSet[String(val)] = true; });
   let updated = false;
   for (let i = 0; i < numerosRange.length; i += 1) {
     const numero = String(numerosRange[i][0] || '');
     if (numeroSet[numero]) {
-      facturadoRange[i][0] = 1;
+      confirmadoRange[i][0] = 1;
       updated = true;
     }
   }
   if (updated) {
-    movimientosSheet.getRange(2, 10, facturadoRange.length, 1).setValues(facturadoRange);
+    movimientosSheet.getRange(2, idxConfirmado + 1, confirmadoRange.length, 1).setValues(confirmadoRange);
   }
 }
 
@@ -1557,19 +2063,26 @@ function parsePayload(e) {
   }
   // Fallback a formulario simple (mantiene compat).
   const data = e.parameter || {};
+  const confirmadoInput = data.confirmado !== undefined ? data.confirmado : data.facturado;
   const item = {
     codigo: data.codigo || '',
     tipo: data.tipo === undefined ? 1 : (Number(data.tipo) || 1),
     cantidad: Number(data.cantidad || 0),
     valor_unitario: Number(data.valor_unitario || 0),
     comentario: data.comentario,
-    facturado: data.facturado === 'on' || data.facturado === 'true' ? 1 : data.facturado || 0,
+    confirmado: confirmadoInput === 'on' || confirmadoInput === 'true' ? 1 : (confirmadoInput || 0),
     credito: data.credito === 'on' || data.credito === 'true' ? 1 : data.credito || 0,
+    transaccion_id: data.transaccion_id || '',
   };
   return {
     fecha: data.fecha,
-    facturado: item.facturado,
+    tipo: data.tipo,
+    confirmado: item.confirmado,
     credito: item.credito,
+    transaccion_id: data.transaccion_id || '',
+    referencia_externa: data.referencia_externa || '',
+    nota: data.nota || '',
+    usuario: data.usuario || '',
     items: [item],
   };
 }

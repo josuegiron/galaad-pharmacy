@@ -629,6 +629,13 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <button type="button" class="module-item" data-view="ventas-transacciones">
+          <div>
+            Transacciones de ventas
+            <span>Listado de transacciones tipo venta.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
       </div>
     </section>
 
@@ -747,6 +754,66 @@
       </div>
     </section>
 
+    <section id="ventas-transacciones" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Transacciones de ventas</h2>
+      <div class="card">
+        <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+          <label>
+            Desde
+            <input type="date" id="ventasTransDesde">
+          </label>
+          <label>
+            Hasta
+            <input type="date" id="ventasTransHasta">
+          </label>
+        </div>
+        <p class="hint" style="margin-top:8px;">Filtra transacciones de venta por rango de fechas.</p>
+      </div>
+      <div class="table-meta">
+        <div id="ventasTransStatus" class="status-pill">Esperando rango...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="ventasTransReload">Recargar</button>
+          <div id="ventasTransCount">0 transacciones</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="ventasTransBody"></tbody>
+        </table>
+      </div>
+      <div class="card" id="ventasTransDetail" style="margin-top:12px;" hidden>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <h3 id="ventasTransDetailTitle" style="margin:0; font-size:16px;">Detalle de transacción</h3>
+          <button type="button" class="btn compact" id="ventasTransDetailClose">Cerrar</button>
+        </div>
+        <div class="table-wrap" style="margin-top:10px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Valor</th>
+                <th>Descuento</th>
+                <th>Total</th>
+                <th>Descripción</th>
+                <th>Confirmado</th>
+              </tr>
+            </thead>
+            <tbody id="ventasTransDetailBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section id="mas-menu" class="form-wrap view">
       <h2 class="section-title" style="margin-bottom:10px;">Más</h2>
       <div class="module-list">
@@ -774,6 +841,66 @@
       </div>
     </section>
 
+    <section id="caja-transacciones" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Transacciones de compra</h2>
+      <div class="card">
+        <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+          <label>
+            Desde
+            <input type="date" id="cajaTransDesde">
+          </label>
+          <label>
+            Hasta
+            <input type="date" id="cajaTransHasta">
+          </label>
+        </div>
+        <p class="hint" style="margin-top:8px;">Filtra transacciones de compra por rango de fechas.</p>
+      </div>
+      <div class="table-meta">
+        <div id="cajaTransStatus" class="status-pill">Esperando rango...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="cajaTransReload">Recargar</button>
+          <div id="cajaTransCount">0 transacciones</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="cajaTransBody"></tbody>
+        </table>
+      </div>
+      <div class="card" id="cajaTransDetail" style="margin-top:12px;" hidden>
+        <div class="card-head">
+          <h3 id="cajaTransDetailTitle" style="margin:0; font-size:16px;">Detalle de compra</h3>
+          <button type="button" class="btn compact" id="cajaTransDetailClose">Cerrar</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Cantidad</th>
+                <th>Valor</th>
+                <th>Descuento</th>
+                <th>Total</th>
+                <th>Descripción</th>
+                <th>Confirmado</th>
+              </tr>
+            </thead>
+            <tbody id="cajaTransDetailBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section id="inventario-menu" class="form-wrap view">
       <h2 class="section-title" style="margin-bottom:10px;">Inventario</h2>
       <div class="module-list">
@@ -795,6 +922,13 @@
           <div>
             Compras registradas
             <span>Listado y gestión de compras.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+        <button type="button" class="module-item" data-view="caja-transacciones">
+          <div>
+            Transacciones de compra
+            <span>Listado de transacciones tipo compra.</span>
           </div>
           <span class="arrow">›</span>
         </button>
@@ -1279,6 +1413,8 @@
     let movimientos = [];
     let movimientosLoaded = false;
     let movimientosLoading = false;
+    let pendingTransaccionDetalle = null;
+    let pendingCompraDetalle = null;
     const gvizHandlers = [];
 
     const ventasFecha = document.getElementById('ventasFecha');
@@ -1292,6 +1428,16 @@
     const ventasResumenBody = document.getElementById('ventasResumenBody');
     const ventasResumenCount = document.getElementById('ventasResumenCount');
     const ventasResumenTotal = document.getElementById('ventasResumenTotal');
+    const ventasTransDesde = document.getElementById('ventasTransDesde');
+    const ventasTransHasta = document.getElementById('ventasTransHasta');
+    const ventasTransStatus = document.getElementById('ventasTransStatus');
+    const ventasTransBody = document.getElementById('ventasTransBody');
+    const ventasTransCount = document.getElementById('ventasTransCount');
+    const ventasTransReload = document.getElementById('ventasTransReload');
+    const ventasTransDetail = document.getElementById('ventasTransDetail');
+    const ventasTransDetailTitle = document.getElementById('ventasTransDetailTitle');
+    const ventasTransDetailBody = document.getElementById('ventasTransDetailBody');
+    const ventasTransDetailClose = document.getElementById('ventasTransDetailClose');
     const facturacionFecha = document.getElementById('facturacionFecha');
     const facturacionGenerar = document.getElementById('facturacionGenerar');
     const facturacionDescargar = document.getElementById('facturacionDescargar');
@@ -1329,6 +1475,16 @@
     const cajaReload = document.getElementById('cajaReload');
     const cajaAdd = document.getElementById('cajaAdd');
     const cajaClose = document.getElementById('cajaClose');
+    const cajaTransDesde = document.getElementById('cajaTransDesde');
+    const cajaTransHasta = document.getElementById('cajaTransHasta');
+    const cajaTransStatus = document.getElementById('cajaTransStatus');
+    const cajaTransBody = document.getElementById('cajaTransBody');
+    const cajaTransCount = document.getElementById('cajaTransCount');
+    const cajaTransReload = document.getElementById('cajaTransReload');
+    const cajaTransDetail = document.getElementById('cajaTransDetail');
+    const cajaTransDetailTitle = document.getElementById('cajaTransDetailTitle');
+    const cajaTransDetailBody = document.getElementById('cajaTransDetailBody');
+    const cajaTransDetailClose = document.getElementById('cajaTransDetailClose');
     const cajaModal = document.getElementById('cajaModal');
     const cajaTipo = document.getElementById('cajaTipo');
     const cajaMonto = document.getElementById('cajaMonto');
@@ -1369,6 +1525,7 @@
       'ventas-form': 'Registro de venta',
       'ventas-historico': 'Ventas registradas',
       'ventas-resumen': 'Resumen del día',
+      'ventas-transacciones': 'Transacciones de ventas',
       'facturacion-menu': 'Facturación',
       'facturacion-generar': 'Generar facturación',
       'facturacion-lotes': 'Lotes generados',
@@ -1379,6 +1536,7 @@
       'caja-menu': 'Caja',
       'caja-view': 'Movimientos de caja',
       'caja-cierres': 'Cierres de caja',
+      'caja-transacciones': 'Transacciones de compra',
       'mas-menu': 'Más',
     };
 
@@ -1406,6 +1564,9 @@
       } else if (viewId === 'ventas-resumen') {
         renderResumen();
       }
+      if (viewId === 'ventas-transacciones') {
+        loadTransacciones('venta');
+      }
       if (viewId === 'facturacion-lotes') {
         loadLotes();
       }
@@ -1414,6 +1575,9 @@
       }
       if (viewId === 'caja-cierres') {
         loadCierres();
+      }
+      if (viewId === 'caja-transacciones') {
+        loadTransacciones('compra');
       }
       if (viewId === 'inventario-productos') {
         loadProductos();
@@ -1451,6 +1615,10 @@
     if (comprasFecha) comprasFecha.value = today;
     if (cierresDesde) cierresDesde.value = monthStart;
     if (cierresHasta) cierresHasta.value = monthEnd;
+    if (ventasTransDesde) ventasTransDesde.value = monthStart;
+    if (ventasTransHasta) ventasTransHasta.value = monthEnd;
+    if (cajaTransDesde) cajaTransDesde.value = monthStart;
+    if (cajaTransHasta) cajaTransHasta.value = monthEnd;
 
     let messageTimer = null;
     const setButtonLoading = (btn, isLoading) => {
@@ -1873,11 +2041,13 @@
         const idxDescuento = cols.findIndex(cell => cell.includes('descuento'));
         const idxTotal = cols.findIndex(cell => cell.includes('costo'));
         const idxComentario = cols.findIndex(cell => cell.includes('comentario'));
-        const idxFacturado = cols.findIndex(cell => cell.includes('facturado'));
+        const idxConfirmado = cols.findIndex(cell => cell.includes('confirmado') || cell.includes('facturado'));
         const idxCredito = cols.findIndex(cell => cell.includes('credito'));
+        const idxTransaccionId = cols.findIndex(cell => cell.includes('transaccion_id'));
 
         movimientos = json.table.rows.map(row => {
           const cell = (index) => row.c[index] ? (row.c[index].v ?? '') : '';
+          const confirmado = normalizeNumber(cell(idxConfirmado));
           return {
             numero: cell(idxNumero),
             fechaRaw: cell(idxFecha),
@@ -1888,8 +2058,10 @@
             descuento: normalizeNumber(cell(idxDescuento)),
             total: normalizeNumber(cell(idxTotal)),
             comentario: cell(idxComentario),
-            facturado: normalizeNumber(cell(idxFacturado)),
+            confirmado: confirmado,
+            facturado: confirmado,
             credito: normalizeNumber(cell(idxCredito)),
+            transaccionId: normalizeNumber(cell(idxTransaccionId)),
           };
         });
         movimientosLoaded = true;
@@ -1901,6 +2073,16 @@
         renderMovimientos();
         renderResumen();
         renderCompras();
+        if (pendingTransaccionDetalle !== null) {
+          const targetId = pendingTransaccionDetalle;
+          pendingTransaccionDetalle = null;
+          showTransaccionDetalle(targetId);
+        }
+        if (pendingCompraDetalle !== null) {
+          const targetId = pendingCompraDetalle;
+          pendingCompraDetalle = null;
+          showCompraDetalle(targetId);
+        }
       } catch (err) {
         movimientosLoading = false;
         if (ventasStatus) ventasStatus.textContent = 'No se pudo leer la hoja.';
@@ -1931,6 +2113,74 @@
       document.body.appendChild(script);
     }
 
+    function showTransaccionDetalle(transaccionId) {
+      if (!ventasTransDetail || !ventasTransDetailBody || !ventasTransDetailTitle) return;
+      if (!movimientosLoaded) {
+        pendingTransaccionDetalle = transaccionId;
+        loadMovimientos(true);
+        return;
+      }
+      const rows = movimientos.filter(item => Number(item.transaccionId) === Number(transaccionId) && Number(item.tipo) === 1);
+      ventasTransDetailTitle.textContent = `Detalle de transaccion #${transaccionId}`;
+      if (!rows.length) {
+        ventasTransDetailBody.innerHTML = '<tr><td colspan="7">Sin items para esta transaccion.</td></tr>';
+        ventasTransDetail.hidden = false;
+        return;
+      }
+      ventasTransDetailBody.innerHTML = rows.map(item => {
+        const cantidad = Math.abs(item.cantidad || 0);
+        const valor = isFinite(item.valorUnitario) ? item.valorUnitario : 0;
+        const descuento = isFinite(item.descuento) ? item.descuento : 0;
+        const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
+        return `
+          <tr>
+            <td>${item.codigo || ''}</td>
+            <td>${cantidad}</td>
+            <td>Q.${valor.toFixed(2)}</td>
+            <td>Q.${descuento.toFixed(2)}</td>
+            <td>Q.${total.toFixed(2)}</td>
+            <td>${item.comentario || ''}</td>
+            <td>${Number(item.confirmado) === 1 ? 'Si' : 'No'}</td>
+          </tr>
+        `;
+      }).join('');
+      ventasTransDetail.hidden = false;
+    }
+
+    function showCompraDetalle(transaccionId) {
+      if (!cajaTransDetail || !cajaTransDetailBody || !cajaTransDetailTitle) return;
+      if (!movimientosLoaded) {
+        pendingCompraDetalle = transaccionId;
+        loadMovimientos(true);
+        return;
+      }
+      const rows = movimientos.filter(item => Number(item.transaccionId) === Number(transaccionId) && Number(item.tipo) === 2);
+      cajaTransDetailTitle.textContent = `Detalle de compra #${transaccionId}`;
+      if (!rows.length) {
+        cajaTransDetailBody.innerHTML = '<tr><td colspan="7">Sin items para esta compra.</td></tr>';
+        cajaTransDetail.hidden = false;
+        return;
+      }
+      cajaTransDetailBody.innerHTML = rows.map(item => {
+        const cantidad = Math.abs(item.cantidad || 0);
+        const valor = isFinite(item.valorUnitario) ? item.valorUnitario : 0;
+        const descuento = isFinite(item.descuento) ? item.descuento : 0;
+        const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
+        return `
+          <tr>
+            <td>${item.codigo || ''}</td>
+            <td>${cantidad}</td>
+            <td>Q.${valor.toFixed(2)}</td>
+            <td>Q.${descuento.toFixed(2)}</td>
+            <td>Q.${total.toFixed(2)}</td>
+            <td>${item.comentario || ''}</td>
+            <td>${Number(item.confirmado) === 1 ? 'Si' : 'No'}</td>
+          </tr>
+        `;
+      }).join('');
+      cajaTransDetail.hidden = false;
+    }
+
     function formatDateTime(value) {
       const parsed = parseSheetDate(value);
       if (!parsed || isNaN(parsed.getTime())) return value || '';
@@ -1957,6 +2207,8 @@
     let cierresLoading = false;
     let cierresData = [];
     let cierresLoadingButton = null;
+    let ventasTransLoading = false;
+    let cajaTransLoading = false;
     let productosLoading = false;
     let productosLoaded = false;
     let productosData = [];
@@ -2217,6 +2469,112 @@
       }).join('');
       cierresCount.textContent = `${cierresData.length} cierres`;
       cierresStatus.textContent = 'Actualizado';
+    }
+
+    function renderTransaccionesVenta(items) {
+      if (!ventasTransBody || !ventasTransStatus || !ventasTransCount) return;
+      if (!items.length) {
+        ventasTransBody.innerHTML = '<tr><td colspan="5">Sin transacciones.</td></tr>';
+        ventasTransCount.textContent = '0 transacciones';
+        ventasTransStatus.textContent = 'Sin resultados';
+        return;
+      }
+      ventasTransBody.innerHTML = items.map(item => {
+        const total = Number(item.total || 0);
+        return `
+          <tr>
+            <td>${item.id || ''}</td>
+            <td>${formatDate(item.fecha)}</td>
+            <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
+            <td>${item.estado || '—'}</td>
+            <td><button type="button" class="btn compact" data-action="transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
+          </tr>
+        `;
+      }).join('');
+      ventasTransCount.textContent = `${items.length} transacciones`;
+      ventasTransStatus.textContent = 'Actualizado';
+    }
+
+    function renderTransaccionesCompra(items) {
+      if (!cajaTransBody || !cajaTransStatus || !cajaTransCount) return;
+      if (!items.length) {
+        cajaTransBody.innerHTML = '<tr><td colspan="5">Sin transacciones.</td></tr>';
+        cajaTransCount.textContent = '0 transacciones';
+        cajaTransStatus.textContent = 'Sin resultados';
+        return;
+      }
+      cajaTransBody.innerHTML = items.map(item => {
+        const total = Number(item.total || 0);
+        return `
+          <tr>
+            <td>${item.id || ''}</td>
+            <td>${formatDate(item.fecha)}</td>
+            <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
+            <td>${item.estado || '—'}</td>
+            <td><button type="button" class="btn compact" data-action="compra-transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
+          </tr>
+        `;
+      }).join('');
+      cajaTransCount.textContent = `${items.length} transacciones`;
+      cajaTransStatus.textContent = 'Actualizado';
+    }
+
+    function loadTransacciones(tipo) {
+      const isVenta = tipo === 'venta';
+      const statusEl = isVenta ? ventasTransStatus : cajaTransStatus;
+      const bodyEl = isVenta ? ventasTransBody : cajaTransBody;
+      const countEl = isVenta ? ventasTransCount : cajaTransCount;
+      const desdeEl = isVenta ? ventasTransDesde : cajaTransDesde;
+      const hastaEl = isVenta ? ventasTransHasta : cajaTransHasta;
+      const reloadBtn = isVenta ? ventasTransReload : cajaTransReload;
+      if (!statusEl) return;
+      if (isVenta && ventasTransDetail) ventasTransDetail.hidden = true;
+      if (!isVenta && cajaTransDetail) cajaTransDetail.hidden = true;
+      if (isVenta && ventasTransLoading) return;
+      if (!isVenta && cajaTransLoading) return;
+      if (isVenta) {
+        ventasTransLoading = true;
+      } else {
+        cajaTransLoading = true;
+      }
+      statusEl.textContent = 'Cargando transacciones...';
+      const desde = desdeEl ? desdeEl.value : '';
+      const hasta = hastaEl ? hastaEl.value : '';
+      const params = [`tipo=${encodeURIComponent(tipo)}`];
+      if (desde) params.push(`fecha_desde=${encodeURIComponent(desde)}`);
+      if (hasta) params.push(`fecha_hasta=${encodeURIComponent(hasta)}`);
+      const url = `${SCRIPT_URL}?action=transacciones_listar&${params.join('&')}`;
+      jsonpRequest(url, (data) => {
+        if (isVenta) {
+          ventasTransLoading = false;
+        } else {
+          cajaTransLoading = false;
+        }
+        if (reloadBtn) setButtonLoading(reloadBtn, false);
+        if (!data || !data.ok) {
+          statusEl.textContent = 'No se pudo cargar.';
+          if (isVenta) {
+            renderTransaccionesVenta([]);
+          } else {
+            renderTransaccionesCompra([]);
+          }
+          return;
+        }
+        const items = Array.isArray(data.items) ? data.items : [];
+        if (isVenta) {
+          renderTransaccionesVenta(items);
+        } else {
+          renderTransaccionesCompra(items);
+        }
+      }, () => {
+        if (isVenta) {
+          ventasTransLoading = false;
+        } else {
+          cajaTransLoading = false;
+        }
+        if (reloadBtn) setButtonLoading(reloadBtn, false);
+        statusEl.textContent = 'Error cargando transacciones.';
+      });
     }
 
     function loadProductos() {
@@ -2787,6 +3145,68 @@
         cierresLoadingButton = cierresReload;
         setButtonLoading(cierresReload, true);
         loadCierres();
+      });
+    }
+    if (ventasTransDesde) {
+      ventasTransDesde.addEventListener('change', () => {
+        loadTransacciones('venta');
+      });
+    }
+    if (ventasTransHasta) {
+      ventasTransHasta.addEventListener('change', () => {
+        loadTransacciones('venta');
+      });
+    }
+    if (ventasTransReload) {
+      ventasTransReload.addEventListener('click', () => {
+        if (ventasTransLoading) return;
+        setButtonLoading(ventasTransReload, true);
+        loadTransacciones('venta');
+      });
+    }
+    if (ventasTransDetailClose) {
+      ventasTransDetailClose.addEventListener('click', () => {
+        if (ventasTransDetail) ventasTransDetail.hidden = true;
+      });
+    }
+    if (cajaTransDetailClose) {
+      cajaTransDetailClose.addEventListener('click', () => {
+        if (cajaTransDetail) cajaTransDetail.hidden = true;
+      });
+    }
+    if (ventasTransBody) {
+      ventasTransBody.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action="transaccion-detalle"][data-id]');
+        if (!btn) return;
+        const transaccionId = btn.getAttribute('data-id');
+        if (!transaccionId) return;
+        showTransaccionDetalle(transaccionId);
+      });
+    }
+    if (cajaTransBody) {
+      cajaTransBody.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action="compra-transaccion-detalle"][data-id]');
+        if (!btn) return;
+        const transaccionId = btn.getAttribute('data-id');
+        if (!transaccionId) return;
+        showCompraDetalle(transaccionId);
+      });
+    }
+    if (cajaTransDesde) {
+      cajaTransDesde.addEventListener('change', () => {
+        loadTransacciones('compra');
+      });
+    }
+    if (cajaTransHasta) {
+      cajaTransHasta.addEventListener('change', () => {
+        loadTransacciones('compra');
+      });
+    }
+    if (cajaTransReload) {
+      cajaTransReload.addEventListener('click', () => {
+        if (cajaTransLoading) return;
+        setButtonLoading(cajaTransReload, true);
+        loadTransacciones('compra');
       });
     }
     if (comprasFecha) {

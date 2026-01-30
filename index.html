@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1020">
   <title>Sistema Galaad</title>
   <link rel="icon" type="image/png" href="assets/castor.png">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
@@ -2211,9 +2212,12 @@
     const viewButtons = [...document.querySelectorAll('[data-view]')];
 
     const THEME_KEY = 'galaad-theme';
+    const THEME_COLORS = { dark: '#0c1020', light: '#f5f7fb' };
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
       if (themeToggle) themeToggle.checked = theme === 'dark';
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta) themeMeta.setAttribute('content', THEME_COLORS[theme] || THEME_COLORS.dark);
     }
     function initTheme() {
       const stored = localStorage.getItem(THEME_KEY);

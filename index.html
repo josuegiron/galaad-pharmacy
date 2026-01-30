@@ -848,7 +848,10 @@
               <th>Fecha</th>
               <th>Total</th>
               <th>Estado</th>
+              <th>Credito</th>
+              <th>Saldo</th>
               <th>Detalle</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="ventasTransBody"></tbody>
@@ -889,6 +892,13 @@
           <div>
             Caja del día
             <span>Entradas y salidas del dia; permite registrar y cerrar.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+        <button type="button" class="module-item" data-view="caja-cuentas">
+          <div>
+            Cuentas por pagar
+            <span>Compras a crédito con saldo y pagos.</span>
           </div>
           <span class="arrow">›</span>
         </button>
@@ -935,7 +945,10 @@
               <th>Fecha</th>
               <th>Total</th>
               <th>Estado</th>
+              <th>Crédito</th>
+              <th>Saldo</th>
               <th>Detalle</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="cajaTransBody"></tbody>
@@ -960,6 +973,72 @@
               </tr>
             </thead>
             <tbody id="cajaTransDetailBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="caja-cuentas" class="form-wrap view">
+      <div class="section-head">
+        <h2 class="section-title">Cuentas por pagar</h2>
+        <button type="button" class="help-btn" data-help="caja-cuentas" aria-label="Ayuda de cuentas por pagar">?</button>
+      </div>
+      <div class="card">
+        <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+          <label>
+            Desde
+            <input type="date" id="cajaCredDesde">
+          </label>
+          <label>
+            Hasta
+            <input type="date" id="cajaCredHasta">
+          </label>
+        </div>
+        <p class="hint" style="margin-top:8px;">Muestra solo compras a crédito en el rango de fechas.</p>
+      </div>
+      <div class="table-meta">
+        <div id="cajaCredStatus" class="status-pill">Esperando rango...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="cajaCredReload">Recargar</button>
+          <div id="cajaCredCount">0 transacciones</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Crédito</th>
+              <th>Saldo</th>
+              <th>Detalle</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cajaCredBody"></tbody>
+        </table>
+      </div>
+      <div class="card" id="cajaCredDetail" style="margin-top:12px;" hidden>
+        <div class="card-head">
+          <h3 id="cajaCredDetailTitle" style="margin:0; font-size:16px;">Detalle de compra</h3>
+          <button type="button" class="btn compact" id="cajaCredDetailClose">Cerrar</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Cantidad</th>
+                <th>Valor</th>
+                <th>Descuento</th>
+                <th>Total</th>
+                <th>Descripción</th>
+                <th>Confirmado</th>
+              </tr>
+            </thead>
+            <tbody id="cajaCredDetailBody"></tbody>
           </table>
         </div>
       </div>
@@ -1570,6 +1649,33 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="creditoModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="creditoModalTitle">
+      <h3 id="creditoModalTitle">Pago de compra a crédito</h3>
+      <div class="hint" id="creditoModalDetalle">Compra</div>
+      <label>
+        Fecha
+        <input type="date" id="creditoModalFecha">
+      </label>
+      <label>
+        Monto a pagar
+        <input type="number" id="creditoModalMonto" step="0.01" min="0">
+      </label>
+      <label>
+        Nota (opcional)
+        <input type="text" id="creditoModalNota" placeholder="Comentario del pago">
+      </label>
+      <label class="checkbox-inline">
+        <span>Registrar en caja</span>
+        <input type="checkbox" id="creditoModalCaja" checked>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="creditoModalCancel">Cancelar</button>
+        <button type="button" class="btn primary" id="creditoModalSave">Guardar pago</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="helpModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
       <h3 id="helpModalTitle">Ayuda</h3>
@@ -1644,6 +1750,7 @@
     let movimientosLoading = false;
     let pendingTransaccionDetalle = null;
     let pendingCompraDetalle = null;
+    let pendingCompraDetalleTarget = 'transacciones';
     const gvizHandlers = [];
 
     const ventasFecha = document.getElementById('ventasFecha');
@@ -1714,6 +1821,16 @@
     const cajaTransDetailTitle = document.getElementById('cajaTransDetailTitle');
     const cajaTransDetailBody = document.getElementById('cajaTransDetailBody');
     const cajaTransDetailClose = document.getElementById('cajaTransDetailClose');
+    const cajaCredDesde = document.getElementById('cajaCredDesde');
+    const cajaCredHasta = document.getElementById('cajaCredHasta');
+    const cajaCredStatus = document.getElementById('cajaCredStatus');
+    const cajaCredBody = document.getElementById('cajaCredBody');
+    const cajaCredCount = document.getElementById('cajaCredCount');
+    const cajaCredReload = document.getElementById('cajaCredReload');
+    const cajaCredDetail = document.getElementById('cajaCredDetail');
+    const cajaCredDetailTitle = document.getElementById('cajaCredDetailTitle');
+    const cajaCredDetailBody = document.getElementById('cajaCredDetailBody');
+    const cajaCredDetailClose = document.getElementById('cajaCredDetailClose');
     const cajaModal = document.getElementById('cajaModal');
     const cajaTipo = document.getElementById('cajaTipo');
     const cajaMonto = document.getElementById('cajaMonto');
@@ -1752,6 +1869,14 @@
     const ajusteModalComentario = document.getElementById('ajusteModalComentario');
     const ajusteModalCancel = document.getElementById('ajusteModalCancel');
     const ajusteModalSave = document.getElementById('ajusteModalSave');
+    const creditoModal = document.getElementById('creditoModal');
+    const creditoModalDetalle = document.getElementById('creditoModalDetalle');
+    const creditoModalFecha = document.getElementById('creditoModalFecha');
+    const creditoModalMonto = document.getElementById('creditoModalMonto');
+    const creditoModalNota = document.getElementById('creditoModalNota');
+    const creditoModalCaja = document.getElementById('creditoModalCaja');
+    const creditoModalCancel = document.getElementById('creditoModalCancel');
+    const creditoModalSave = document.getElementById('creditoModalSave');
     const helpModal = document.getElementById('helpModal');
     const helpModalTitle = document.getElementById('helpModalTitle');
     const helpModalBody = document.getElementById('helpModalBody');
@@ -1780,6 +1905,7 @@
       'caja-view': 'Caja del día',
       'caja-cierres': 'Cierres diarios',
       'caja-transacciones': 'Historico de compras',
+      'caja-cuentas': 'Cuentas por pagar',
     };
 
     const helpContent = {
@@ -1925,6 +2051,16 @@
         bullets: [
           'Filtrar por rango de fechas.',
           'Ver detalle por ID.',
+          'Registrar pagos de compras a crédito y revisar saldo pendiente.',
+        ],
+      },
+      'caja-cuentas': {
+        title: 'Cuentas por pagar',
+        desc: 'Solo compras registradas a crédito.',
+        bullets: [
+          'Filtrar por rango de fechas.',
+          'Ver detalle por ID.',
+          'Registrar pagos y revisar saldo pendiente.',
         ],
       },
     };
@@ -1997,6 +2133,9 @@
       if (viewId === 'caja-transacciones') {
         loadTransacciones('compra');
       }
+      if (viewId === 'caja-cuentas') {
+        loadCuentasPorPagar();
+      }
       if (viewId === 'inventario-productos') {
         loadProductos();
       }
@@ -2066,6 +2205,8 @@
     if (ventasTransHasta) ventasTransHasta.value = monthEnd;
     if (cajaTransDesde) cajaTransDesde.value = monthStart;
     if (cajaTransHasta) cajaTransHasta.value = monthEnd;
+    if (cajaCredDesde) cajaCredDesde.value = monthStart;
+    if (cajaCredHasta) cajaCredHasta.value = monthEnd;
 
     let messageTimer = null;
     const setButtonLoading = (btn, isLoading) => {
@@ -2665,8 +2806,10 @@
         }
         if (pendingCompraDetalle !== null) {
           const targetId = pendingCompraDetalle;
+          const targetView = pendingCompraDetalleTarget;
           pendingCompraDetalle = null;
-          showCompraDetalle(targetId);
+          pendingCompraDetalleTarget = 'transacciones';
+          showCompraDetalle(targetId, targetView);
         }
       } catch (err) {
         movimientosLoading = false;
@@ -2732,21 +2875,26 @@
       ventasTransDetail.hidden = false;
     }
 
-    function showCompraDetalle(transaccionId) {
-      if (!cajaTransDetail || !cajaTransDetailBody || !cajaTransDetailTitle) return;
+    function showCompraDetalle(transaccionId, target = 'transacciones') {
+      const isCuentas = target === 'cuentas';
+      const detail = isCuentas ? cajaCredDetail : cajaTransDetail;
+      const detailBody = isCuentas ? cajaCredDetailBody : cajaTransDetailBody;
+      const detailTitle = isCuentas ? cajaCredDetailTitle : cajaTransDetailTitle;
+      if (!detail || !detailBody || !detailTitle) return;
       if (!movimientosLoaded) {
         pendingCompraDetalle = transaccionId;
+        pendingCompraDetalleTarget = target;
         loadMovimientos(true);
         return;
       }
       const rows = movimientos.filter(item => Number(item.transaccionId) === Number(transaccionId) && Number(item.tipo) === 2);
-      cajaTransDetailTitle.textContent = `Detalle de compra #${transaccionId}`;
+      detailTitle.textContent = `Detalle de compra #${transaccionId}`;
       if (!rows.length) {
-        cajaTransDetailBody.innerHTML = '<tr><td colspan="7">Sin items para esta compra.</td></tr>';
-        cajaTransDetail.hidden = false;
+        detailBody.innerHTML = '<tr><td colspan="7">Sin items para esta compra.</td></tr>';
+        detail.hidden = false;
         return;
       }
-      cajaTransDetailBody.innerHTML = rows.map(item => {
+      detailBody.innerHTML = rows.map(item => {
         const cantidad = Math.abs(item.cantidad || 0);
         const valor = isFinite(item.valorUnitario) ? item.valorUnitario : 0;
         const descuento = isFinite(item.descuento) ? item.descuento : 0;
@@ -2763,7 +2911,7 @@
           </tr>
         `;
       }).join('');
-      cajaTransDetail.hidden = false;
+      detail.hidden = false;
     }
 
     function formatDateTime(value) {
@@ -2794,6 +2942,7 @@
     let cierresLoadingButton = null;
     let ventasTransLoading = false;
     let cajaTransLoading = false;
+    let cajaCredLoading = false;
     let productosLoading = false;
     let productosLoaded = false;
     let productosData = [];
@@ -3083,25 +3232,69 @@
     function renderTransaccionesCompra(items) {
       if (!cajaTransBody || !cajaTransStatus || !cajaTransCount) return;
       if (!items.length) {
-        cajaTransBody.innerHTML = '<tr><td colspan="5">Sin transacciones.</td></tr>';
+        cajaTransBody.innerHTML = '<tr><td colspan="8">Sin transacciones.</td></tr>';
         cajaTransCount.textContent = '0 transacciones';
         cajaTransStatus.textContent = 'Sin resultados';
         return;
       }
       cajaTransBody.innerHTML = items.map(item => {
         const total = Number(item.total || 0);
+        const credito = Number(item.credito || 0);
+        const saldo = Number(item.saldo || 0);
+        const saldoLabel = credito ? `Q.${isFinite(saldo) ? saldo.toFixed(2) : '0.00'}` : '—';
+        const creditoLabel = credito ? 'Si' : 'No';
+        const pagarBtn = credito && saldo > 0
+          ? `<button type="button" class="btn compact" data-action="compra-credito-pagar" data-id="${item.id}" data-saldo="${saldo}">Pagar</button>`
+          : '—';
         return `
           <tr>
             <td>${item.id || ''}</td>
             <td>${formatDate(item.fecha)}</td>
             <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
             <td>${item.estado || '—'}</td>
+            <td>${creditoLabel}</td>
+            <td>${saldoLabel}</td>
             <td><button type="button" class="btn compact" data-action="compra-transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
+            <td>${pagarBtn}</td>
           </tr>
         `;
       }).join('');
       cajaTransCount.textContent = `${items.length} transacciones`;
       cajaTransStatus.textContent = 'Actualizado';
+    }
+
+    function renderCuentasPorPagar(items) {
+      if (!cajaCredBody || !cajaCredStatus || !cajaCredCount) return;
+      if (!items.length) {
+        cajaCredBody.innerHTML = '<tr><td colspan="8">Sin transacciones.</td></tr>';
+        cajaCredCount.textContent = '0 transacciones';
+        cajaCredStatus.textContent = 'Sin resultados';
+        return;
+      }
+      cajaCredBody.innerHTML = items.map(item => {
+        const total = Number(item.total || 0);
+        const credito = Number(item.credito || 0);
+        const saldo = Number(item.saldo || 0);
+        const saldoLabel = credito ? `Q.${isFinite(saldo) ? saldo.toFixed(2) : '0.00'}` : '—';
+        const creditoLabel = credito ? 'Si' : 'No';
+        const pagarBtn = credito && saldo > 0
+          ? `<button type="button" class="btn compact" data-action="compra-credito-pagar" data-id="${item.id}" data-saldo="${saldo}">Pagar</button>`
+          : '—';
+        return `
+          <tr>
+            <td>${item.id || ''}</td>
+            <td>${formatDate(item.fecha)}</td>
+            <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
+            <td>${item.estado || '—'}</td>
+            <td>${creditoLabel}</td>
+            <td>${saldoLabel}</td>
+            <td><button type="button" class="btn compact" data-action="compra-transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
+            <td>${pagarBtn}</td>
+          </tr>
+        `;
+      }).join('');
+      cajaCredCount.textContent = `${items.length} transacciones`;
+      cajaCredStatus.textContent = 'Actualizado';
     }
 
     function loadTransacciones(tipo) {
@@ -3125,10 +3318,11 @@
       statusEl.textContent = 'Cargando transacciones...';
       const desde = desdeEl ? desdeEl.value : '';
       const hasta = hastaEl ? hastaEl.value : '';
-      const params = [`tipo=${encodeURIComponent(tipo)}`];
+      const params = isVenta ? [`tipo=${encodeURIComponent(tipo)}`] : [];
       if (desde) params.push(`fecha_desde=${encodeURIComponent(desde)}`);
       if (hasta) params.push(`fecha_hasta=${encodeURIComponent(hasta)}`);
-      const url = `${SCRIPT_URL}?action=transacciones_listar&${params.join('&')}`;
+      const action = isVenta ? 'transacciones_listar' : 'transacciones_compra_listar';
+      const url = `${SCRIPT_URL}?action=${action}&${params.join('&')}`;
       jsonpRequest(url, (data) => {
         if (isVenta) {
           ventasTransLoading = false;
@@ -3159,6 +3353,36 @@
         }
         if (reloadBtn) setButtonLoading(reloadBtn, false);
         statusEl.textContent = 'Error cargando transacciones.';
+      });
+    }
+
+    function loadCuentasPorPagar() {
+      if (cajaCredLoading || !cajaCredStatus) return;
+      cajaCredLoading = true;
+      if (cajaCredDetail) cajaCredDetail.hidden = true;
+      cajaCredStatus.textContent = 'Cargando transacciones...';
+      const desde = cajaCredDesde ? cajaCredDesde.value : '';
+      const hasta = cajaCredHasta ? cajaCredHasta.value : '';
+      const params = [];
+      if (desde) params.push(`fecha_desde=${encodeURIComponent(desde)}`);
+      if (hasta) params.push(`fecha_hasta=${encodeURIComponent(hasta)}`);
+      const query = params.length ? `&${params.join('&')}` : '';
+      const url = `${SCRIPT_URL}?action=transacciones_compra_listar${query}`;
+      jsonpRequest(url, (data) => {
+        cajaCredLoading = false;
+        if (cajaCredReload) setButtonLoading(cajaCredReload, false);
+        if (!data || !data.ok) {
+          cajaCredStatus.textContent = 'No se pudo cargar.';
+          renderCuentasPorPagar([]);
+          return;
+        }
+        const items = Array.isArray(data.items) ? data.items : [];
+        const creditoItems = items.filter(item => Number(item.credito || 0) === 1);
+        renderCuentasPorPagar(creditoItems);
+      }, () => {
+        cajaCredLoading = false;
+        if (cajaCredReload) setButtonLoading(cajaCredReload, false);
+        cajaCredStatus.textContent = 'Error cargando transacciones.';
       });
     }
 
@@ -3279,6 +3503,83 @@
       ajusteModal.dataset.nombre = '';
       ajusteModal.dataset.proveedor = '';
       if (ajusteModalSave) setButtonLoading(ajusteModalSave, false);
+    }
+
+    function openCreditoModal(data = {}) {
+      if (!creditoModal || !creditoModalDetalle || !creditoModalFecha || !creditoModalMonto || !creditoModalNota || !creditoModalCaja) return;
+      const saldo = Number(data.saldo || 0);
+      creditoModal.dataset.transaccionId = data.transaccionId || '';
+      creditoModal.dataset.saldo = String(saldo);
+      creditoModalDetalle.textContent = `Compra #${data.transaccionId || ''} · Saldo: Q.${isFinite(saldo) ? saldo.toFixed(2) : '0.00'}`;
+      creditoModalFecha.value = toLocalISODate(new Date());
+      creditoModalMonto.value = saldo > 0 ? saldo.toFixed(2) : '';
+      creditoModalNota.value = '';
+      creditoModalCaja.checked = true;
+      creditoModal.classList.add('active');
+    }
+
+    function closeCreditoModal() {
+      if (!creditoModal) return;
+      creditoModal.classList.remove('active');
+      creditoModal.dataset.transaccionId = '';
+      creditoModal.dataset.saldo = '';
+      if (creditoModalSave) setButtonLoading(creditoModalSave, false);
+    }
+
+    function saveCreditoPago() {
+      if (!creditoModal || !creditoModalMonto) return;
+      const transaccionId = creditoModal.dataset.transaccionId || '';
+      if (!transaccionId) return;
+      const saldo = Number(creditoModal.dataset.saldo || 0);
+      const monto = Number(creditoModalMonto.value || 0);
+      if (!isFinite(monto) || monto <= 0) {
+        window.alert('Monto inválido.');
+        return;
+      }
+      if (isFinite(saldo) && saldo > 0 && monto > saldo) {
+        window.alert('El monto no puede superar el saldo.');
+        return;
+      }
+      const fecha = (creditoModalFecha && creditoModalFecha.value)
+        ? creditoModalFecha.value
+        : toLocalISODate(new Date());
+      const nota = creditoModalNota ? String(creditoModalNota.value || '').trim() : '';
+      const registrarCaja = creditoModalCaja && creditoModalCaja.checked ? 1 : 0;
+      if (!window.confirm('¿Registrar pago de crédito?')) return;
+      if (creditoModalSave) setButtonLoading(creditoModalSave, true);
+      if (cajaTransStatus) cajaTransStatus.textContent = 'Registrando pago...';
+      if (cajaCredStatus) cajaCredStatus.textContent = 'Registrando pago...';
+      const params = [
+        'action=credito_pagar',
+        `transaccion_id=${encodeURIComponent(transaccionId)}`,
+        `fecha=${encodeURIComponent(fecha)}`,
+        `monto=${encodeURIComponent(monto)}`,
+        `nota=${encodeURIComponent(nota)}`,
+        `registrar_caja=${encodeURIComponent(registrarCaja)}`,
+      ];
+      const url = `${SCRIPT_URL}?${params.join('&')}`;
+      jsonpRequest(url, (data) => {
+        if (creditoModalSave) setButtonLoading(creditoModalSave, false);
+        if (!data || !data.ok) {
+          if (cajaTransStatus) {
+            cajaTransStatus.textContent = data && data.error ? data.error : 'No se pudo registrar el pago.';
+          }
+          if (cajaCredStatus) {
+            cajaCredStatus.textContent = data && data.error ? data.error : 'No se pudo registrar el pago.';
+          }
+          return;
+        }
+        closeCreditoModal();
+        if (cajaTransStatus) cajaTransStatus.textContent = 'Pago registrado.';
+        if (cajaCredStatus) cajaCredStatus.textContent = 'Pago registrado.';
+        loadTransacciones('compra');
+        loadCuentasPorPagar();
+        if (registrarCaja) loadCaja(true);
+      }, () => {
+        if (creditoModalSave) setButtonLoading(creditoModalSave, false);
+        if (cajaTransStatus) cajaTransStatus.textContent = 'Error registrando el pago.';
+        if (cajaCredStatus) cajaCredStatus.textContent = 'Error registrando el pago.';
+      });
     }
 
     function saveProducto() {
@@ -3881,6 +4182,11 @@
         if (cajaTransDetail) cajaTransDetail.hidden = true;
       });
     }
+    if (cajaCredDetailClose) {
+      cajaCredDetailClose.addEventListener('click', () => {
+        if (cajaCredDetail) cajaCredDetail.hidden = true;
+      });
+    }
     if (ventasTransBody) {
       ventasTransBody.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-action="transaccion-detalle"][data-id]');
@@ -3892,11 +4198,36 @@
     }
     if (cajaTransBody) {
       cajaTransBody.addEventListener('click', (event) => {
+        const payBtn = event.target.closest('button[data-action="compra-credito-pagar"][data-id]');
+        if (payBtn) {
+          const transaccionId = payBtn.getAttribute('data-id');
+          if (!transaccionId) return;
+          const saldo = payBtn.getAttribute('data-saldo');
+          openCreditoModal({ transaccionId, saldo });
+          return;
+        }
         const btn = event.target.closest('button[data-action="compra-transaccion-detalle"][data-id]');
         if (!btn) return;
         const transaccionId = btn.getAttribute('data-id');
         if (!transaccionId) return;
-        showCompraDetalle(transaccionId);
+        showCompraDetalle(transaccionId, 'transacciones');
+      });
+    }
+    if (cajaCredBody) {
+      cajaCredBody.addEventListener('click', (event) => {
+        const payBtn = event.target.closest('button[data-action="compra-credito-pagar"][data-id]');
+        if (payBtn) {
+          const transaccionId = payBtn.getAttribute('data-id');
+          if (!transaccionId) return;
+          const saldo = payBtn.getAttribute('data-saldo');
+          openCreditoModal({ transaccionId, saldo });
+          return;
+        }
+        const btn = event.target.closest('button[data-action="compra-transaccion-detalle"][data-id]');
+        if (!btn) return;
+        const transaccionId = btn.getAttribute('data-id');
+        if (!transaccionId) return;
+        showCompraDetalle(transaccionId, 'cuentas');
       });
     }
     if (cajaTransDesde) {
@@ -3914,6 +4245,23 @@
         if (cajaTransLoading) return;
         setButtonLoading(cajaTransReload, true);
         loadTransacciones('compra');
+      });
+    }
+    if (cajaCredDesde) {
+      cajaCredDesde.addEventListener('change', () => {
+        loadCuentasPorPagar();
+      });
+    }
+    if (cajaCredHasta) {
+      cajaCredHasta.addEventListener('change', () => {
+        loadCuentasPorPagar();
+      });
+    }
+    if (cajaCredReload) {
+      cajaCredReload.addEventListener('click', () => {
+        if (cajaCredLoading) return;
+        setButtonLoading(cajaCredReload, true);
+        loadCuentasPorPagar();
       });
     }
     if (comprasFecha) {
@@ -4056,6 +4404,23 @@
         } finally {
           setButtonLoading(ajusteModalSave, false);
         }
+      });
+    }
+    if (creditoModalCancel) {
+      creditoModalCancel.addEventListener('click', () => {
+        closeCreditoModal();
+      });
+    }
+    if (creditoModal) {
+      creditoModal.addEventListener('click', (event) => {
+        if (event.target === creditoModal) {
+          closeCreditoModal();
+        }
+      });
+    }
+    if (creditoModalSave) {
+      creditoModalSave.addEventListener('click', () => {
+        saveCreditoPago();
       });
     }
     if (productosBody) {

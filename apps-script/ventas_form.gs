@@ -10,6 +10,7 @@ const LOTES_SHEET_NAME = 'lotes_facturacion';
 const LOTES_ITEMS_SHEET_NAME = 'lotes_items';
 const CIERRES_SHEET_NAME = 'cierres_caja';
 const PRODUCTOS_SHEET_NAME = 'productos';
+const PAGOS_CREDITO_SHEET_NAME = 'pagos_credito';
 const TRANSACCIONES_HEADERS = [
   'id', 'tipo', 'fecha', 'total', 'estado', 'usuario', 'timestamp', 'referencia_externa', 'nota',
 ];
@@ -22,6 +23,9 @@ const CIERRES_HEADERS = [
 ];
 const PRODUCTOS_HEADERS = [
   'codigo', 'nombre', 'afecto', 'proveedor', 'costo_unitario', 'precio_venta', 'activo', 'stock_actual',
+];
+const PAGOS_CREDITO_HEADERS = [
+  'id', 'transaccion_id', 'fecha', 'monto', 'nota', 'timestamp',
 ];
 const FACTURACION_FOLDER_ID = '1AK9CZlEeh6oLlnf6PcV_cp5uZMPH2Qqa';
 const FACTURACION_TEMPLATE_ID = '16gxGia3t367ImiAW_2t0dhJ2Zy7D5E5HGooSWAemQ9s';
@@ -78,6 +82,16 @@ function doGet(e) {
     if (action === 'transacciones_listar') {
       const payload = e && e.parameter ? e.parameter : {};
       const result = listTransacciones(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'transacciones_compra_listar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = listTransaccionesCompra(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'credito_pagar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = createPagoCredito(payload);
       return callback ? jsonpResponse(result, callback) : jsonResponse(result);
     }
     if (action === 'caja_crear') {
@@ -159,6 +173,9 @@ function doPost(e) {
     if (action === 'transacciones_listar') {
       return jsonResponse(listTransacciones(payload));
     }
+    if (action === 'transacciones_compra_listar') {
+      return jsonResponse(listTransaccionesCompra(payload));
+    }
     if (action === 'caja_actualizar') {
       return jsonResponse(updateCaja(payload));
     }
@@ -176,6 +193,9 @@ function doPost(e) {
     }
     if (action === 'caja_cerrar') {
       return jsonResponse(closeCaja(payload));
+    }
+    if (action === 'credito_pagar') {
+      return jsonResponse(createPagoCredito(payload));
     }
     const items = payload.items || [];
     if (!items.length) throw new Error('No hay items para registrar.');
@@ -1301,6 +1321,189 @@ function listTransacciones(payload) {
   return { ok: true, items: items };
 }
 
+function listTransaccionesCompra(payload) {
+  const sheet = getTransaccionesSheet();
+  if (!sheet) return { ok: true, items: [] };
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, items: [] };
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxId = headers.indexOf('id');
+  const idxTipo = headers.indexOf('tipo');
+  const idxFecha = headers.indexOf('fecha');
+  const idxTotal = headers.indexOf('total');
+  const idxEstado = headers.indexOf('estado');
+  const idxUsuario = headers.indexOf('usuario');
+  const idxReferencia = headers.indexOf('referencia_externa');
+  const idxNota = headers.indexOf('nota');
+  const requiredIdx = [idxId, idxTipo, idxFecha, idxTotal, idxEstado, idxUsuario];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en transacciones.');
+  }
+  let fromRaw = payload && (payload.fecha_desde || payload.desde);
+  let toRaw = payload && (payload.fecha_hasta || payload.hasta);
+  if (payload && payload.fecha) {
+    fromRaw = payload.fecha;
+    toRaw = payload.fecha;
+  }
+  const fromDate = parseDateValue(fromRaw);
+  const toDate = parseDateValue(toRaw);
+  const fromTime = fromDate ? new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate()).getTime() : null;
+  const toTime = toDate ? new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate()).getTime() : null;
+  const creditoMap = getCreditoFlagByTransaccionId();
+  const pagosMap = getPagosCreditoMap();
+
+  const items = data.slice(1).map(row => ({
+    id: row[idxId],
+    tipo: row[idxTipo],
+    fecha: row[idxFecha],
+    total: row[idxTotal],
+    estado: row[idxEstado],
+    usuario: row[idxUsuario],
+    referencia_externa: idxReferencia >= 0 ? row[idxReferencia] : '',
+    nota: idxNota >= 0 ? row[idxNota] : '',
+  })).filter(item => {
+    if (normalizeTransaccionTipo(item.tipo) !== 'compra') return false;
+    if (!fromTime && !toTime) return true;
+    const dateValue = parseDateValue(item.fecha);
+    if (!dateValue) return false;
+    const dayTime = new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate()).getTime();
+    if (fromTime && dayTime < fromTime) return false;
+    if (toTime && dayTime > toTime) return false;
+    return true;
+  }).map(item => {
+    const idKey = String(item.id || '');
+    const total = Number(item.total || 0);
+    const credito = creditoMap[idKey] ? 1 : 0;
+    const pagado = Number(pagosMap[idKey] || 0);
+    const saldo = credito ? Math.max(0, total - pagado) : 0;
+    return Object.assign({}, item, {
+      credito: credito,
+      pagado: pagado,
+      saldo: saldo,
+    });
+  });
+
+  items.sort((a, b) => {
+    const dateA = parseDateValue(a.fecha) || new Date(0);
+    const dateB = parseDateValue(b.fecha) || new Date(0);
+    if (dateB.getTime() !== dateA.getTime()) {
+      return dateB.getTime() - dateA.getTime();
+    }
+    return Number(b.id || 0) - Number(a.id || 0);
+  });
+  return { ok: true, items: items };
+}
+
+function getCreditoFlagByTransaccionId() {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
+  if (!sheet) return {};
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return {};
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  const idxCredito = headers.indexOf('credito');
+  if (idxTransaccionId < 0 || idxCredito < 0) return {};
+  const map = {};
+  for (let i = 1; i < data.length; i += 1) {
+    const transaccionId = Number(data[i][idxTransaccionId] || 0);
+    if (!transaccionId) continue;
+    if (Number(data[i][idxCredito] || 0) === 1) {
+      map[String(transaccionId)] = 1;
+    }
+  }
+  return map;
+}
+
+function getPagosCreditoMap() {
+  const sheet = getPagosCreditoSheet();
+  if (!sheet) return {};
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return {};
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  const idxMonto = headers.indexOf('monto');
+  if (idxTransaccionId < 0 || idxMonto < 0) return {};
+  const map = {};
+  for (let i = 1; i < data.length; i += 1) {
+    const transaccionId = String(data[i][idxTransaccionId] || '').trim();
+    if (!transaccionId) continue;
+    const monto = Number(data[i][idxMonto] || 0);
+    if (!isFinite(monto)) continue;
+    map[transaccionId] = (map[transaccionId] || 0) + monto;
+  }
+  return map;
+}
+
+function createPagoCredito(payload) {
+  const transaccionId = Number(payload.transaccion_id || 0);
+  if (!transaccionId) throw new Error('Transacción requerida.');
+  const monto = Number(payload.monto || 0);
+  if (!isFinite(monto) || monto <= 0) throw new Error('Monto inválido.');
+  const fecha = payload.fecha ? parseDateValue(payload.fecha) : new Date();
+  if (!fecha) throw new Error('Fecha inválida.');
+  const nota = String(payload.nota || '').trim();
+  const registrarCaja = payload.registrar_caja === undefined ? 1 : (Number(payload.registrar_caja) === 1 ? 1 : 0);
+
+  const meta = getTransaccionMetaById(transaccionId);
+  if (!meta) throw new Error('Transacción no encontrada.');
+  if (normalizeTransaccionTipo(meta.tipo) !== 'compra') {
+    throw new Error('Solo se pueden pagar transacciones de compra.');
+  }
+  const creditoMap = getCreditoFlagByTransaccionId();
+  if (!creditoMap[String(transaccionId)]) {
+    throw new Error('La transacción no es a crédito.');
+  }
+  const total = Number(meta.total || 0);
+  const pagosMap = getPagosCreditoMap();
+  const pagado = Number(pagosMap[String(transaccionId)] || 0);
+  const saldo = total - pagado;
+  if (saldo <= 0) throw new Error('La transacción ya está pagada.');
+  if (monto > saldo) throw new Error('El monto supera el saldo pendiente.');
+  if (registrarCaja === 1) assertDateNotClosed(fecha);
+
+  const sheet = getPagosCreditoSheet();
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(15000);
+  try {
+    const lastRow = sheet.getLastRow();
+    let nextId = 1;
+    if (lastRow >= 2) {
+      const lastValue = sheet.getRange(lastRow, 1).getValue();
+      nextId = (typeof lastValue === 'number' && !isNaN(lastValue)) ? lastValue + 1 : lastRow;
+    }
+    const row = new Array(sheet.getLastColumn()).fill('');
+    row[0] = nextId;
+    row[1] = transaccionId;
+    row[2] = fecha;
+    row[3] = monto;
+    row[4] = nota;
+    row[5] = new Date();
+    sheet.appendRow(row);
+    if (registrarCaja === 1) {
+      createCaja({
+        fecha: fecha,
+        tipo: 2,
+        monto: monto,
+        concepto: `Pago crédito compra #${transaccionId}`,
+        referencia: String(transaccionId),
+        tipo_descripcion: 'pagos',
+      });
+    }
+    const saldoRestante = saldo - monto;
+    if (saldoRestante <= 0) {
+      updateTransaccionEstado(transaccionId, 'pagada');
+    }
+    return {
+      ok: true,
+      id: nextId,
+      transaccion_id: transaccionId,
+      saldo_restante: Math.max(0, saldoRestante),
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function listProductos(payload) {
   const sheet = getProductosSheet();
   if (!sheet) return { ok: true, items: [] };
@@ -1860,6 +2063,12 @@ function getProductosSheet() {
   return sheet;
 }
 
+function getPagosCreditoSheet() {
+  const sheet = getOrCreateSheet(PAGOS_CREDITO_SHEET_NAME, PAGOS_CREDITO_HEADERS);
+  ensurePagosCreditoHeaders(sheet, PAGOS_CREDITO_HEADERS);
+  return sheet;
+}
+
 function ensureCierresHeaders(sheet, headers) {
   if (!sheet) return;
   const lastCol = Math.max(sheet.getLastColumn(), headers.length);
@@ -1879,6 +2088,24 @@ function ensureCierresHeaders(sheet, headers) {
 }
 
 function ensureProductosHeaders(sheet, headers) {
+  if (!sheet) return;
+  const lastCol = Math.max(sheet.getLastColumn(), headers.length);
+  const row = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const normalized = row.map(h => String(h).toLowerCase());
+  let changed = false;
+  headers.forEach((header) => {
+    if (!normalized.includes(header)) {
+      row.push(header);
+      normalized.push(header);
+      changed = true;
+    }
+  });
+  if (changed) {
+    sheet.getRange(1, 1, 1, row.length).setValues([row]);
+  }
+}
+
+function ensurePagosCreditoHeaders(sheet, headers) {
   if (!sheet) return;
   const lastCol = Math.max(sheet.getLastColumn(), headers.length);
   const row = sheet.getRange(1, 1, 1, lastCol).getValues()[0];

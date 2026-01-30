@@ -934,6 +934,20 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <button type="button" class="module-item" data-view="inventario-ajustes-crear">
+          <div>
+            Ajustes de inventario
+            <span>Registra ajustes positivos o negativos.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+        <button type="button" class="module-item" data-view="inventario-ajustes-listado">
+          <div>
+            Ajustes del día
+            <span>Listado de ajustes por fecha.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
         <button type="button" class="module-item" data-view="caja-transacciones">
           <div>
             Historico de compras
@@ -971,6 +985,7 @@
               <th>Proveedor</th>
               <th>Costo</th>
               <th>Precio</th>
+              <th>Stock</th>
               <th>Activo</th>
               <th>Acciones</th>
             </tr>
@@ -1059,6 +1074,74 @@
       <div class="card summary-card" style="margin-top:12px;">
         <div>Total compras</div>
         <div><span id="comprasTotal">Q.0.00</span></div>
+      </div>
+    </section>
+
+    <section id="inventario-ajustes-crear" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Ajustes de inventario</h2>
+      <form id="ajusteForm">
+        <div class="card date-card">
+          <label class="date-field">
+            Fecha
+            <input type="date" name="fecha" id="ajusteFecha" required>
+          </label>
+          <p class="hint" style="margin-top:8px;">Usa cantidades positivas o negativas para ajustar el stock.</p>
+        </div>
+
+        <div class="card items-card">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; align-items:flex-end;">
+            <label style="flex:1 1 320px; position:relative;">
+              Buscar producto
+              <input id="ajusteProductSearch" placeholder="Código o nombre" autocomplete="off">
+              <div id="ajusteSearchResults" class="search-results" hidden></div>
+            </label>
+            <div id="ajusteSearchError" class="search-error" hidden>No se encontró el producto en el catálogo.</div>
+            <button type="button" class="btn" id="ajusteAddSelectedBtn">Agregar producto</button>
+            <button type="button" class="btn" id="ajusteClearSearchBtn">Limpiar búsqueda</button>
+          </div>
+          <div class="divider"></div>
+          <div id="ajusteItemsWrapper" class="items-wrapper"></div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:4px;">
+          <button type="submit" class="btn primary full-width" id="ajusteSubmitBtn">Guardar ajuste</button>
+        </div>
+      </form>
+      <div class="message" id="ajusteMessage"></div>
+    </section>
+
+    <section id="inventario-ajustes-listado" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Ajustes del día</h2>
+      <div class="card" style="margin-top:16px;">
+        <label>
+          Fecha
+          <input type="date" id="ajustesFecha">
+        </label>
+        <p class="hint" style="margin-top:8px;">Filtra ajustes por fecha.</p>
+      </div>
+      <div class="table-meta">
+        <div id="ajustesStatus" class="status-pill">Esperando fecha...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="ajustesReload">Recargar</button>
+          <div id="ajustesCount">0 ajustes</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Código</th>
+              <th>Cantidad</th>
+              <th>Descripción</th>
+            </tr>
+          </thead>
+          <tbody id="ajustesBody"></tbody>
+        </table>
+      </div>
+      <div class="card summary-card" style="margin-top:12px;">
+        <div>Total ajustes</div>
+        <div><span id="ajustesTotal">Q.0.00</span></div>
       </div>
     </section>
 
@@ -1376,6 +1459,29 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="ajusteModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ajusteModalTitle">
+      <h3 id="ajusteModalTitle">Ajuste de inventario</h3>
+      <div class="hint" id="ajusteModalProducto">Producto</div>
+      <label>
+        Fecha
+        <input type="date" id="ajusteModalFecha">
+      </label>
+      <label>
+        Cantidad (puede ser negativa)
+        <input type="number" id="ajusteModalCantidad" step="0.01">
+      </label>
+      <label>
+        Comentario (opcional)
+        <input type="text" id="ajusteModalComentario" placeholder="Motivo del ajuste">
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="ajusteModalCancel">Cancelar</button>
+        <button type="button" class="btn primary" id="ajusteModalSave">Guardar ajuste</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtP9-p5x9ZgEn6quRePwQbrBmk4ElLB3E3zvli-z66QW129J0c98Qy1AF7k83X1f7U/exec';
@@ -1403,12 +1509,29 @@
     const compraTotalEl = document.getElementById('compraTotal');
     const compraSubmitBtn = document.getElementById('compraSubmitBtn');
     const compraMessageEl = document.getElementById('compraMessage');
+    const ajusteForm = document.getElementById('ajusteForm');
+    const ajusteFecha = document.getElementById('ajusteFecha');
+    const ajusteProductSearch = document.getElementById('ajusteProductSearch');
+    const ajusteClearSearchBtn = document.getElementById('ajusteClearSearchBtn');
+    const ajusteSearchResults = document.getElementById('ajusteSearchResults');
+    const ajusteSearchError = document.getElementById('ajusteSearchError');
+    const ajusteAddSelectedBtn = document.getElementById('ajusteAddSelectedBtn');
+    const ajusteItemsWrapper = document.getElementById('ajusteItemsWrapper');
+    const ajusteTotalEl = document.getElementById('ajusteTotal');
+    const ajusteSubmitBtn = document.getElementById('ajusteSubmitBtn');
+    const ajusteMessageEl = document.getElementById('ajusteMessage');
     const comprasFecha = document.getElementById('comprasFecha');
     const comprasStatus = document.getElementById('comprasStatus');
     const comprasBody = document.getElementById('comprasBody');
     const comprasCount = document.getElementById('comprasCount');
     const comprasReload = document.getElementById('comprasReload');
     const comprasTotal = document.getElementById('comprasTotal');
+    const ajustesFecha = document.getElementById('ajustesFecha');
+    const ajustesStatus = document.getElementById('ajustesStatus');
+    const ajustesBody = document.getElementById('ajustesBody');
+    const ajustesCount = document.getElementById('ajustesCount');
+    const ajustesReload = document.getElementById('ajustesReload');
+    const ajustesTotal = document.getElementById('ajustesTotal');
     const catalogOptions = document.createElement('datalist');
     catalogOptions.id = 'catalogOptions';
     document.body.appendChild(catalogOptions);
@@ -1524,6 +1647,13 @@
     const productoActivo = document.getElementById('productoActivo');
     const productoCancel = document.getElementById('productoCancel');
     const productoSave = document.getElementById('productoSave');
+    const ajusteModal = document.getElementById('ajusteModal');
+    const ajusteModalProducto = document.getElementById('ajusteModalProducto');
+    const ajusteModalFecha = document.getElementById('ajusteModalFecha');
+    const ajusteModalCantidad = document.getElementById('ajusteModalCantidad');
+    const ajusteModalComentario = document.getElementById('ajusteModalComentario');
+    const ajusteModalCancel = document.getElementById('ajusteModalCancel');
+    const ajusteModalSave = document.getElementById('ajusteModalSave');
     const facturacionGenerarLabel = facturacionGenerar ? facturacionGenerar.textContent.trim() : 'Generar archivo';
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
@@ -1541,6 +1671,8 @@
       'inventario-productos': 'Productos',
       'inventario-compras-crear': 'Registrar compra',
       'inventario-compras-listado': 'Compras registradas',
+      'inventario-ajustes-crear': 'Ajustes de inventario',
+      'inventario-ajustes-listado': 'Ajustes del día',
       'caja-menu': 'Caja',
       'caja-view': 'Movimientos de caja',
       'caja-cierres': 'Cierres de caja',
@@ -1602,6 +1734,19 @@
           renderCompras();
         }
       }
+      if (viewId === 'inventario-ajustes-crear') {
+        if (!catalog.length) {
+          loadCatalog();
+        }
+      }
+      if (viewId === 'inventario-ajustes-listado') {
+        if (ajustesStatus) ajustesStatus.textContent = 'Cargando ajustes...';
+        if (!movimientosLoaded) {
+          loadMovimientos(true);
+        } else {
+          renderAjustes();
+        }
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -1620,6 +1765,8 @@
     if (cajaFecha) cajaFecha.value = today;
     if (compraFecha) compraFecha.value = today;
     if (comprasFecha) comprasFecha.value = today;
+    if (ajusteFecha) ajusteFecha.value = today;
+    if (ajustesFecha) ajustesFecha.value = today;
     if (cierresDesde) cierresDesde.value = monthStart;
     if (cierresHasta) cierresHasta.value = monthEnd;
     if (ventasTransDesde) ventasTransDesde.value = monthStart;
@@ -1751,6 +1898,38 @@
       compraItemsWrapper.appendChild(card);
     };
 
+    const createAjusteItemRow = (item = {}) => {
+      if (!ajusteItemsWrapper) return;
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.dataset.codigo = item.codigo || '';
+      card.dataset.producto = item.nombre || '';
+      card.dataset.proveedor = item.proveedor || '';
+      card.dataset.precio = 0;
+      card.innerHTML = `
+        <div class="row">
+          <div class="product-meta">
+            <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'} <span class="inline-provider">· ${item.proveedor || '—'}</span></span>
+          </div>
+          <button type="button" class="remove-btn">✕</button>
+        </div>
+        <div class="controls">
+          <label>
+            Cantidad
+            <input type="number" class="cantidad" step="0.01" value="${item.cantidad || 1}" required>
+          </label>
+        </div>
+      `;
+      card.querySelector('.remove-btn').addEventListener('click', () => {
+        card.remove();
+        updateAjusteTotal();
+      });
+      ['cantidad'].forEach(cls => {
+        card.querySelector('.' + cls).addEventListener('input', updateAjusteTotal);
+      });
+      ajusteItemsWrapper.appendChild(card);
+    };
+
     addSelectedBtn.addEventListener('click', () => {
       const query = (productSearch.value || '').trim();
       if (!query) {
@@ -1801,6 +1980,32 @@
       });
     }
 
+    if (ajusteAddSelectedBtn) {
+      ajusteAddSelectedBtn.addEventListener('click', () => {
+        const query = (ajusteProductSearch ? ajusteProductSearch.value : '').trim();
+        if (!query) {
+          if (ajusteSearchError) ajusteSearchError.hidden = false;
+          return;
+        }
+        const selected = findProduct(query);
+        if (!selected) {
+          if (ajusteSearchError) ajusteSearchError.hidden = false;
+          return;
+        }
+        if (ajusteSearchError) ajusteSearchError.hidden = true;
+        const item = {
+          codigo: selected.codigo,
+          nombre: selected.nombre,
+          proveedor: selected.proveedor,
+          precio_venta: selected.precio_venta,
+          valor_unitario: selected.precio_venta,
+        };
+        createAjusteItemRow(item);
+        if (ajusteProductSearch) ajusteProductSearch.value = '';
+        updateAjusteTotal();
+      });
+    }
+
     const updateTotal = () => {
       let total = 0;
       itemsWrapper.querySelectorAll('.item-card').forEach(row => {
@@ -1835,6 +2040,12 @@
       compraTotalEl.style.color = total > 0 ? '#5ef8b0' : (total < 0 ? '#ffb36b' : 'var(--text)');
     };
 
+    const updateAjusteTotal = () => {
+      if (!ajusteItemsWrapper || !ajusteTotalEl) return;
+      ajusteTotalEl.textContent = 'Q.0.00';
+      ajusteTotalEl.style.color = 'var(--text)';
+    };
+
     const showCompraMessage = (text, isError = false) => {
       if (!compraMessageEl) return;
       compraMessageEl.textContent = text;
@@ -1843,6 +2054,17 @@
       compraMessageEl.style.display = 'block';
       setTimeout(() => {
         compraMessageEl.style.display = 'none';
+      }, 5000);
+    };
+
+    const showAjusteMessage = (text, isError = false) => {
+      if (!ajusteMessageEl) return;
+      ajusteMessageEl.textContent = text;
+      ajusteMessageEl.classList.toggle('error', isError);
+      ajusteMessageEl.classList.toggle('success', !isError);
+      ajusteMessageEl.style.display = 'block';
+      setTimeout(() => {
+        ajusteMessageEl.style.display = 'none';
       }, 5000);
     };
 
@@ -1949,6 +2171,68 @@
           showCompraMessage(err.message || 'No se pudo enviar.', true);
         } finally {
           setButtonLoading(compraSubmitBtn, false);
+        }
+      });
+    }
+
+    if (ajusteForm) {
+      ajusteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (ajusteMessageEl) ajusteMessageEl.style.display = 'none';
+        const rows = [...(ajusteItemsWrapper ? ajusteItemsWrapper.querySelectorAll('.item-card') : [])];
+        if (!rows.length) {
+          showAjusteMessage('Agrega al menos un ítem.', true);
+          return;
+        }
+        if (!window.confirm('¿Confirmar ajuste de inventario?')) return;
+        setButtonLoading(ajusteSubmitBtn, true);
+        try {
+          const items = rows.map(row => {
+            const qtyRaw = Number(row.querySelector('.cantidad').value || 0);
+            const codigo = (row.dataset.codigo || '').trim();
+            const nombre = (row.dataset.producto || '').trim();
+            const comentario = nombre ? `Ajuste de inventario: ${nombre}` : 'Ajuste de inventario';
+            const proveedor = (row.dataset.proveedor || '').trim();
+            return {
+              codigo,
+              tipo: 3,
+              cantidad: qtyRaw,
+              valor_unitario: 0,
+              descuento: 0,
+              comentario,
+              proveedor,
+              precio_venta: 0,
+              confirmado: 1,
+              credito: 0,
+            };
+          });
+          const selectedDate = ajusteFecha ? ajusteFecha.value : toLocalISODate(new Date());
+          const now = new Date();
+          const time = now.toTimeString().slice(0, 8);
+          const fechaConHora = `${selectedDate} ${time}`;
+          const payload = {
+            fecha: fechaConHora,
+            confirmado: 1,
+            credito: 0,
+            items,
+          };
+          const fd = new FormData();
+          fd.append('payload', JSON.stringify(payload));
+          await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: fd,
+          });
+          showAjusteMessage('¡Ajuste registrado con éxito!');
+          ajusteForm.reset();
+          if (ajusteFecha) ajusteFecha.value = toLocalISODate(new Date());
+          if (ajusteItemsWrapper) ajusteItemsWrapper.innerHTML = '';
+          updateAjusteTotal();
+          loadMovimientos(true);
+        } catch (err) {
+          showAjusteMessage(err.message || 'No se pudo enviar.', true);
+        } finally {
+          setButtonLoading(ajusteSubmitBtn, false);
         }
       });
     }
@@ -2080,6 +2364,7 @@
         renderMovimientos();
         renderResumen();
         renderCompras();
+        renderAjustes();
         if (pendingTransaccionDetalle !== null) {
           const targetId = pendingTransaccionDetalle;
           pendingTransaccionDetalle = null;
@@ -2626,7 +2911,7 @@
         return codigo.includes(q) || nombre.includes(q) || proveedor.includes(q);
       });
       if (!rows.length) {
-        productosBody.innerHTML = '<tr><td colspan="8">Sin productos para este filtro.</td></tr>';
+        productosBody.innerHTML = '<tr><td colspan="9">Sin productos para este filtro.</td></tr>';
         productosCount.textContent = '0 productos';
         productosStatus.textContent = q ? 'Sin resultados' : 'Sin registros';
         return;
@@ -2634,6 +2919,7 @@
       productosBody.innerHTML = rows.map(item => {
         const costo = Number(item.costo_unitario || 0);
         const precio = Number(item.precio_venta || 0);
+        const stock = Number(item.stock_actual || 0);
         const afecto = Number(item.afecto || 0) === 1 ? 'Sí' : 'No';
         const activo = Number(item.activo || 0) === 1 ? 'Sí' : 'No';
         return `
@@ -2644,10 +2930,12 @@
             <td>${item.proveedor || ''}</td>
             <td>Q.${isFinite(costo) ? costo.toFixed(2) : '0.00'}</td>
             <td>Q.${isFinite(precio) ? precio.toFixed(2) : '0.00'}</td>
+            <td>${isFinite(stock) ? stock : '0'}</td>
             <td>${activo}</td>
             <td>
               <div style="display:flex; gap:6px; flex-wrap:nowrap;">
                 <button type="button" class="btn compact" data-action="producto-editar" data-codigo="${item.codigo || ''}" data-nombre="${item.nombre || ''}" data-afecto="${item.afecto || 0}" data-proveedor="${item.proveedor || ''}" data-costo="${item.costo_unitario || 0}" data-precio="${item.precio_venta || 0}" data-activo="${item.activo || 0}">Editar</button>
+                <button type="button" class="btn compact" data-action="producto-ajustar" data-codigo="${item.codigo || ''}" data-nombre="${item.nombre || ''}" data-proveedor="${item.proveedor || ''}" data-stock="${item.stock_actual || 0}">Ajustar</button>
                 <button type="button" class="btn compact danger" data-action="producto-eliminar" data-codigo="${item.codigo || ''}">Eliminar</button>
               </div>
             </td>
@@ -2677,6 +2965,27 @@
       if (!productoModal) return;
       productoModal.classList.remove('active');
       productoModal.dataset.mode = '';
+    }
+
+    function openAjusteModal(data = {}) {
+      if (!ajusteModal || !ajusteModalProducto || !ajusteModalFecha || !ajusteModalCantidad || !ajusteModalComentario) return;
+      ajusteModal.dataset.codigo = data.codigo || '';
+      ajusteModal.dataset.nombre = data.nombre || '';
+      ajusteModal.dataset.proveedor = data.proveedor || '';
+      ajusteModalProducto.textContent = `${data.codigo || ''} - ${data.nombre || 'Producto'}${data.proveedor ? ` · ${data.proveedor}` : ''}`;
+      ajusteModalFecha.value = toLocalISODate(new Date());
+      ajusteModalCantidad.value = '';
+      ajusteModalComentario.value = '';
+      ajusteModal.classList.add('active');
+    }
+
+    function closeAjusteModal() {
+      if (!ajusteModal) return;
+      ajusteModal.classList.remove('active');
+      ajusteModal.dataset.codigo = '';
+      ajusteModal.dataset.nombre = '';
+      ajusteModal.dataset.proveedor = '';
+      if (ajusteModalSave) setButtonLoading(ajusteModalSave, false);
     }
 
     function saveProducto() {
@@ -2838,6 +3147,44 @@
       if (comprasCount) comprasCount.textContent = `${rows.length} compras`;
       if (comprasTotal) comprasTotal.textContent = `Q.${totalSum.toFixed(2)}`;
       if (comprasStatus) comprasStatus.textContent = 'Actualizado';
+    }
+
+    function renderAjustes() {
+      if (!ajustesBody || !ajustesFecha) return;
+      const selectedDate = ajustesFecha.value || toLocalISODate(new Date());
+      if (!movimientosLoaded) {
+        if (ajustesStatus) ajustesStatus.textContent = 'Cargando ajustes...';
+        return;
+      }
+      const rows = movimientos.filter(item => {
+        if (Number(item.tipo) !== 3) return false;
+        const dateObj = parseSheetDate(item.fechaRaw);
+        if (!dateObj) return false;
+        return toLocalISODate(dateObj) === selectedDate;
+      });
+
+      if (!rows.length) {
+        ajustesBody.innerHTML = '<tr><td colspan="4">Sin ajustes para esta fecha.</td></tr>';
+        if (ajustesCount) ajustesCount.textContent = '0 ajustes';
+        if (ajustesTotal) ajustesTotal.textContent = 'Q.0.00';
+        if (ajustesStatus) ajustesStatus.textContent = 'Sin resultados';
+        return;
+      }
+
+      ajustesBody.innerHTML = rows.map(item => {
+        const cantidad = isFinite(item.cantidad) ? item.cantidad : 0;
+        return `
+          <tr>
+            <td>${formatDateTime(item.fechaRaw)}</td>
+            <td>${item.codigo || ''}</td>
+            <td>${cantidad}</td>
+            <td>${item.comentario || ''}</td>
+          </tr>
+        `;
+      }).join('');
+      if (ajustesCount) ajustesCount.textContent = `${rows.length} ajustes`;
+      if (ajustesTotal) ajustesTotal.textContent = 'Q.0.00';
+      if (ajustesStatus) ajustesStatus.textContent = 'Actualizado';
     }
 
     function renderResumen() {
@@ -3034,6 +3381,36 @@
       compraSearchResults.hidden = false;
     }
 
+    const toggleAjusteClear = () => {
+      if (!ajusteClearSearchBtn || !ajusteProductSearch) return;
+      ajusteClearSearchBtn.disabled = !ajusteProductSearch.value.trim();
+    };
+    function renderAjusteResults(query) {
+      if (!ajusteSearchResults) return;
+      const normalized = query.trim().toLowerCase();
+      if (!normalized) {
+        ajusteSearchResults.hidden = true;
+        ajusteSearchResults.innerHTML = '';
+        return;
+      }
+      const results = catalog.filter(p => {
+        const code = String(p.codigo).toLowerCase();
+        const name = String(p.nombre).toLowerCase();
+        const provider = String(p.proveedor || '').toLowerCase();
+        return code.includes(normalized) || name.includes(normalized) || provider.includes(normalized);
+      }).slice(0, 8);
+      if (!results.length) {
+        ajusteSearchResults.hidden = true;
+        ajusteSearchResults.innerHTML = '';
+        return;
+      }
+      ajusteSearchResults.innerHTML = results.map(p => {
+        const label = `${p.codigo} - ${p.nombre} / ${p.proveedor || '—'} / Precio: Q.${p.precio_venta}`;
+        return `<button type="button" data-code="${p.codigo}">${label}</button>`;
+      }).join('');
+      ajusteSearchResults.hidden = false;
+    }
+
     if (compraSearchResults) {
       compraSearchResults.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
@@ -3044,6 +3421,20 @@
           compraProductSearch.value = `${product.codigo} - ${product.nombre} / ${product.proveedor || '—'} / Q.${product.precio_venta}`;
           toggleCompraClear();
           compraSearchResults.hidden = true;
+        }
+      });
+    }
+
+    if (ajusteSearchResults) {
+      ajusteSearchResults.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const code = btn.getAttribute('data-code');
+        const product = catalog.find(p => String(p.codigo) === String(code));
+        if (product && ajusteProductSearch) {
+          ajusteProductSearch.value = `${product.codigo} - ${product.nombre} / ${product.proveedor || '—'} / Q.${product.precio_venta}`;
+          toggleAjusteClear();
+          ajusteSearchResults.hidden = true;
         }
       });
     }
@@ -3059,6 +3450,13 @@
         toggleCompraClear();
         renderCompraResults(compraProductSearch.value);
         if (compraSearchError) compraSearchError.hidden = true;
+      });
+    }
+    if (ajusteProductSearch) {
+      ajusteProductSearch.addEventListener('input', () => {
+        toggleAjusteClear();
+        renderAjusteResults(ajusteProductSearch.value);
+        if (ajusteSearchError) ajusteSearchError.hidden = true;
       });
     }
     const keepSearchVisible = () => {
@@ -3100,6 +3498,15 @@
         renderCompraResults('');
         if (compraSearchError) compraSearchError.hidden = true;
         compraProductSearch.focus();
+      });
+    }
+    if (ajusteClearSearchBtn && ajusteProductSearch) {
+      ajusteClearSearchBtn.addEventListener('click', () => {
+        ajusteProductSearch.value = '';
+        toggleAjusteClear();
+        renderAjusteResults('');
+        if (ajusteSearchError) ajusteSearchError.hidden = true;
+        ajusteProductSearch.focus();
       });
     }
 
@@ -3225,11 +3632,28 @@
         }
       });
     }
+    if (ajustesFecha) {
+      ajustesFecha.addEventListener('change', () => {
+        if (!movimientosLoaded) {
+          loadMovimientos();
+        } else {
+          renderAjustes();
+        }
+      });
+    }
     if (comprasReload) {
       comprasReload.addEventListener('click', () => {
         if (movimientosLoading) return;
         movimientosLoadingButton = comprasReload;
         setButtonLoading(comprasReload, true);
+        loadMovimientos(true);
+      });
+    }
+    if (ajustesReload) {
+      ajustesReload.addEventListener('click', () => {
+        if (movimientosLoading) return;
+        movimientosLoadingButton = ajustesReload;
+        setButtonLoading(ajustesReload, true);
         loadMovimientos(true);
       });
     }
@@ -3272,6 +3696,75 @@
         saveProducto();
       });
     }
+    if (ajusteModalCancel) {
+      ajusteModalCancel.addEventListener('click', () => {
+        closeAjusteModal();
+      });
+    }
+    if (ajusteModal) {
+      ajusteModal.addEventListener('click', (event) => {
+        if (event.target === ajusteModal) {
+          closeAjusteModal();
+        }
+      });
+    }
+    if (ajusteModalSave) {
+      ajusteModalSave.addEventListener('click', async () => {
+        if (!ajusteModal) return;
+        const codigo = ajusteModal.dataset.codigo || '';
+        if (!codigo) return;
+        const cantidad = Number(ajusteModalCantidad ? ajusteModalCantidad.value : 0);
+        if (!isFinite(cantidad) || cantidad === 0) {
+          window.alert('Cantidad inválida.');
+          return;
+        }
+        const fecha = (ajusteModalFecha && ajusteModalFecha.value) ? ajusteModalFecha.value : toLocalISODate(new Date());
+        const comentarioRaw = ajusteModalComentario ? String(ajusteModalComentario.value || '').trim() : '';
+        const nombre = ajusteModal.dataset.nombre || '';
+        const proveedor = ajusteModal.dataset.proveedor || '';
+        const comentario = comentarioRaw || (nombre ? `Ajuste de inventario: ${nombre}` : 'Ajuste de inventario');
+        if (!window.confirm('¿Confirmar ajuste de inventario?')) return;
+        setButtonLoading(ajusteModalSave, true);
+        if (productosStatus) productosStatus.textContent = 'Registrando ajuste...';
+        try {
+          const now = new Date();
+          const time = now.toTimeString().slice(0, 8);
+          const fechaConHora = `${fecha} ${time}`;
+          const payload = {
+            fecha: fechaConHora,
+            confirmado: 1,
+            credito: 0,
+            items: [{
+              codigo,
+              tipo: 3,
+              cantidad,
+              valor_unitario: 0,
+              descuento: 0,
+              comentario,
+              proveedor,
+              precio_venta: 0,
+              confirmado: 1,
+              credito: 0,
+            }],
+          };
+          const fd = new FormData();
+          fd.append('payload', JSON.stringify(payload));
+          await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: fd,
+          });
+          closeAjusteModal();
+          if (productosStatus) productosStatus.textContent = 'Ajuste registrado.';
+          loadMovimientos(true);
+          loadProductos();
+        } catch (err) {
+          if (productosStatus) productosStatus.textContent = 'Error registrando ajuste.';
+        } finally {
+          setButtonLoading(ajusteModalSave, false);
+        }
+      });
+    }
     if (productosBody) {
       productosBody.addEventListener('click', (event) => {
         const deleteBtn = event.target.closest('button[data-action="producto-eliminar"][data-codigo]');
@@ -3308,6 +3801,15 @@
             costo_unitario: editBtn.getAttribute('data-costo') || 0,
             precio_venta: editBtn.getAttribute('data-precio') || 0,
             activo: editBtn.getAttribute('data-activo') || 0,
+          });
+          return;
+        }
+        const ajusteBtn = event.target.closest('button[data-action="producto-ajustar"][data-codigo]');
+        if (ajusteBtn) {
+          openAjusteModal({
+            codigo: ajusteBtn.getAttribute('data-codigo') || '',
+            nombre: ajusteBtn.getAttribute('data-nombre') || '',
+            proveedor: ajusteBtn.getAttribute('data-proveedor') || '',
           });
         }
       });
@@ -3738,9 +4240,11 @@
 
     toggleClear();
     toggleCompraClear();
+    toggleAjusteClear();
     loadCatalog();
     updateTotal();
     updateCompraTotal();
+    updateAjusteTotal();
   </script>
 </body>
 </html>

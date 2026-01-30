@@ -21,7 +21,7 @@ const CIERRES_HEADERS = [
   'fecha', 'saldo_inicial', 'total_entradas', 'total_salidas', 'saldo_final', 'timestamp', 'usuario',
 ];
 const PRODUCTOS_HEADERS = [
-  'codigo', 'nombre', 'afecto', 'proveedor', 'costo_unitario', 'precio_venta', 'activo',
+  'codigo', 'nombre', 'afecto', 'proveedor', 'costo_unitario', 'precio_venta', 'activo', 'stock_actual',
 ];
 const FACTURACION_FOLDER_ID = '1AK9CZlEeh6oLlnf6PcV_cp5uZMPH2Qqa';
 const FACTURACION_TEMPLATE_ID = '16gxGia3t367ImiAW_2t0dhJ2Zy7D5E5HGooSWAemQ9s';
@@ -205,60 +205,65 @@ function doPost(e) {
     let nextNum = 1;
     const timestamp = new Date();
     const tipoNumerico = getTipoNumericoFromItems(items);
-    const tipoTextoFromItems = normalizeTransaccionTipo(tipoNumerico);
-    const tipoTextoFromPayload = normalizeTransaccionTipo(payload.tipo);
-    const creditoFlag = getCreditoFlag(items, payload);
+    const isAjusteInventario = Number(tipoNumerico) === 3;
+    const tipoTextoFromItems = isAjusteInventario ? '' : normalizeTransaccionTipo(tipoNumerico);
+    const tipoTextoFromPayload = isAjusteInventario ? '' : normalizeTransaccionTipo(payload.tipo);
+    const creditoFlag = isAjusteInventario ? 0 : getCreditoFlag(items, payload);
     const referenciaExterna = payload.referencia_externa || payload.referencia || '';
     const nota = payload.nota || '';
     const usuario = payload.usuario || '';
     let transaccionId = Number(payload.transaccion_id || 0);
-    const transaccionIds = {};
-    items.forEach((item) => {
-      if (item.transaccion_id) transaccionIds[String(item.transaccion_id)] = true;
-    });
-    const transaccionIdKeys = Object.keys(transaccionIds);
-    if (!transaccionId && transaccionIdKeys.length) {
-      if (transaccionIdKeys.length > 1) {
-        throw new Error('Todos los items deben pertenecer a la misma transacción.');
-      }
-      transaccionId = Number(transaccionIdKeys[0]);
-    }
-    let transaccionMeta = transaccionId ? getTransaccionMetaById(transaccionId) : null;
-    if (transaccionId && !transaccionMeta) throw new Error('Transacción no encontrada.');
-    if (transaccionMeta && String(transaccionMeta.estado || '').toLowerCase() === 'anulada') {
-      throw new Error('Transacción anulada.');
-    }
-    const tipoTexto = transaccionMeta
-      ? normalizeTransaccionTipo(transaccionMeta.tipo)
-      : (tipoTextoFromPayload || tipoTextoFromItems);
-    if (!tipoTexto) throw new Error('Tipo de transacción inválido.');
-    if (tipoTextoFromItems && tipoTextoFromItems !== tipoTexto) {
-      throw new Error('Los items no coinciden con el tipo de transacción.');
-    }
-    if (tipoTextoFromPayload && tipoTextoFromPayload !== tipoTexto) {
-      throw new Error('El tipo del payload no coincide con la transacción.');
-    }
-    if (transaccionIdKeys.length && transaccionId) {
-      if (transaccionIdKeys.some(id => Number(id) !== transaccionId)) {
-        throw new Error('Todos los items deben pertenecer a la misma transacción.');
-      }
-    }
-    if (transaccionMeta) {
-      const summary = getTransaccionSummary(transaccionId);
-      if (summary && summary.count > 0 && summary.credito !== creditoFlag) {
-        throw new Error('La transacción ya tiene un crédito distinto.');
-      }
-    } else {
-      const fechaTransaccion = payload.fecha ? new Date(payload.fecha) : (items[0].fecha ? new Date(items[0].fecha) : new Date());
-      const created = createTransaccionRecord({
-        tipo: tipoTexto,
-        fecha: fechaTransaccion,
-        usuario: usuario,
-        referencia_externa: referenciaExterna,
-        nota: nota,
+    if (isAjusteInventario) transaccionId = 0;
+    let transaccionMeta = null;
+    if (!isAjusteInventario) {
+      const transaccionIds = {};
+      items.forEach((item) => {
+        if (item.transaccion_id) transaccionIds[String(item.transaccion_id)] = true;
       });
-      transaccionId = created.id;
-      transaccionMeta = getTransaccionMetaById(transaccionId);
+      const transaccionIdKeys = Object.keys(transaccionIds);
+      if (!transaccionId && transaccionIdKeys.length) {
+        if (transaccionIdKeys.length > 1) {
+          throw new Error('Todos los items deben pertenecer a la misma transacción.');
+        }
+        transaccionId = Number(transaccionIdKeys[0]);
+      }
+      transaccionMeta = transaccionId ? getTransaccionMetaById(transaccionId) : null;
+      if (transaccionId && !transaccionMeta) throw new Error('Transacción no encontrada.');
+      if (transaccionMeta && String(transaccionMeta.estado || '').toLowerCase() === 'anulada') {
+        throw new Error('Transacción anulada.');
+      }
+      const tipoTexto = transaccionMeta
+        ? normalizeTransaccionTipo(transaccionMeta.tipo)
+        : (tipoTextoFromPayload || tipoTextoFromItems);
+      if (!tipoTexto) throw new Error('Tipo de transacción inválido.');
+      if (tipoTextoFromItems && tipoTextoFromItems !== tipoTexto) {
+        throw new Error('Los items no coinciden con el tipo de transacción.');
+      }
+      if (tipoTextoFromPayload && tipoTextoFromPayload !== tipoTexto) {
+        throw new Error('El tipo del payload no coincide con la transacción.');
+      }
+      if (transaccionIdKeys.length && transaccionId) {
+        if (transaccionIdKeys.some(id => Number(id) !== transaccionId)) {
+          throw new Error('Todos los items deben pertenecer a la misma transacción.');
+        }
+      }
+      if (transaccionMeta) {
+        const summary = getTransaccionSummary(transaccionId);
+        if (summary && summary.count > 0 && summary.credito !== creditoFlag) {
+          throw new Error('La transacción ya tiene un crédito distinto.');
+        }
+      } else {
+        const fechaTransaccion = payload.fecha ? new Date(payload.fecha) : (items[0].fecha ? new Date(items[0].fecha) : new Date());
+        const created = createTransaccionRecord({
+          tipo: tipoTexto,
+          fecha: fechaTransaccion,
+          usuario: usuario,
+          referencia_externa: referenciaExterna,
+          nota: nota,
+        });
+        transaccionId = created.id;
+        transaccionMeta = getTransaccionMetaById(transaccionId);
+      }
     }
     const lock = LockService.getDocumentLock();
     lock.waitLock(15000);
@@ -274,18 +279,22 @@ function doPost(e) {
         const codigo = item.codigo || '';
         const tipo = item.tipo === undefined ? 1 : (Number(item.tipo) || 1);
         const cantidad = Number(item.cantidad || 0);
-        const valorUnitario = Number(item.valor_unitario || 0);
-        const descuento = Number(item.descuento || 0);
-        const comentario = item.comentario && String(item.comentario).trim() ? item.comentario : 'Venta mostrador';
-        const confirmado = item.confirmado !== undefined
-          ? item.confirmado
-          : (item.facturado !== undefined
-            ? item.facturado
-            : (payload.confirmado !== undefined
-              ? payload.confirmado
-              : (payload.facturado || 0)));
-        const credito = item.credito !== undefined ? item.credito : (payload.credito || 0);
-        const costoTotal = (Math.abs(cantidad) * valorUnitario) - descuento;
+        const valorUnitario = isAjusteInventario ? 0 : Number(item.valor_unitario || 0);
+        const descuento = isAjusteInventario ? 0 : Number(item.descuento || 0);
+        const comentario = item.comentario && String(item.comentario).trim()
+          ? item.comentario
+          : (isAjusteInventario ? 'Ajuste de inventario' : 'Venta mostrador');
+        const confirmado = isAjusteInventario
+          ? 1
+          : (item.confirmado !== undefined
+            ? item.confirmado
+            : (item.facturado !== undefined
+              ? item.facturado
+              : (payload.confirmado !== undefined
+                ? payload.confirmado
+                : (payload.facturado || 0))));
+        const credito = isAjusteInventario ? 0 : (item.credito !== undefined ? item.credito : (payload.credito || 0));
+        const costoTotal = isAjusteInventario ? 0 : ((Math.abs(cantidad) * valorUnitario) - descuento);
         const row = new Array(headers.length).fill('');
         row[idxNumero] = nextNum + idx;
         row[idxFecha] = fecha;
@@ -298,7 +307,7 @@ function doPost(e) {
         row[idxComentario] = comentario;
         row[idxConfirmado] = confirmado;
         row[idxCredito] = credito;
-        if (idxTransaccionId >= 0) row[idxTransaccionId] = transaccionId;
+        if (idxTransaccionId >= 0 && !isAjusteInventario) row[idxTransaccionId] = transaccionId;
         if (idxTimestamp >= 0) row[idxTimestamp] = timestamp;
         return row;
       });
@@ -308,7 +317,9 @@ function doPost(e) {
       lock.releaseLock();
     }
 
-    syncTransaccionAndCaja(transaccionId);
+    if (!isAjusteInventario) {
+      syncTransaccionAndCaja(transaccionId);
+    }
 
     return jsonResponse({ ok: true, inserted: rows.length, first_numero: nextNum, transaccion_id: transaccionId });
   } catch (err) {
@@ -810,6 +821,7 @@ function deleteMovimiento(payload) {
   const idxFecha = headers.indexOf('fecha');
   const idxConfirmado = headers.indexOf('confirmado');
   const idxCredito = headers.indexOf('credito');
+  const idxTipo = headers.indexOf('tipo');
   const idxTransaccionId = headers.indexOf('transaccion_id');
   if (idxNumero < 0 || idxFecha < 0 || idxConfirmado < 0 || idxCredito < 0) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
@@ -817,6 +829,7 @@ function deleteMovimiento(payload) {
   let rowIndex = -1;
   let confirmado = 0;
   let credito = 0;
+  let tipo = 0;
   let rowDate = null;
   let transaccionId = 0;
   for (let i = 1; i < data.length; i += 1) {
@@ -824,6 +837,7 @@ function deleteMovimiento(payload) {
       rowIndex = i + 1;
       confirmado = Number(data[i][idxConfirmado] || 0);
       credito = Number(data[i][idxCredito] || 0);
+      if (idxTipo >= 0) tipo = Number(data[i][idxTipo] || 0);
       rowDate = data[i][idxFecha];
       if (idxTransaccionId >= 0) transaccionId = Number(data[i][idxTransaccionId] || 0);
       break;
@@ -841,7 +855,7 @@ function deleteMovimiento(payload) {
   movimientosSheet.deleteRow(rowIndex);
   if (transaccionId) {
     syncTransaccionAndCaja(transaccionId);
-  } else if (credito !== 1) {
+  } else if (credito !== 1 && tipo !== 3) {
     deleteCajaByNumero(numero);
   }
   return { ok: true, numero: numero, transaccion_id: transaccionId || '' };
@@ -916,14 +930,16 @@ function updateMovimiento(payload) {
     }
   }
   let nextValorUnitario = valorUnitario;
-  if (valorUnitarioRaw !== undefined && tipo === 2) {
+  if (tipo === 3) {
+    nextValorUnitario = 0;
+  } else if (valorUnitarioRaw !== undefined && tipo === 2) {
     const valorInput = Number(valorUnitarioRaw);
     if (!isFinite(valorInput)) throw new Error('Valor unitario inválido.');
     nextValorUnitario = valorInput;
   }
   const cantidad = tipo === 1 ? -Math.abs(cantidadInput) : cantidadInput;
-  const descuento = Math.max(0, descuentoInput);
-  const costoTotal = (Math.abs(cantidad) * nextValorUnitario) - descuento;
+  const descuento = tipo === 3 ? 0 : Math.max(0, descuentoInput);
+  const costoTotal = tipo === 3 ? 0 : ((Math.abs(cantidad) * nextValorUnitario) - descuento);
   movimientosSheet.getRange(rowIndex, idxCantidad + 1, 1, 3).setValues([[cantidad, nextValorUnitario, descuento]]);
   movimientosSheet.getRange(rowIndex, idxTotal + 1).setValue(costoTotal);
   if (confirmadoRaw !== undefined) {
@@ -931,7 +947,7 @@ function updateMovimiento(payload) {
   }
   if (transaccionId) {
     syncTransaccionAndCaja(transaccionId);
-  } else if (credito !== 1) {
+  } else if (credito !== 1 && tipo !== 3) {
     updateCajaMontoByNumero(numero, costoTotal);
   }
   return { ok: true, numero: numero, total: costoTotal, confirmado: nextConfirmado, transaccion_id: transaccionId || '' };
@@ -1298,6 +1314,7 @@ function listProductos(payload) {
   const idxCosto = headers.indexOf('costo_unitario');
   const idxPrecio = headers.indexOf('precio_venta');
   const idxActivo = headers.indexOf('activo');
+  const idxStock = headers.indexOf('stock_actual');
   const requiredIdx = [idxCodigo, idxNombre, idxAfecto, idxProveedor, idxCosto, idxPrecio, idxActivo];
   if (requiredIdx.some(idx => idx < 0)) {
     throw new Error('Columnas requeridas faltantes en productos.');
@@ -1311,6 +1328,7 @@ function listProductos(payload) {
     costo_unitario: row[idxCosto],
     precio_venta: row[idxPrecio],
     activo: row[idxActivo],
+    stock_actual: idxStock >= 0 ? row[idxStock] : '',
   })).filter(item => {
     if (!q) return true;
     const codigo = String(item.codigo || '').toLowerCase();

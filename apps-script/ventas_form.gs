@@ -7,9 +7,13 @@ const SHEET_NAME = 'movimientos';
 const CAJA_SHEET_NAME = 'caja';
 const LOTES_SHEET_NAME = 'lotes_facturacion';
 const LOTES_ITEMS_SHEET_NAME = 'lotes_items';
+const CIERRES_SHEET_NAME = 'cierres_caja';
 const LOTES_HEADERS = [
   'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'fecha_actualizacion',
   'total_items', 'total_monto', 'archivo_nombre', 'archivo_id', 'url', 'nota',
+];
+const CIERRES_HEADERS = [
+  'fecha', 'saldo_inicial', 'total_entradas', 'total_salidas', 'saldo_final', 'timestamp', 'usuario',
 ];
 const FACTURACION_FOLDER_ID = '1AK9CZlEeh6oLlnf6PcV_cp5uZMPH2Qqa';
 const FACTURACION_TEMPLATE_ID = '16gxGia3t367ImiAW_2t0dhJ2Zy7D5E5HGooSWAemQ9s';
@@ -48,6 +52,36 @@ function doGet(e) {
       const result = updateMovimiento(payload);
       return callback ? jsonpResponse(result, callback) : jsonResponse(result);
     }
+    if (action === 'caja_listar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = listCaja(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'cierres_listar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = listCierres(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'caja_crear') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = createCaja(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'caja_actualizar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = updateCaja(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'caja_eliminar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = deleteCaja(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'caja_cerrar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = closeCaja(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
     if (action === 'facturacion_descargar') {
       const loteId = e && e.parameter ? e.parameter.lote_id : null;
       return downloadFacturacion(loteId);
@@ -80,13 +114,46 @@ function doPost(e) {
     if (action === 'movimiento_actualizar') {
       return jsonResponse(updateMovimiento(payload));
     }
+    if (action === 'caja_crear') {
+      return jsonResponse(createCaja(payload));
+    }
+    if (action === 'cierres_listar') {
+      return jsonResponse(listCierres(payload));
+    }
+    if (action === 'caja_actualizar') {
+      return jsonResponse(updateCaja(payload));
+    }
+    if (action === 'caja_eliminar') {
+      return jsonResponse(deleteCaja(payload));
+    }
+    if (action === 'caja_cerrar') {
+      return jsonResponse(closeCaja(payload));
+    }
     const items = payload.items || [];
     if (!items.length) throw new Error('No hay items para registrar.');
+    items.forEach((item) => {
+      const fechaItem = item.fecha ? new Date(item.fecha) : (payload.fecha ? new Date(payload.fecha) : new Date());
+      assertDateNotClosed(fechaItem);
+    });
     const sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
     if (!sheet) throw new Error(`No se encontró la hoja "${SHEET_NAME}".`);
+    const headers = ensureHeader(sheet, 'timestamp');
+    const idxNumero = headers.indexOf('numero') >= 0 ? headers.indexOf('numero') : 0;
+    const idxFecha = headers.indexOf('fecha') >= 0 ? headers.indexOf('fecha') : 1;
+    const idxCodigo = headers.indexOf('codigo_producto') >= 0 ? headers.indexOf('codigo_producto') : 2;
+    const idxTipo = headers.indexOf('tipo') >= 0 ? headers.indexOf('tipo') : 3;
+    const idxCantidad = headers.indexOf('cantidad') >= 0 ? headers.indexOf('cantidad') : 4;
+    const idxValor = headers.indexOf('valor_unitario') >= 0 ? headers.indexOf('valor_unitario') : 5;
+    const idxDescuento = headers.indexOf('descuento') >= 0 ? headers.indexOf('descuento') : 6;
+    const idxTotal = headers.indexOf('costo_total') >= 0 ? headers.indexOf('costo_total') : 7;
+    const idxComentario = headers.indexOf('comentario') >= 0 ? headers.indexOf('comentario') : 8;
+    const idxFacturado = headers.indexOf('facturado') >= 0 ? headers.indexOf('facturado') : 9;
+    const idxCredito = headers.indexOf('credito') >= 0 ? headers.indexOf('credito') : 10;
+    const idxTimestamp = headers.indexOf('timestamp');
 
     let rows = [];
     let nextNum = 1;
+    const timestamp = new Date();
     const lock = LockService.getDocumentLock();
     lock.waitLock(15000);
     try {
@@ -107,22 +174,23 @@ function doPost(e) {
         const facturado = item.facturado !== undefined ? item.facturado : (payload.facturado || 0);
         const credito = item.credito !== undefined ? item.credito : (payload.credito || 0);
         const costoTotal = (Math.abs(cantidad) * valorUnitario) - descuento;
-        return [
-          nextNum + idx,
-          fecha,
-          codigo,
-          tipo,
-          cantidad,
-          valorUnitario,
-          descuento,
-          costoTotal,
-          comentario,
-          facturado,
-          credito,
-        ];
+        const row = new Array(headers.length).fill('');
+        row[idxNumero] = nextNum + idx;
+        row[idxFecha] = fecha;
+        row[idxCodigo] = codigo;
+        row[idxTipo] = tipo;
+        row[idxCantidad] = cantidad;
+        row[idxValor] = valorUnitario;
+        row[idxDescuento] = descuento;
+        row[idxTotal] = costoTotal;
+        row[idxComentario] = comentario;
+        row[idxFacturado] = facturado;
+        row[idxCredito] = credito;
+        if (idxTimestamp >= 0) row[idxTimestamp] = timestamp;
+        return row;
       });
 
-      sheet.getRange(lastRow + 1, 1, rows.length, 11).setValues(rows);
+      sheet.getRange(lastRow + 1, 1, rows.length, headers.length).setValues(rows);
     } finally {
       lock.releaseLock();
     }
@@ -149,10 +217,10 @@ function jsonpResponse(obj, callback) {
 function insertCaja(payload, rows) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
   if (!sheet || !rows.length) return;
+  const headers = ensureHeader(sheet, 'timestamp');
   // row: [numero, fecha, codigo, tipo, cantidad, valorUnitario, descuento, costo_total, ...]
   const lastRow = sheet.getLastRow();
   const nextId = Math.max(1, lastRow);
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
   let idxMonto = headers.indexOf('monto');
   if (idxMonto < 0 && headers.length >= 4) idxMonto = 3;
   let idxConcepto = headers.indexOf('concepto');
@@ -160,6 +228,8 @@ function insertCaja(payload, rows) {
   let idxReferencia = headers.indexOf('referencia');
   if (idxReferencia < 0 && headers.length >= 6) idxReferencia = 5;
   let idxTipoDescripcion = headers.indexOf('tipo_descripcion');
+  const idxTimestamp = headers.indexOf('timestamp');
+  const timestamp = new Date();
   const cajaRows = rows.map((row, idx) => {
     const numero = row[0];
     const fecha = row[1];
@@ -179,6 +249,7 @@ function insertCaja(payload, rows) {
     if (idxConcepto >= 0) rowData[idxConcepto] = concepto;
     if (idxReferencia >= 0) rowData[idxReferencia] = numero;
     if (idxTipoDescripcion >= 0) rowData[idxTipoDescripcion] = 'venta';
+    if (idxTimestamp >= 0) rowData[idxTimestamp] = timestamp;
     return rowData;
   });
   sheet.getRange(lastRow + 1, 1, cajaRows.length, sheet.getLastColumn()).setValues(cajaRows.map(row => {
@@ -333,20 +404,24 @@ function deleteMovimiento(payload) {
   if (data.length < 2) throw new Error('No hay movimientos.');
   const headers = data[0].map(h => String(h).toLowerCase());
   const idxNumero = headers.indexOf('numero');
+  const idxFecha = headers.indexOf('fecha');
   const idxFacturado = headers.indexOf('facturado');
-  if (idxNumero < 0 || idxFacturado < 0) {
+  if (idxNumero < 0 || idxFecha < 0 || idxFacturado < 0) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
   }
   let rowIndex = -1;
   let facturado = 0;
+  let rowDate = null;
   for (let i = 1; i < data.length; i += 1) {
     if (String(data[i][idxNumero] || '') === numero) {
       rowIndex = i + 1;
       facturado = Number(data[i][idxFacturado] || 0);
+      rowDate = data[i][idxFecha];
       break;
     }
   }
   if (rowIndex < 0) throw new Error('Movimiento no encontrado.');
+  if (isDateClosed(rowDate)) throw new Error('Día ya conciliado y cuadrado.');
   if (facturado === 1) throw new Error('No se puede eliminar un movimiento facturado.');
   movimientosSheet.deleteRow(rowIndex);
   deleteCajaByNumero(numero);
@@ -371,29 +446,33 @@ function updateMovimiento(payload) {
   if (data.length < 2) throw new Error('No hay movimientos.');
   const headers = data[0].map(h => String(h).toLowerCase());
   const idxNumero = headers.indexOf('numero');
+  const idxFecha = headers.indexOf('fecha');
   const idxCantidad = headers.indexOf('cantidad');
   const idxValor = headers.indexOf('valor_unitario');
   const idxDescuento = headers.indexOf('descuento');
   const idxTotal = headers.indexOf('costo_total');
   const idxFacturado = headers.indexOf('facturado');
   const idxTipo = headers.indexOf('tipo');
-  if (idxNumero < 0 || idxCantidad < 0 || idxValor < 0 || idxDescuento < 0 || idxTotal < 0 || idxFacturado < 0 || idxTipo < 0) {
+  if (idxNumero < 0 || idxFecha < 0 || idxCantidad < 0 || idxValor < 0 || idxDescuento < 0 || idxTotal < 0 || idxFacturado < 0 || idxTipo < 0) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
   }
   let rowIndex = -1;
   let facturado = 0;
   let valorUnitario = 0;
   let tipo = 0;
+  let rowDate = null;
   for (let i = 1; i < data.length; i += 1) {
     if (String(data[i][idxNumero] || '') === numero) {
       rowIndex = i + 1;
       facturado = Number(data[i][idxFacturado] || 0);
       valorUnitario = Number(data[i][idxValor] || 0);
       tipo = Number(data[i][idxTipo] || 0);
+      rowDate = data[i][idxFecha];
       break;
     }
   }
   if (rowIndex < 0) throw new Error('Movimiento no encontrado.');
+  if (isDateClosed(rowDate)) throw new Error('Día ya conciliado y cuadrado.');
   if (facturado === 1) throw new Error('No se puede editar un movimiento facturado.');
   let nextFacturado = facturado;
   if (facturadoRaw !== undefined) {
@@ -412,6 +491,391 @@ function updateMovimiento(payload) {
   }
   updateCajaMontoByNumero(numero, costoTotal);
   return { ok: true, numero: numero, total: costoTotal, facturado: nextFacturado };
+}
+
+function assertDateNotClosed(dateValue) {
+  if (!dateValue) return;
+  if (isDateClosed(dateValue)) throw new Error('Día ya conciliado y cuadrado.');
+}
+
+function isDateClosed(dateValue) {
+  const dateTarget = parseDateValue(dateValue);
+  if (!dateTarget) return false;
+  return !!getCierreByDate(dateTarget);
+}
+
+function getSaldoInicialForDate(dateValue) {
+  const dateTarget = parseDateValue(dateValue);
+  if (!dateTarget) return 0;
+  const previous = getLastCierreBefore(dateTarget);
+  return previous ? Number(previous.saldo_final || 0) : 0;
+}
+
+function getCierreByDate(dateValue) {
+  const sheet = getCierresSheet();
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return null;
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxFecha = headers.indexOf('fecha');
+  const idxSaldoInicial = headers.indexOf('saldo_inicial');
+  const idxEntradas = headers.indexOf('total_entradas');
+  const idxSalidas = headers.indexOf('total_salidas');
+  const idxSaldoFinal = headers.indexOf('saldo_final');
+  const idxTimestamp = headers.indexOf('timestamp');
+  const idxUsuario = headers.indexOf('usuario');
+  if (idxFecha < 0) return null;
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  const targetKey = Utilities.formatDate(parseDateValue(dateValue), tz, 'yyyy-MM-dd');
+  for (let i = 1; i < data.length; i += 1) {
+    const rowDate = parseDateValue(data[i][idxFecha]);
+    if (!rowDate) continue;
+    const rowKey = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+    if (rowKey === targetKey) {
+      return {
+        rowIndex: i + 1,
+        fecha: data[i][idxFecha],
+        saldo_inicial: data[i][idxSaldoInicial],
+        total_entradas: data[i][idxEntradas],
+        total_salidas: data[i][idxSalidas],
+        saldo_final: data[i][idxSaldoFinal],
+        timestamp: data[i][idxTimestamp],
+        usuario: data[i][idxUsuario],
+      };
+    }
+  }
+  return null;
+}
+
+function getLastCierreBefore(dateValue) {
+  const sheet = getCierresSheet();
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return null;
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxFecha = headers.indexOf('fecha');
+  const idxSaldoFinal = headers.indexOf('saldo_final');
+  if (idxFecha < 0 || idxSaldoFinal < 0) return null;
+  const targetDate = parseDateValue(dateValue);
+  if (!targetDate) return null;
+  let latest = null;
+  for (let i = 1; i < data.length; i += 1) {
+    const rowDate = parseDateValue(data[i][idxFecha]);
+    if (!rowDate) continue;
+    if (rowDate.getTime() >= targetDate.getTime()) continue;
+    if (!latest || rowDate.getTime() > latest.date.getTime()) {
+      latest = { date: rowDate, saldo_final: data[i][idxSaldoFinal] };
+    }
+  }
+  return latest;
+}
+
+function closeCaja(payload) {
+  const dateRaw = payload && payload.fecha ? payload.fecha : null;
+  if (!dateRaw) throw new Error('Fecha requerida.');
+  const dateTarget = parseDateValue(dateRaw);
+  if (!dateTarget) throw new Error('Fecha inválida.');
+  if (isDateClosed(dateTarget)) throw new Error('Día ya conciliado y cuadrado.');
+  const previousDate = new Date(dateTarget.getTime());
+  previousDate.setDate(previousDate.getDate() - 1);
+  if (!getCierreByDate(previousDate)) {
+    throw new Error('Debe cerrar el día anterior antes de cerrar este día.');
+  }
+
+  const cajaSheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!cajaSheet) throw new Error('No se encontró la hoja "caja".');
+  const data = cajaSheet.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxFecha = headers.indexOf('fecha');
+  const idxTipo = headers.indexOf('tipo');
+  const idxMonto = headers.indexOf('monto');
+  const idxConciliado = headers.indexOf('conciliado');
+  const requiredIdx = [idxFecha, idxTipo, idxMonto, idxConciliado];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en caja.');
+  }
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  const targetKey = Utilities.formatDate(dateTarget, tz, 'yyyy-MM-dd');
+  let totalEntradas = 0;
+  let totalSalidas = 0;
+  const conciliadoRange = data.length > 1
+    ? cajaSheet.getRange(2, idxConciliado + 1, data.length - 1, 1).getValues()
+    : [];
+  let updateConciliado = false;
+  for (let i = 1; i < data.length; i += 1) {
+    const rowDate = parseDateValue(data[i][idxFecha]);
+    if (!rowDate) continue;
+    const rowKey = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+    if (rowKey !== targetKey) continue;
+    const tipo = Number(data[i][idxTipo] || 0);
+    const monto = Number(data[i][idxMonto] || 0);
+    if (tipo === 1) totalEntradas += monto;
+    if (tipo === 2) totalSalidas += monto;
+    if (conciliadoRange[i - 1] && conciliadoRange[i - 1][0] !== 1) {
+      conciliadoRange[i - 1][0] = 1;
+      updateConciliado = true;
+    }
+  }
+  if (updateConciliado && conciliadoRange.length) {
+    cajaSheet.getRange(2, idxConciliado + 1, conciliadoRange.length, 1).setValues(conciliadoRange);
+  }
+
+  const saldoInicial = getSaldoInicialForDate(dateTarget);
+  const saldoFinal = saldoInicial + totalEntradas - totalSalidas;
+  const cierresSheet = getCierresSheet();
+  const row = [dateTarget, saldoInicial, totalEntradas, totalSalidas, saldoFinal, new Date(), ''];
+  cierresSheet.appendRow(row);
+  return {
+    ok: true,
+    fecha: dateTarget,
+    saldo_inicial: saldoInicial,
+    total_entradas: totalEntradas,
+    total_salidas: totalSalidas,
+    saldo_final: saldoFinal,
+  };
+}
+
+function listCaja(payload) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!sheet) return { ok: true, items: [] };
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, items: [] };
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxId = headers.indexOf('id');
+  const idxFecha = headers.indexOf('fecha');
+  const idxTipo = headers.indexOf('tipo');
+  const idxMonto = headers.indexOf('monto');
+  const idxConcepto = headers.indexOf('concepto');
+  const idxReferencia = headers.indexOf('referencia');
+  const idxConciliado = headers.indexOf('conciliado');
+  const idxTipoDescripcion = headers.indexOf('tipo_descripcion');
+  const requiredIdx = [idxId, idxFecha, idxTipo, idxMonto, idxConcepto, idxReferencia, idxConciliado, idxTipoDescripcion];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en caja.');
+  }
+  const filterDate = payload && payload.fecha ? parseDateValue(payload.fecha) : null;
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  const filterKey = filterDate ? Utilities.formatDate(filterDate, tz, 'yyyy-MM-dd') : null;
+  const items = data.slice(1).map(row => ({
+    id: row[idxId],
+    fecha: row[idxFecha],
+    tipo: row[idxTipo],
+    monto: row[idxMonto],
+    concepto: row[idxConcepto],
+    referencia: row[idxReferencia],
+    conciliado: row[idxConciliado],
+    tipo_descripcion: row[idxTipoDescripcion],
+  })).filter(item => {
+    if (!filterKey) return true;
+    const dateValue = parseDateValue(item.fecha);
+    if (!dateValue) return false;
+    const dateKey = Utilities.formatDate(dateValue, tz, 'yyyy-MM-dd');
+    return dateKey === filterKey;
+  });
+  items.sort((a, b) => {
+    const dateA = parseDateValue(a.fecha) || new Date(0);
+    const dateB = parseDateValue(b.fecha) || new Date(0);
+    return dateB.getTime() - dateA.getTime();
+  });
+  const summaryDate = filterDate || new Date();
+  const saldoInicial = getSaldoInicialForDate(summaryDate);
+  const cerrado = !!getCierreByDate(summaryDate);
+  return { ok: true, items: items, saldo_inicial: saldoInicial, cerrado: cerrado };
+}
+
+function listCierres(payload) {
+  const sheet = getCierresSheet();
+  if (!sheet) return { ok: true, items: [] };
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, items: [] };
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxFecha = headers.indexOf('fecha');
+  const idxSaldoInicial = headers.indexOf('saldo_inicial');
+  const idxEntradas = headers.indexOf('total_entradas');
+  const idxSalidas = headers.indexOf('total_salidas');
+  const idxSaldoFinal = headers.indexOf('saldo_final');
+  const idxTimestamp = headers.indexOf('timestamp');
+  const idxUsuario = headers.indexOf('usuario');
+  const requiredIdx = [idxFecha, idxSaldoInicial, idxEntradas, idxSalidas, idxSaldoFinal];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en cierres_caja.');
+  }
+  const fromRaw = payload && (payload.fecha_desde || payload.desde);
+  const toRaw = payload && (payload.fecha_hasta || payload.hasta);
+  const fromDate = parseDateValue(fromRaw);
+  const toDate = parseDateValue(toRaw);
+  const fromTime = fromDate ? new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate()).getTime() : null;
+  const toTime = toDate ? new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate()).getTime() : null;
+  const items = data.slice(1).map(row => ({
+    fecha: row[idxFecha],
+    saldo_inicial: row[idxSaldoInicial],
+    total_entradas: row[idxEntradas],
+    total_salidas: row[idxSalidas],
+    saldo_final: row[idxSaldoFinal],
+    timestamp: idxTimestamp >= 0 ? row[idxTimestamp] : '',
+    usuario: idxUsuario >= 0 ? row[idxUsuario] : '',
+  })).filter(item => {
+    const dateValue = parseDateValue(item.fecha);
+    if (!dateValue) return false;
+    const dayTime = new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate()).getTime();
+    if (fromTime && dayTime < fromTime) return false;
+    if (toTime && dayTime > toTime) return false;
+    return true;
+  });
+  items.sort((a, b) => {
+    const dateA = parseDateValue(a.fecha) || new Date(0);
+    const dateB = parseDateValue(b.fecha) || new Date(0);
+    return dateB.getTime() - dateA.getTime();
+  });
+  return { ok: true, items: items };
+}
+
+function createCaja(payload) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!sheet) throw new Error('No se encontró la hoja "caja".');
+  const headers = ensureHeader(sheet, 'timestamp');
+  const idxId = headers.indexOf('id');
+  const idxFecha = headers.indexOf('fecha');
+  const idxTipo = headers.indexOf('tipo');
+  const idxMonto = headers.indexOf('monto');
+  const idxConcepto = headers.indexOf('concepto');
+  const idxReferencia = headers.indexOf('referencia');
+  const idxConciliado = headers.indexOf('conciliado');
+  const idxTipoDescripcion = headers.indexOf('tipo_descripcion');
+  const idxTimestamp = headers.indexOf('timestamp');
+  const requiredIdx = [idxId, idxFecha, idxTipo, idxMonto, idxConcepto, idxReferencia, idxConciliado, idxTipoDescripcion];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en caja.');
+  }
+  const tipo = Number(payload.tipo || 0);
+  const monto = Number(payload.monto || 0);
+  const concepto = String(payload.concepto || '').trim();
+  const referencia = String(payload.referencia || '').trim();
+  const tipoDescripcion = String(payload.tipo_descripcion || '').trim();
+  if (![1, 2].includes(tipo)) throw new Error('Tipo inválido.');
+  if (!concepto) throw new Error('Concepto requerido.');
+  if (!isFinite(monto)) throw new Error('Monto inválido.');
+  const dateValue = payload.fecha ? parseDateValue(payload.fecha) : new Date();
+  const fecha = dateValue || new Date();
+  assertDateNotClosed(fecha);
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(15000);
+  try {
+    const lastRow = sheet.getLastRow();
+    let nextId = 1;
+    if (lastRow >= 2) {
+      const lastValue = sheet.getRange(lastRow, 1).getValue();
+      nextId = (typeof lastValue === 'number' && !isNaN(lastValue)) ? lastValue + 1 : lastRow;
+    }
+    const row = new Array(sheet.getLastColumn()).fill('');
+    row[idxId] = nextId;
+    row[idxFecha] = fecha;
+    row[idxTipo] = tipo;
+    row[idxMonto] = monto;
+    row[idxConcepto] = concepto;
+    row[idxReferencia] = referencia;
+    row[idxConciliado] = '';
+    row[idxTipoDescripcion] = tipoDescripcion || 'otros';
+    if (idxTimestamp >= 0) row[idxTimestamp] = new Date();
+    sheet.getRange(lastRow + 1, 1, 1, row.length).setValues([row]);
+    return { ok: true, id: nextId };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateCaja(payload) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!sheet) throw new Error('No se encontró la hoja "caja".');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxId = headers.indexOf('id');
+  const idxFecha = headers.indexOf('fecha');
+  const idxTipo = headers.indexOf('tipo');
+  const idxMonto = headers.indexOf('monto');
+  const idxConcepto = headers.indexOf('concepto');
+  const idxReferencia = headers.indexOf('referencia');
+  const idxConciliado = headers.indexOf('conciliado');
+  const idxTipoDescripcion = headers.indexOf('tipo_descripcion');
+  const requiredIdx = [idxId, idxFecha, idxTipo, idxMonto, idxConcepto, idxReferencia, idxConciliado, idxTipoDescripcion];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en caja.');
+  }
+  const id = String(payload.id || '').trim();
+  if (!id) throw new Error('ID requerido.');
+  const tipo = Number(payload.tipo || 0);
+  const monto = Number(payload.monto || 0);
+  const concepto = String(payload.concepto || '').trim();
+  const referencia = String(payload.referencia || '').trim();
+  const tipoDescripcion = String(payload.tipo_descripcion || '').trim();
+  if (![1, 2].includes(tipo)) throw new Error('Tipo inválido.');
+  if (!concepto) throw new Error('Concepto requerido.');
+  if (!isFinite(monto)) throw new Error('Monto inválido.');
+  const data = sheet.getDataRange().getValues();
+  let rowIndex = -1;
+  let conciliado = 0;
+  let currentTipoDescripcion = '';
+  let rowDate = null;
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][idxId] || '') === id) {
+      rowIndex = i + 1;
+      conciliado = Number(data[i][idxConciliado] || 0);
+      currentTipoDescripcion = String(data[i][idxTipoDescripcion] || '');
+      rowDate = data[i][idxFecha];
+      break;
+    }
+  }
+  if (rowIndex < 0) throw new Error('Movimiento no encontrado.');
+  if (isDateClosed(rowDate)) throw new Error('Día ya conciliado y cuadrado.');
+  if (conciliado === 1) throw new Error('Movimiento conciliado.');
+  const tipoDescripcionLower = currentTipoDescripcion.toLowerCase();
+  if (tipoDescripcionLower === 'venta' || tipoDescripcionLower === 'compra') {
+    throw new Error('No se puede editar un movimiento de venta.');
+  }
+  sheet.getRange(rowIndex, idxTipo + 1).setValue(tipo);
+  sheet.getRange(rowIndex, idxMonto + 1).setValue(monto);
+  sheet.getRange(rowIndex, idxConcepto + 1).setValue(concepto);
+  sheet.getRange(rowIndex, idxReferencia + 1).setValue(referencia);
+  sheet.getRange(rowIndex, idxTipoDescripcion + 1).setValue(tipoDescripcion || 'otros');
+  return { ok: true, id: id };
+}
+
+function deleteCaja(payload) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!sheet) throw new Error('No se encontró la hoja "caja".');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxId = headers.indexOf('id');
+  const idxFecha = headers.indexOf('fecha');
+  const idxConciliado = headers.indexOf('conciliado');
+  const idxTipoDescripcion = headers.indexOf('tipo_descripcion');
+  const requiredIdx = [idxId, idxFecha, idxConciliado, idxTipoDescripcion];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en caja.');
+  }
+  const id = String(payload.id || '').trim();
+  if (!id) throw new Error('ID requerido.');
+  const data = sheet.getDataRange().getValues();
+  let rowIndex = -1;
+  let conciliado = 0;
+  let currentTipoDescripcion = '';
+  let rowDate = null;
+  for (let i = 1; i < data.length; i += 1) {
+    if (String(data[i][idxId] || '') === id) {
+      rowIndex = i + 1;
+      conciliado = Number(data[i][idxConciliado] || 0);
+      currentTipoDescripcion = String(data[i][idxTipoDescripcion] || '');
+      rowDate = data[i][idxFecha];
+      break;
+    }
+  }
+  if (rowIndex < 0) throw new Error('Movimiento no encontrado.');
+  if (isDateClosed(rowDate)) throw new Error('Día ya conciliado y cuadrado.');
+  if (conciliado === 1) throw new Error('Movimiento conciliado.');
+  const tipoDescripcionLower = currentTipoDescripcion.toLowerCase();
+  if (tipoDescripcionLower === 'venta' || tipoDescripcionLower === 'compra') {
+    throw new Error('No se puede eliminar un movimiento de venta.');
+  }
+  sheet.deleteRow(rowIndex);
+  return { ok: true, id: id };
 }
 
 function listFacturacionLotes(payload) {
@@ -646,6 +1110,44 @@ function ensureLotesHeaders(sheet, headers) {
   if (changed) {
     sheet.getRange(1, 1, 1, row.length).setValues([row]);
   }
+}
+
+function getCierresSheet() {
+  const sheet = getOrCreateSheet(CIERRES_SHEET_NAME, CIERRES_HEADERS);
+  ensureCierresHeaders(sheet, CIERRES_HEADERS);
+  return sheet;
+}
+
+function ensureCierresHeaders(sheet, headers) {
+  if (!sheet) return;
+  const lastCol = Math.max(sheet.getLastColumn(), headers.length);
+  const row = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const normalized = row.map(h => String(h).toLowerCase());
+  let changed = false;
+  headers.forEach((header) => {
+    if (!normalized.includes(header)) {
+      row.push(header);
+      normalized.push(header);
+      changed = true;
+    }
+  });
+  if (changed) {
+    sheet.getRange(1, 1, 1, row.length).setValues([row]);
+  }
+}
+
+function ensureHeader(sheet, headerName) {
+  if (!sheet) return [];
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const row = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const normalized = row.map(h => String(h).toLowerCase());
+  const target = String(headerName || '').toLowerCase();
+  if (target && !normalized.includes(target)) {
+    row.push(target);
+    normalized.push(target);
+    sheet.getRange(1, 1, 1, row.length).setValues([row]);
+  }
+  return normalized;
 }
 
 function markMovimientosFacturados(numeros) {

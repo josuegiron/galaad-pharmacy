@@ -31,7 +31,6 @@
       position: sticky;
       top: 0;
       z-index: 10;
-      backdrop-filter: blur(10px);
       background: rgba(7, 10, 20, 0.9);
       border-bottom: 1px solid var(--stroke);
       padding: 14px 18px;
@@ -59,6 +58,14 @@
       transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
     }
     .btn:hover { transform: translateY(-1px); border-color: rgba(233, 255, 112, 0.4); }
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+      box-shadow: none;
+      border-color: var(--stroke);
+    }
+    .btn:disabled:hover { transform: none; border-color: var(--stroke); }
     .btn.primary {
       background: linear-gradient(140deg, #e9ff70 0%, #5ef8b0 100%);
       color: #0a0f1c;
@@ -100,7 +107,7 @@
     }
     form#ventaForm { display: flex; flex-direction: column; gap: 10px; }
     label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       border-radius: 12px;
       border: 1px solid var(--stroke);
@@ -111,7 +118,12 @@
       outline: none;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
-    input:focus, textarea:focus {
+    select {
+      appearance: auto;
+      -webkit-appearance: menulist;
+      -moz-appearance: auto;
+    }
+    input:focus, textarea:focus, select:focus {
       border-color: rgba(233, 255, 112, 0.65);
       box-shadow: 0 0 0 3px rgba(233, 255, 112, 0.16);
     }
@@ -366,11 +378,10 @@
       background: rgba(7, 10, 20, 0.95);
       border-top: 1px solid var(--stroke);
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 6px;
       padding: 10px 12px 14px;
       z-index: 20;
-      backdrop-filter: blur(10px);
     }
     .tab-item {
       border: 1px solid transparent;
@@ -392,7 +403,6 @@
       position: fixed;
       inset: 0;
       background: rgba(4, 7, 16, 0.72);
-      backdrop-filter: blur(6px);
       display: none;
       align-items: center;
       justify-content: center;
@@ -464,6 +474,24 @@
       color: var(--muted);
       font-size: 13px;
     }
+    .table-meta.stacked {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .meta-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .meta-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
     .table-link {
       display: inline-flex;
       align-items: center;
@@ -486,6 +514,25 @@
       color: var(--muted);
       font-size: 12px;
     }
+    .status-pill.ok {
+      border-color: rgba(94, 248, 176, 0.55);
+      background: rgba(94, 248, 176, 0.12);
+      color: #c2ffd7;
+    }
+    .status-pill.warn {
+      border-color: rgba(255, 198, 92, 0.55);
+      background: rgba(255, 198, 92, 0.12);
+      color: #ffe1a3;
+    }
+    .status-pill.blocked {
+      border-color: rgba(255, 122, 122, 0.55);
+      background: rgba(255, 122, 122, 0.12);
+      color: #ffd0d0;
+    }
+    .muted-count {
+      color: var(--muted);
+      font-size: 12px;
+    }
     .summary-card {
       display: flex;
       align-items: center;
@@ -494,6 +541,24 @@
       font-weight: 600;
     }
     .summary-card span { color: var(--muted); font-weight: 500; }
+    .summary-card.summary-list {
+      display: grid;
+      align-items: stretch;
+      justify-content: initial;
+      gap: 10px;
+    }
+    .summary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .summary-label { color: var(--muted); font-size: 12px; }
+    .summary-value { font-size: 14px; font-weight: 600; }
+    .summary-card.summary-list .summary-value span {
+      color: var(--text);
+      font-weight: 600;
+    }
     .facturacion-meta {
       display: flex;
       align-items: center;
@@ -638,7 +703,7 @@
         </table>
       </div>
       <div class="card summary-card" id="facturacionLoteCard" style="margin-top:12px;" hidden>
-        <div>Total del día</div>
+        <div>Total en caja</div>
         <div><span id="ventasTotal">Q.0.00</span></div>
       </div>
     </section>
@@ -680,6 +745,127 @@
       <h2 class="section-title" style="margin-bottom:10px;">Más</h2>
       <div class="module-list">
         <div class="placeholder">Pronto verás más opciones aquí.</div>
+      </div>
+    </section>
+
+    <section id="caja-menu" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Caja</h2>
+      <div class="module-list">
+        <button type="button" class="module-item" data-view="caja-view">
+          <div>
+            Movimientos de caja
+            <span>Entradas, salidas y conciliación diaria.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+        <button type="button" class="module-item" data-view="caja-cierres">
+          <div>
+            Cierres de caja
+            <span>Listado de cierres registrados.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="caja-view" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Caja</h2>
+      <div class="card">
+        <label>
+          Fecha
+          <input type="date" id="cajaFecha">
+        </label>
+        <p class="hint" style="margin-top:8px;">Filtra movimientos de caja por fecha.</p>
+      </div>
+      <div class="card summary-card summary-list" style="margin-top:12px;">
+        <div class="summary-row">
+          <div class="summary-label">Total de movimientos</div>
+          <div class="summary-value"><span id="cajaMovimientos">0</span></div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">Saldo inicial</div>
+          <div class="summary-value"><span id="cajaSaldoInicial">Q.0.00</span></div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">Total entradas</div>
+          <div class="summary-value"><span id="cajaEntradas">Q.0.00</span></div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">Total salidas</div>
+          <div class="summary-value"><span id="cajaSalidas">Q.0.00</span></div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">Saldo final</div>
+          <div class="summary-value"><span id="cajaSaldoFinal">Q.0.00</span></div>
+        </div>
+      </div>
+      <div class="table-meta stacked">
+        <div class="meta-info">
+          <div id="cajaStatus" class="status-pill">Esperando fecha...</div>
+          <div id="cajaCount" class="muted-count">0 movimientos</div>
+        </div>
+        <div class="meta-actions">
+          <button type="button" class="btn" id="cajaAdd">Agregar movimiento</button>
+          <button type="button" class="btn" id="cajaClose">Cerrar día</button>
+          <button type="button" class="btn" id="cajaReload">Recargar</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Monto</th>
+              <th>Concepto</th>
+              <th>Referencia</th>
+              <th>Tipo descripción</th>
+              <th>Conciliado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cajaBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="caja-cierres" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Cierres de caja</h2>
+      <div class="card">
+        <div style="display:grid; gap:10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+          <label>
+            Desde
+            <input type="date" id="cierresDesde">
+          </label>
+          <label>
+            Hasta
+            <input type="date" id="cierresHasta">
+          </label>
+        </div>
+        <p class="hint" style="margin-top:8px;">Filtra cierres por rango de fechas.</p>
+      </div>
+      <div class="table-meta">
+        <div id="cierresStatus" class="status-pill">Esperando fecha...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="cierresReload">Recargar</button>
+          <div id="cierresCount">0 cierres</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Saldo inicial</th>
+              <th>Total entradas</th>
+              <th>Total salidas</th>
+              <th>Saldo final</th>
+              <th>Timestamp</th>
+              <th>Usuario</th>
+            </tr>
+          </thead>
+          <tbody id="cierresBody"></tbody>
+        </table>
       </div>
     </section>
 
@@ -780,8 +966,49 @@
   <nav class="tab-bar">
     <button type="button" class="tab-item active" data-view="ventas-menu">Ventas</button>
     <button type="button" class="tab-item" data-view="facturacion-menu">Facturación</button>
+    <button type="button" class="tab-item" data-view="caja-menu">Caja</button>
     <button type="button" class="tab-item" data-view="mas-menu">Más</button>
   </nav>
+
+  <div class="modal-backdrop" id="cajaModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cajaTitle">
+      <h3 id="cajaTitle">Movimiento de caja</h3>
+      <label>
+        Tipo
+        <select id="cajaTipo">
+          <option value="1">Entrada</option>
+          <option value="2">Salida</option>
+        </select>
+      </label>
+      <label>
+        Monto
+        <input type="number" id="cajaMonto" step="0.01" min="0">
+      </label>
+      <label>
+        Concepto
+        <input type="text" id="cajaConcepto" placeholder="Descripción">
+      </label>
+      <label>
+        Referencia (opcional)
+        <input type="text" id="cajaReferencia" placeholder="ref, num fact, recibo etc">
+      </label>
+      <label>
+        Tipo descripción
+        <select id="cajaTipoDescripcion">
+          <option value="pagos">Pagos</option>
+          <option value="gastos">Gastos</option>
+          <option value="cobros">Cobros</option>
+          <option value="ingreso">Ingreso</option>
+          <option value="retiro">Retiro</option>
+          <option value="otros">Otros</option>
+        </select>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="cajaCancel">Cancelar</button>
+        <button type="button" class="btn primary" id="cajaSave">Guardar</button>
+      </div>
+    </div>
+  </div>
 
   <div class="modal-backdrop" id="editModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
@@ -867,6 +1094,32 @@
     const editFacturado = document.getElementById('editFacturado');
     const editCancel = document.getElementById('editCancel');
     const editSave = document.getElementById('editSave');
+    const cajaFecha = document.getElementById('cajaFecha');
+    const cajaStatus = document.getElementById('cajaStatus');
+    const cajaBody = document.getElementById('cajaBody');
+    const cajaCount = document.getElementById('cajaCount');
+    const cajaSaldoInicial = document.getElementById('cajaSaldoInicial');
+    const cajaEntradas = document.getElementById('cajaEntradas');
+    const cajaSalidas = document.getElementById('cajaSalidas');
+    const cajaSaldoFinal = document.getElementById('cajaSaldoFinal');
+    const cajaMovimientos = document.getElementById('cajaMovimientos');
+    const cajaReload = document.getElementById('cajaReload');
+    const cajaAdd = document.getElementById('cajaAdd');
+    const cajaClose = document.getElementById('cajaClose');
+    const cajaModal = document.getElementById('cajaModal');
+    const cajaTipo = document.getElementById('cajaTipo');
+    const cajaMonto = document.getElementById('cajaMonto');
+    const cajaConcepto = document.getElementById('cajaConcepto');
+    const cajaReferencia = document.getElementById('cajaReferencia');
+    const cajaTipoDescripcion = document.getElementById('cajaTipoDescripcion');
+    const cajaCancel = document.getElementById('cajaCancel');
+    const cajaSave = document.getElementById('cajaSave');
+    const cierresDesde = document.getElementById('cierresDesde');
+    const cierresHasta = document.getElementById('cierresHasta');
+    const cierresStatus = document.getElementById('cierresStatus');
+    const cierresBody = document.getElementById('cierresBody');
+    const cierresCount = document.getElementById('cierresCount');
+    const cierresReload = document.getElementById('cierresReload');
     const facturacionGenerarLabel = facturacionGenerar ? facturacionGenerar.textContent.trim() : 'Generar archivo';
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
@@ -879,13 +1132,19 @@
       'facturacion-menu': 'Facturación',
       'facturacion-generar': 'Generar facturación',
       'facturacion-lotes': 'Lotes generados',
+      'caja-menu': 'Caja',
+      'caja-view': 'Movimientos de caja',
+      'caja-cierres': 'Cierres de caja',
       'mas-menu': 'Más',
     };
 
     if (facturacionLoteCard) facturacionLoteCard.hidden = true;
 
     const setActiveView = (viewId) => {
-      const rootView = viewId.startsWith('ventas') ? 'ventas-menu' : viewId.startsWith('facturacion') ? 'facturacion-menu' : viewId;
+      const rootView = viewId.startsWith('ventas') ? 'ventas-menu'
+        : viewId.startsWith('facturacion') ? 'facturacion-menu'
+        : viewId.startsWith('caja') ? 'caja-menu'
+        : viewId;
       views.forEach(view => {
         view.classList.toggle('active', view.id === viewId);
       });
@@ -905,6 +1164,12 @@
       if (viewId === 'facturacion-lotes') {
         loadLotes();
       }
+      if (viewId === 'caja-view') {
+        loadCaja(true);
+      }
+      if (viewId === 'caja-cierres') {
+        loadCierres();
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -912,11 +1177,17 @@
       btn.addEventListener('click', () => setActiveView(btn.dataset.view));
     });
 
-    form.fecha.value = new Date().toISOString().slice(0, 10);
-    if (ventasFecha) ventasFecha.value = new Date().toISOString().slice(0, 10);
-    if (ventasResumenFecha) ventasResumenFecha.value = new Date().toISOString().slice(0, 10);
-    if (facturacionFecha) facturacionFecha.value = new Date().toISOString().slice(0, 10);
-    if (lotesFecha) lotesFecha.value = new Date().toISOString().slice(0, 10);
+    const today = toLocalISODate(new Date());
+    const monthStart = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    const monthEnd = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
+    form.fecha.value = today;
+    if (ventasFecha) ventasFecha.value = today;
+    if (ventasResumenFecha) ventasResumenFecha.value = today;
+    if (facturacionFecha) facturacionFecha.value = today;
+    if (lotesFecha) lotesFecha.value = today;
+    if (cajaFecha) cajaFecha.value = today;
+    if (cierresDesde) cierresDesde.value = monthStart;
+    if (cierresHasta) cierresHasta.value = monthEnd;
 
     let messageTimer = null;
     const setButtonLoading = (btn, isLoading) => {
@@ -1051,7 +1322,7 @@
           return { codigo, tipo: 1, cantidad, valor_unitario: valor, descuento, comentario, proveedor, precio_venta };
         });
 
-        const selectedDate = form.fecha.value || new Date().toISOString().slice(0, 10);
+        const selectedDate = form.fecha.value || toLocalISODate(new Date());
         const now = new Date();
         const time = now.toTimeString().slice(0, 8);
         const fechaConHora = `${selectedDate} ${time}`;
@@ -1073,7 +1344,7 @@
 
         showMessage('¡Venta registrada con éxito!');
         form.reset();
-        form.fecha.value = new Date().toISOString().slice(0, 10);
+        form.fecha.value = toLocalISODate(new Date());
         itemsWrapper.innerHTML = '';
         updateTotal();
         loadMovimientos(true);
@@ -1259,6 +1530,13 @@
     let lotesLoading = false;
     let lotesData = [];
     let lotesLoadingButton = null;
+    let cierresLoading = false;
+    let cierresData = [];
+    let cierresLoadingButton = null;
+    let cajaLoading = false;
+    let cajaData = [];
+    let cajaMeta = { saldoInicial: 0, cerrado: false };
+    let cajaLoadingButton = null;
 
     function loadLotes() {
       if (lotesLoading || !lotesStatus) return;
@@ -1331,6 +1609,186 @@
       }).join('');
       lotesCount.textContent = `${lotesData.length} lotes`;
       lotesStatus.textContent = 'Actualizado';
+    }
+
+    function loadCaja(force = false) {
+      if (cajaLoading || !cajaStatus) return;
+      cajaLoading = true;
+      cajaStatus.textContent = 'Cargando caja...';
+      const fecha = cajaFecha ? cajaFecha.value : '';
+      const query = fecha ? `&fecha=${encodeURIComponent(fecha)}` : '';
+      const url = `${SCRIPT_URL}?action=caja_listar${query}`;
+      jsonpRequest(url, (data) => {
+        cajaLoading = false;
+        if (cajaLoadingButton) {
+          setButtonLoading(cajaLoadingButton, false);
+          cajaLoadingButton = null;
+        }
+        if (!data || !data.ok) {
+          cajaStatus.textContent = 'No se pudo cargar.';
+          cajaData = [];
+          cajaMeta = { saldoInicial: 0, cerrado: false };
+          renderCaja();
+          return;
+        }
+        cajaData = Array.isArray(data.items) ? data.items : [];
+        cajaMeta = {
+          saldoInicial: Number(data.saldo_inicial || 0),
+          cerrado: data.cerrado === true,
+        };
+        renderCaja();
+      }, () => {
+        cajaLoading = false;
+        cajaStatus.textContent = 'Error cargando caja.';
+        if (cajaLoadingButton) {
+          setButtonLoading(cajaLoadingButton, false);
+          cajaLoadingButton = null;
+        }
+      });
+    }
+
+    function renderCaja() {
+      if (!cajaBody || !cajaStatus || !cajaCount || !cajaSaldoFinal) return;
+      if (cajaSaldoInicial) {
+        cajaSaldoInicial.textContent = `Q.${(cajaMeta.saldoInicial || 0).toFixed(2)}`;
+      }
+      if (cajaAdd) cajaAdd.disabled = cajaMeta.cerrado;
+      if (cajaClose) cajaClose.disabled = cajaMeta.cerrado;
+      if (!cajaData.length) {
+        cajaBody.innerHTML = '<tr><td colspan="8">Sin movimientos para esta fecha.</td></tr>';
+        cajaCount.textContent = '0 movimientos';
+        if (cajaEntradas) cajaEntradas.textContent = 'Q.0.00';
+        if (cajaSalidas) cajaSalidas.textContent = 'Q.0.00';
+        if (cajaSaldoFinal) {
+          cajaSaldoFinal.textContent = `Q.${(cajaMeta.saldoInicial || 0).toFixed(2)}`;
+        }
+        if (cajaMovimientos) cajaMovimientos.textContent = '0';
+        if (cajaStatus) {
+          cajaStatus.classList.remove('ok', 'warn', 'blocked');
+          if (cajaMeta.cerrado) {
+            cajaStatus.classList.add('blocked');
+            cajaStatus.textContent = 'Día conciliado y cuadrado';
+          } else {
+            cajaStatus.classList.add('warn');
+            cajaStatus.textContent = 'Sin resultados';
+          }
+        }
+        return;
+      }
+      let totalEntradas = 0;
+      let totalSalidas = 0;
+      cajaBody.innerHTML = cajaData.map(item => {
+        const tipo = Number(item.tipo || 0);
+        const monto = parseFloat(item.monto) || 0;
+        const conciliado = Number(item.conciliado || 0) === 1;
+        const tipoDescripcion = String(item.tipo_descripcion || '');
+        const tipoDescripcionLower = tipoDescripcion.toLowerCase();
+        const canEdit = !conciliado && tipoDescripcionLower !== 'venta' && tipoDescripcionLower !== 'compra';
+        const canDelete = canEdit;
+        if (tipo === 1) totalEntradas += monto;
+        if (tipo === 2) totalSalidas += monto;
+        return `
+          <tr>
+            <td>${formatDateTime(item.fecha)}</td>
+            <td>${tipo === 2 ? 'Salida' : 'Entrada'}</td>
+            <td>Q.${monto.toFixed(2)}</td>
+            <td>${item.concepto || ''}</td>
+            <td>${item.referencia || ''}</td>
+            <td>${tipoDescripcion || '—'}</td>
+            <td>${conciliado ? 'Si' : 'No'}</td>
+            <td>
+              ${canEdit || canDelete ? `
+                <div style="display:flex; gap:6px; flex-wrap:nowrap;">
+                  ${canEdit ? `<button type="button" class="btn compact" data-action="caja-editar" data-id="${item.id}" data-tipo="${tipo}" data-monto="${monto}" data-concepto="${item.concepto || ''}" data-referencia="${item.referencia || ''}" data-tipo-descripcion="${tipoDescripcion}">Editar</button>` : ''}
+                  ${canDelete ? `<button type="button" class="btn compact danger" data-action="caja-eliminar" data-id="${item.id}">Eliminar</button>` : ''}
+                </div>
+              ` : '—'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+      cajaCount.textContent = `${cajaData.length} movimientos`;
+      if (cajaMovimientos) cajaMovimientos.textContent = String(cajaData.length);
+      if (cajaEntradas) cajaEntradas.textContent = `Q.${totalEntradas.toFixed(2)}`;
+      if (cajaSalidas) cajaSalidas.textContent = `Q.${totalSalidas.toFixed(2)}`;
+      const totalFinal = (cajaMeta.saldoInicial || 0) + totalEntradas - totalSalidas;
+      cajaSaldoFinal.textContent = `Q.${totalFinal.toFixed(2)}`;
+      if (cajaStatus) {
+        cajaStatus.classList.remove('ok', 'warn', 'blocked');
+        if (cajaMeta.cerrado) {
+          cajaStatus.classList.add('blocked');
+          cajaStatus.textContent = 'Día conciliado y cuadrado';
+        } else {
+          cajaStatus.classList.add('ok');
+          cajaStatus.textContent = 'Actualizado';
+        }
+      }
+    }
+
+    function loadCierres() {
+      if (cierresLoading || !cierresStatus) return;
+      cierresLoading = true;
+      cierresStatus.textContent = 'Cargando cierres...';
+      const desde = cierresDesde ? cierresDesde.value : '';
+      const hasta = cierresHasta ? cierresHasta.value : '';
+      const params = [];
+      if (desde) params.push(`desde=${encodeURIComponent(desde)}`);
+      if (hasta) params.push(`hasta=${encodeURIComponent(hasta)}`);
+      const query = params.length ? `&${params.join('&')}` : '';
+      const url = `${SCRIPT_URL}?action=cierres_listar${query}`;
+      jsonpRequest(url, (data) => {
+        cierresLoading = false;
+        if (cierresLoadingButton) {
+          setButtonLoading(cierresLoadingButton, false);
+          cierresLoadingButton = null;
+        }
+        if (!data || !data.ok) {
+          cierresStatus.textContent = 'No se pudo cargar.';
+          cierresData = [];
+          renderCierres();
+          return;
+        }
+        cierresData = Array.isArray(data.items) ? data.items : [];
+        renderCierres();
+      }, () => {
+        cierresLoading = false;
+        cierresStatus.textContent = 'Error cargando cierres.';
+        if (cierresLoadingButton) {
+          setButtonLoading(cierresLoadingButton, false);
+          cierresLoadingButton = null;
+        }
+      });
+    }
+
+    function renderCierres() {
+      if (!cierresBody || !cierresStatus || !cierresCount) return;
+      if (!cierresData.length) {
+        cierresBody.innerHTML = '<tr><td colspan="7">Sin cierres para esta fecha.</td></tr>';
+        cierresCount.textContent = '0 cierres';
+        cierresStatus.textContent = 'Sin resultados';
+        return;
+      }
+      cierresBody.innerHTML = cierresData.map(item => {
+        const saldoInicial = Number(item.saldo_inicial || 0);
+        const totalEntradas = Number(item.total_entradas || 0);
+        const totalSalidas = Number(item.total_salidas || 0);
+        const saldoFinal = Number(item.saldo_final || 0);
+        const timestamp = item.timestamp ? formatDateTime(item.timestamp) : '—';
+        const usuario = item.usuario ? String(item.usuario) : '—';
+        return `
+          <tr>
+            <td>${formatDate(item.fecha)}</td>
+            <td>Q.${saldoInicial.toFixed(2)}</td>
+            <td>Q.${totalEntradas.toFixed(2)}</td>
+            <td>Q.${totalSalidas.toFixed(2)}</td>
+            <td>Q.${saldoFinal.toFixed(2)}</td>
+            <td>${timestamp}</td>
+            <td>${usuario}</td>
+          </tr>
+        `;
+      }).join('');
+      cierresCount.textContent = `${cierresData.length} cierres`;
+      cierresStatus.textContent = 'Actualizado';
     }
 
     function renderMovimientos() {
@@ -1625,6 +2083,166 @@
         lotesLoadingButton = lotesReload;
         setButtonLoading(lotesReload, true);
         loadLotes();
+      });
+    }
+    if (cierresDesde) {
+      cierresDesde.addEventListener('change', () => {
+        loadCierres();
+      });
+    }
+    if (cierresHasta) {
+      cierresHasta.addEventListener('change', () => {
+        loadCierres();
+      });
+    }
+    if (cierresReload) {
+      cierresReload.addEventListener('click', () => {
+        if (cierresLoading) return;
+        cierresLoadingButton = cierresReload;
+        setButtonLoading(cierresReload, true);
+        loadCierres();
+      });
+    }
+    if (cajaFecha) {
+      cajaFecha.addEventListener('change', () => {
+        loadCaja(true);
+      });
+    }
+    if (cajaReload) {
+      cajaReload.addEventListener('click', () => {
+        if (cajaLoading) return;
+        cajaLoadingButton = cajaReload;
+        setButtonLoading(cajaReload, true);
+        loadCaja(true);
+      });
+    }
+    if (cajaClose) {
+      cajaClose.addEventListener('click', () => {
+        if (!cajaFecha) return;
+        const fecha = cajaFecha.value;
+        if (!fecha) {
+          cajaStatus.textContent = 'Selecciona una fecha.';
+          return;
+        }
+        if (!confirm(`¿Cerrar el día ${fecha}?`)) return;
+        setButtonLoading(cajaClose, true);
+        cajaStatus.textContent = 'Cerrando día...';
+        const url = `${SCRIPT_URL}?action=caja_cerrar&fecha=${encodeURIComponent(fecha)}`;
+        jsonpRequest(url, (data) => {
+          setButtonLoading(cajaClose, false);
+          if (!data || !data.ok) {
+            cajaStatus.textContent = data && data.error ? data.error : 'No se pudo cerrar.';
+            return;
+          }
+          loadCaja(true);
+        }, () => {
+          setButtonLoading(cajaClose, false);
+          cajaStatus.textContent = 'Error al cerrar.';
+        });
+      });
+    }
+    if (cajaAdd) {
+      cajaAdd.addEventListener('click', () => {
+        if (!cajaModal) return;
+        cajaModal.dataset.mode = 'create';
+        cajaModal.dataset.id = '';
+        cajaTipo.value = '1';
+        cajaMonto.value = '';
+        cajaConcepto.value = '';
+        cajaReferencia.value = '';
+        cajaTipoDescripcion.value = 'pagos';
+        cajaModal.classList.add('active');
+      });
+    }
+    if (cajaCancel) {
+      cajaCancel.addEventListener('click', () => {
+        if (!cajaModal) return;
+        cajaModal.classList.remove('active');
+        cajaModal.dataset.id = '';
+      });
+    }
+    if (cajaModal) {
+      cajaModal.addEventListener('click', (event) => {
+        if (event.target === cajaModal) {
+          cajaModal.classList.remove('active');
+          cajaModal.dataset.id = '';
+        }
+      });
+    }
+    if (cajaBody) {
+      cajaBody.addEventListener('click', (event) => {
+        const deleteBtn = event.target.closest('button[data-action="caja-eliminar"][data-id]');
+        if (deleteBtn) {
+          const id = deleteBtn.getAttribute('data-id');
+          if (!id) return;
+          const confirmed = window.confirm('¿Eliminar este movimiento?');
+          if (!confirmed) return;
+          setButtonLoading(deleteBtn, true);
+          if (cajaStatus) cajaStatus.textContent = 'Eliminando...';
+          const url = `${SCRIPT_URL}?action=caja_eliminar&id=${encodeURIComponent(id)}`;
+          jsonpRequest(url, (data) => {
+            if (!data || !data.ok) {
+              if (cajaStatus) cajaStatus.textContent = data && data.error ? data.error : 'No se pudo eliminar.';
+              setButtonLoading(deleteBtn, false);
+              return;
+            }
+            loadCaja(true);
+          }, () => {
+            if (cajaStatus) cajaStatus.textContent = 'Error al eliminar.';
+            setButtonLoading(deleteBtn, false);
+          });
+          return;
+        }
+        const btn = event.target.closest('button[data-action="caja-editar"][data-id]');
+        if (!btn || !cajaModal) return;
+        cajaModal.dataset.mode = 'edit';
+        cajaModal.dataset.id = btn.getAttribute('data-id');
+        cajaTipo.value = btn.getAttribute('data-tipo') || '1';
+        cajaMonto.value = btn.getAttribute('data-monto') || '0';
+        cajaConcepto.value = btn.getAttribute('data-concepto') || '';
+        cajaReferencia.value = btn.getAttribute('data-referencia') || '';
+        cajaTipoDescripcion.value = btn.getAttribute('data-tipo-descripcion') || 'pagos';
+        cajaModal.classList.add('active');
+      });
+    }
+    if (cajaSave) {
+      cajaSave.addEventListener('click', () => {
+        const mode = cajaModal ? cajaModal.dataset.mode : 'create';
+        const id = cajaModal ? cajaModal.dataset.id : '';
+        const tipo = Number(cajaTipo.value || 1);
+        const monto = Number(cajaMonto.value || 0);
+        const concepto = (cajaConcepto.value || '').trim();
+        const referencia = (cajaReferencia.value || '').trim();
+        const tipoDescripcion = (cajaTipoDescripcion.value || '').trim();
+        if (!concepto || !isFinite(monto)) return;
+        setButtonLoading(cajaSave, true);
+        if (cajaStatus) cajaStatus.textContent = 'Guardando...';
+        const fecha = cajaFecha ? cajaFecha.value : '';
+        const params = [
+          `tipo=${encodeURIComponent(tipo)}`,
+          `monto=${encodeURIComponent(monto)}`,
+          `concepto=${encodeURIComponent(concepto)}`,
+          `referencia=${encodeURIComponent(referencia)}`,
+          `tipo_descripcion=${encodeURIComponent(tipoDescripcion)}`,
+        ];
+        if (mode === 'edit') params.push(`id=${encodeURIComponent(id)}`);
+        if (fecha) params.push(`fecha=${encodeURIComponent(fecha)}`);
+        const action = mode === 'edit' ? 'caja_actualizar' : 'caja_crear';
+        const url = `${SCRIPT_URL}?action=${action}&${params.join('&')}`;
+        jsonpRequest(url, (data) => {
+          if (!data || !data.ok) {
+            if (cajaStatus) cajaStatus.textContent = data && data.error ? data.error : 'No se pudo guardar.';
+            setButtonLoading(cajaSave, false);
+            return;
+          }
+          cajaModal.classList.remove('active');
+          cajaModal.dataset.id = '';
+          setButtonLoading(cajaSave, false);
+          loadCaja(true);
+        }, () => {
+          if (cajaStatus) cajaStatus.textContent = 'Error al guardar.';
+          setButtonLoading(cajaSave, false);
+        });
       });
     }
     if (lotesBody) {

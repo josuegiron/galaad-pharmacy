@@ -134,6 +134,25 @@
       line-height: 1.5;
     }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .mini-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .mini-title {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .mini-value {
+      font-size: 18px;
+      font-weight: 700;
+    }
     .card {
       background: var(--card);
       border: 1px solid var(--stroke);
@@ -887,6 +906,22 @@
         <h2 class="section-title">Caja</h2>
         <button type="button" class="help-btn" data-help="caja-menu" aria-label="Ayuda de caja">?</button>
       </div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+          <div class="mini-card">
+            <div class="mini-title">Dinero en caja (hoy)</div>
+            <div class="mini-value" id="cajaResumenDisponible">Q.0.00</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-title">Cuentas por pagar</div>
+            <div class="mini-value" id="cajaResumenDeuda">Q.0.00</div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-title">Compras a crédito</div>
+            <div class="mini-value" id="cajaResumenCreditos">0</div>
+          </div>
+        </div>
+      </div>
       <div class="module-list">
         <button type="button" class="module-item" data-view="caja-view">
           <div>
@@ -929,6 +964,10 @@
           </label>
         </div>
         <p class="hint" style="margin-top:8px;">Filtra transacciones de compra por rango de fechas.</p>
+        <label class="inline" style="margin-top:10px;">
+          <input type="checkbox" id="cajaTransCreditoOnly">
+          Solo compras a crédito
+        </label>
       </div>
       <div class="table-meta">
         <div id="cajaTransStatus" class="status-pill">Esperando rango...</div>
@@ -1813,6 +1852,7 @@
     const cajaClose = document.getElementById('cajaClose');
     const cajaTransDesde = document.getElementById('cajaTransDesde');
     const cajaTransHasta = document.getElementById('cajaTransHasta');
+    const cajaTransCreditoOnly = document.getElementById('cajaTransCreditoOnly');
     const cajaTransStatus = document.getElementById('cajaTransStatus');
     const cajaTransBody = document.getElementById('cajaTransBody');
     const cajaTransCount = document.getElementById('cajaTransCount');
@@ -1821,6 +1861,9 @@
     const cajaTransDetailTitle = document.getElementById('cajaTransDetailTitle');
     const cajaTransDetailBody = document.getElementById('cajaTransDetailBody');
     const cajaTransDetailClose = document.getElementById('cajaTransDetailClose');
+    const cajaResumenDisponible = document.getElementById('cajaResumenDisponible');
+    const cajaResumenDeuda = document.getElementById('cajaResumenDeuda');
+    const cajaResumenCreditos = document.getElementById('cajaResumenCreditos');
     const cajaCredDesde = document.getElementById('cajaCredDesde');
     const cajaCredHasta = document.getElementById('cajaCredHasta');
     const cajaCredStatus = document.getElementById('cajaCredStatus');
@@ -2026,6 +2069,7 @@
         title: 'Caja',
         desc: 'Control diario de caja.',
         bullets: [
+          'Revisar un resumen general de dinero disponible y cuentas por pagar.',
           'Registrar entradas y salidas.',
           'Cerrar el día cuando esté conciliado.',
         ],
@@ -2050,6 +2094,7 @@
         desc: 'Compras agrupadas por transacción.',
         bullets: [
           'Filtrar por rango de fechas.',
+          'Filtrar solo compras a credito.',
           'Ver detalle por ID.',
           'Registrar pagos de compras a crédito y revisar saldo pendiente.',
         ],
@@ -2132,6 +2177,9 @@
       }
       if (viewId === 'caja-transacciones') {
         loadTransacciones('compra');
+      }
+      if (viewId === 'caja-menu') {
+        loadCajaResumen();
       }
       if (viewId === 'caja-cuentas') {
         loadCuentasPorPagar();
@@ -3051,6 +3099,7 @@
           cerrado: data.cerrado === true,
         };
         renderCaja();
+        loadCajaResumen();
       }, () => {
         cajaLoading = false;
         cajaStatus.textContent = 'Error cargando caja.';
@@ -3058,6 +3107,57 @@
           setButtonLoading(cajaLoadingButton, false);
           cajaLoadingButton = null;
         }
+      });
+    }
+
+    function loadCajaResumen() {
+      if (!cajaResumenDisponible || !cajaResumenDeuda || !cajaResumenCreditos) return;
+      const fecha = cajaFecha && cajaFecha.value ? cajaFecha.value : toLocalISODate(new Date());
+      const cajaUrl = `${SCRIPT_URL}?action=caja_listar&fecha=${encodeURIComponent(fecha)}`;
+      const creditosUrl = `${SCRIPT_URL}?action=transacciones_compra_listar`;
+
+      jsonpRequest(cajaUrl, (data) => {
+        if (!data || !data.ok) {
+          cajaResumenDisponible.textContent = 'Q.0.00';
+          return;
+        }
+        const items = Array.isArray(data.items) ? data.items : [];
+        let entradas = 0;
+        let salidas = 0;
+        items.forEach((item) => {
+          const tipo = Number(item.tipo || 0);
+          const monto = Number(item.monto || 0);
+          if (tipo === 1) entradas += monto;
+          if (tipo === 2) salidas += monto;
+        });
+        const saldoInicial = Number(data.saldo_inicial || 0);
+        const saldoFinal = saldoInicial + entradas - salidas;
+        cajaResumenDisponible.textContent = `Q.${saldoFinal.toFixed(2)}`;
+      }, () => {
+        cajaResumenDisponible.textContent = 'Q.0.00';
+      });
+
+      jsonpRequest(creditosUrl, (data) => {
+        if (!data || !data.ok) {
+          cajaResumenDeuda.textContent = 'Q.0.00';
+          cajaResumenCreditos.textContent = '0';
+          return;
+        }
+        const items = Array.isArray(data.items) ? data.items : [];
+        let deuda = 0;
+        let creditos = 0;
+        items.forEach((item) => {
+          const credito = Number(item.credito || 0);
+          if (credito !== 1) return;
+          const saldo = Number(item.saldo || 0);
+          if (saldo > 0) creditos += 1;
+          deuda += Math.max(0, saldo);
+        });
+        cajaResumenDeuda.textContent = `Q.${deuda.toFixed(2)}`;
+        cajaResumenCreditos.textContent = String(creditos);
+      }, () => {
+        cajaResumenDeuda.textContent = 'Q.0.00';
+        cajaResumenCreditos.textContent = '0';
       });
     }
 
@@ -3231,13 +3331,17 @@
 
     function renderTransaccionesCompra(items) {
       if (!cajaTransBody || !cajaTransStatus || !cajaTransCount) return;
-      if (!items.length) {
+      const onlyCredito = cajaTransCreditoOnly && cajaTransCreditoOnly.checked;
+      const filteredItems = onlyCredito
+        ? items.filter(item => Number(item.credito || 0) === 1)
+        : items;
+      if (!filteredItems.length) {
         cajaTransBody.innerHTML = '<tr><td colspan="8">Sin transacciones.</td></tr>';
         cajaTransCount.textContent = '0 transacciones';
         cajaTransStatus.textContent = 'Sin resultados';
         return;
       }
-      cajaTransBody.innerHTML = items.map(item => {
+      cajaTransBody.innerHTML = filteredItems.map(item => {
         const total = Number(item.total || 0);
         const credito = Number(item.credito || 0);
         const saldo = Number(item.saldo || 0);
@@ -3259,7 +3363,7 @@
           </tr>
         `;
       }).join('');
-      cajaTransCount.textContent = `${items.length} transacciones`;
+      cajaTransCount.textContent = `${filteredItems.length} transacciones`;
       cajaTransStatus.textContent = 'Actualizado';
     }
 
@@ -3574,6 +3678,7 @@
         if (cajaCredStatus) cajaCredStatus.textContent = 'Pago registrado.';
         loadTransacciones('compra');
         loadCuentasPorPagar();
+        loadCajaResumen();
         if (registrarCaja) loadCaja(true);
       }, () => {
         if (creditoModalSave) setButtonLoading(creditoModalSave, false);
@@ -4237,6 +4342,12 @@
     }
     if (cajaTransHasta) {
       cajaTransHasta.addEventListener('change', () => {
+        loadTransacciones('compra');
+      });
+    }
+    if (cajaTransCreditoOnly) {
+      cajaTransCreditoOnly.addEventListener('change', () => {
+        if (cajaTransLoading) return;
         loadTransacciones('compra');
       });
     }

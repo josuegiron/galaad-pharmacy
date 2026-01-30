@@ -378,7 +378,7 @@
       background: rgba(7, 10, 20, 0.95);
       border-top: 1px solid var(--stroke);
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 6px;
       padding: 10px 12px 14px;
       z-index: 20;
@@ -430,6 +430,12 @@
       display: flex;
       gap: 10px;
       justify-content: flex-end;
+    }
+    .modal-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      margin-top: 12px;
     }
     .placeholder {
       padding: 16px;
@@ -768,6 +774,69 @@
       </div>
     </section>
 
+    <section id="inventario-menu" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Inventario</h2>
+      <div class="module-list">
+        <button type="button" class="module-item" data-view="inventario-productos">
+          <div>
+            Productos
+            <span>Catálogo con precios y proveedor.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+        <button type="button" class="module-item" data-view="inventario-compras">
+          <div>
+            Compras
+            <span>Registro y gestión de compras.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="inventario-productos" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Productos</h2>
+      <div class="card">
+        <label>
+          Buscar
+          <input type="text" id="productosSearch" placeholder="Código, nombre o proveedor">
+        </label>
+        <p class="hint" style="margin-top:8px;">Busca en el catálogo de productos.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <button type="button" class="btn" id="productosAdd">Agregar producto</button>
+          <button type="button" class="btn" id="productosReload">Recargar</button>
+        </div>
+      </div>
+      <div class="table-meta">
+        <div id="productosStatus" class="status-pill">Cargando...</div>
+        <div id="productosCount">0 productos</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Nombre</th>
+              <th>Afecto</th>
+              <th>Proveedor</th>
+              <th>Costo</th>
+              <th>Precio</th>
+              <th>Activo</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="productosBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="inventario-compras" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Compras</h2>
+      <div class="module-list">
+        <div class="placeholder">Pronto verás el módulo de compras.</div>
+      </div>
+    </section>
+
     <section id="caja-view" class="form-wrap view">
       <h2 class="section-title" style="margin-bottom:10px;">Caja</h2>
       <div class="card">
@@ -966,6 +1035,7 @@
   <nav class="tab-bar">
     <button type="button" class="tab-item active" data-view="ventas-menu">Ventas</button>
     <button type="button" class="tab-item" data-view="facturacion-menu">Facturación</button>
+    <button type="button" class="tab-item" data-view="inventario-menu">Inventario</button>
     <button type="button" class="tab-item" data-view="caja-menu">Caja</button>
     <button type="button" class="tab-item" data-view="mas-menu">Más</button>
   </nav>
@@ -1028,6 +1098,52 @@
       <div class="modal-actions">
         <button type="button" class="btn" id="editCancel">Cancelar</button>
         <button type="button" class="btn primary" id="editSave">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="productoModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="productoTitle">
+      <h3 id="productoTitle">Producto</h3>
+      <div class="modal-grid">
+        <label>
+          Código
+          <input type="text" id="productoCodigo" autocomplete="off">
+        </label>
+        <label>
+          Nombre
+          <input type="text" id="productoNombre" autocomplete="off">
+        </label>
+        <label>
+          Afecto
+          <select id="productoAfecto">
+            <option value="1">Sí</option>
+            <option value="0">No</option>
+          </select>
+        </label>
+        <label>
+          Proveedor
+          <input type="text" id="productoProveedor" autocomplete="off">
+        </label>
+        <label>
+          Costo unitario
+          <input type="number" id="productoCosto" step="0.01" min="0">
+        </label>
+        <label>
+          Precio venta
+          <input type="number" id="productoPrecio" step="0.01" min="0">
+        </label>
+        <label>
+          Activo
+          <select id="productoActivo">
+            <option value="1">Sí</option>
+            <option value="0">No</option>
+          </select>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="productoCancel">Cancelar</button>
+        <button type="button" class="btn primary" id="productoSave">Guardar producto</button>
       </div>
     </div>
   </div>
@@ -1120,6 +1236,23 @@
     const cierresBody = document.getElementById('cierresBody');
     const cierresCount = document.getElementById('cierresCount');
     const cierresReload = document.getElementById('cierresReload');
+    const productosSearch = document.getElementById('productosSearch');
+    const productosAdd = document.getElementById('productosAdd');
+    const productosReload = document.getElementById('productosReload');
+    const productosStatus = document.getElementById('productosStatus');
+    const productosBody = document.getElementById('productosBody');
+    const productosCount = document.getElementById('productosCount');
+    const productoModal = document.getElementById('productoModal');
+    const productoTitle = document.getElementById('productoTitle');
+    const productoCodigo = document.getElementById('productoCodigo');
+    const productoNombre = document.getElementById('productoNombre');
+    const productoAfecto = document.getElementById('productoAfecto');
+    const productoProveedor = document.getElementById('productoProveedor');
+    const productoCosto = document.getElementById('productoCosto');
+    const productoPrecio = document.getElementById('productoPrecio');
+    const productoActivo = document.getElementById('productoActivo');
+    const productoCancel = document.getElementById('productoCancel');
+    const productoSave = document.getElementById('productoSave');
     const facturacionGenerarLabel = facturacionGenerar ? facturacionGenerar.textContent.trim() : 'Generar archivo';
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
@@ -1132,6 +1265,9 @@
       'facturacion-menu': 'Facturación',
       'facturacion-generar': 'Generar facturación',
       'facturacion-lotes': 'Lotes generados',
+      'inventario-menu': 'Inventario',
+      'inventario-productos': 'Productos',
+      'inventario-compras': 'Compras',
       'caja-menu': 'Caja',
       'caja-view': 'Movimientos de caja',
       'caja-cierres': 'Cierres de caja',
@@ -1143,6 +1279,7 @@
     const setActiveView = (viewId) => {
       const rootView = viewId.startsWith('ventas') ? 'ventas-menu'
         : viewId.startsWith('facturacion') ? 'facturacion-menu'
+        : viewId.startsWith('inventario') ? 'inventario-menu'
         : viewId.startsWith('caja') ? 'caja-menu'
         : viewId;
       views.forEach(view => {
@@ -1169,6 +1306,9 @@
       }
       if (viewId === 'caja-cierres') {
         loadCierres();
+      }
+      if (viewId === 'inventario-productos') {
+        loadProductos();
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -1533,6 +1673,10 @@
     let cierresLoading = false;
     let cierresData = [];
     let cierresLoadingButton = null;
+    let productosLoading = false;
+    let productosLoaded = false;
+    let productosData = [];
+    let productosLoadingButton = null;
     let cajaLoading = false;
     let cajaData = [];
     let cajaMeta = { saldoInicial: 0, cerrado: false };
@@ -1789,6 +1933,146 @@
       }).join('');
       cierresCount.textContent = `${cierresData.length} cierres`;
       cierresStatus.textContent = 'Actualizado';
+    }
+
+    function loadProductos() {
+      if (productosLoading || !productosStatus) return;
+      productosLoading = true;
+      productosStatus.textContent = 'Cargando productos...';
+      const url = `${SCRIPT_URL}?action=productos_listar`;
+      jsonpRequest(url, (data) => {
+        productosLoading = false;
+        productosLoaded = true;
+        if (productosLoadingButton) {
+          setButtonLoading(productosLoadingButton, false);
+          productosLoadingButton = null;
+        }
+        if (!data || !data.ok) {
+          productosStatus.textContent = 'No se pudo cargar.';
+          productosData = [];
+          renderProductos();
+          return;
+        }
+        productosData = Array.isArray(data.items) ? data.items : [];
+        renderProductos();
+      }, () => {
+        productosLoading = false;
+        productosLoaded = false;
+        productosStatus.textContent = 'Error cargando productos.';
+        if (productosLoadingButton) {
+          setButtonLoading(productosLoadingButton, false);
+          productosLoadingButton = null;
+        }
+      });
+    }
+
+    function renderProductos() {
+      if (!productosBody || !productosStatus || !productosCount) return;
+      const q = productosSearch ? productosSearch.value.trim().toLowerCase() : '';
+      const rows = productosData.filter(item => {
+        if (!q) return true;
+        const codigo = String(item.codigo || '').toLowerCase();
+        const nombre = String(item.nombre || '').toLowerCase();
+        const proveedor = String(item.proveedor || '').toLowerCase();
+        return codigo.includes(q) || nombre.includes(q) || proveedor.includes(q);
+      });
+      if (!rows.length) {
+        productosBody.innerHTML = '<tr><td colspan="8">Sin productos para este filtro.</td></tr>';
+        productosCount.textContent = '0 productos';
+        productosStatus.textContent = q ? 'Sin resultados' : 'Sin registros';
+        return;
+      }
+      productosBody.innerHTML = rows.map(item => {
+        const costo = Number(item.costo_unitario || 0);
+        const precio = Number(item.precio_venta || 0);
+        const afecto = Number(item.afecto || 0) === 1 ? 'Sí' : 'No';
+        const activo = Number(item.activo || 0) === 1 ? 'Sí' : 'No';
+        return `
+          <tr>
+            <td>${item.codigo || ''}</td>
+            <td>${item.nombre || ''}</td>
+            <td>${afecto}</td>
+            <td>${item.proveedor || ''}</td>
+            <td>Q.${isFinite(costo) ? costo.toFixed(2) : '0.00'}</td>
+            <td>Q.${isFinite(precio) ? precio.toFixed(2) : '0.00'}</td>
+            <td>${activo}</td>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:nowrap;">
+                <button type="button" class="btn compact" data-action="producto-editar" data-codigo="${item.codigo || ''}" data-nombre="${item.nombre || ''}" data-afecto="${item.afecto || 0}" data-proveedor="${item.proveedor || ''}" data-costo="${item.costo_unitario || 0}" data-precio="${item.precio_venta || 0}" data-activo="${item.activo || 0}">Editar</button>
+                <button type="button" class="btn compact danger" data-action="producto-eliminar" data-codigo="${item.codigo || ''}">Eliminar</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+      productosCount.textContent = `${rows.length} productos`;
+      productosStatus.textContent = q ? 'Filtrado' : 'Actualizado';
+    }
+
+    function openProductoModal(mode, data = {}) {
+      if (!productoModal || !productoCodigo || !productoNombre || !productoAfecto || !productoProveedor || !productoCosto || !productoPrecio || !productoActivo || !productoTitle) return;
+      productoModal.dataset.mode = mode;
+      productoTitle.textContent = mode === 'edit' ? 'Editar producto' : 'Agregar producto';
+      productoCodigo.value = data.codigo || '';
+      productoNombre.value = data.nombre || '';
+      productoAfecto.value = data.afecto !== undefined ? String(data.afecto) : '1';
+      productoProveedor.value = data.proveedor || '';
+      productoCosto.value = data.costo_unitario !== undefined ? data.costo_unitario : '';
+      productoPrecio.value = data.precio_venta !== undefined ? data.precio_venta : '';
+      productoActivo.value = data.activo !== undefined ? String(data.activo) : '1';
+      productoCodigo.disabled = mode === 'edit';
+      productoModal.classList.add('active');
+    }
+
+    function closeProductoModal() {
+      if (!productoModal) return;
+      productoModal.classList.remove('active');
+      productoModal.dataset.mode = '';
+    }
+
+    function saveProducto() {
+      if (!productoModal || !productoCodigo || !productoNombre || !productoAfecto || !productoProveedor || !productoCosto || !productoPrecio || !productoActivo) return;
+      const mode = productoModal ? productoModal.dataset.mode : 'create';
+      const codigo = String(productoCodigo.value || '').trim();
+      const nombre = String(productoNombre.value || '').trim();
+      if (!codigo) {
+        productosStatus.textContent = 'Código requerido.';
+        return;
+      }
+      if (!nombre) {
+        productosStatus.textContent = 'Nombre requerido.';
+        return;
+      }
+      const afecto = productoAfecto.value;
+      const proveedor = String(productoProveedor.value || '').trim();
+      const costo = productoCosto.value || 0;
+      const precio = productoPrecio.value || 0;
+      const activo = productoActivo.value;
+      const action = mode === 'edit' ? 'productos_actualizar' : 'productos_crear';
+      const params = [
+        `action=${action}`,
+        `codigo=${encodeURIComponent(codigo)}`,
+        `nombre=${encodeURIComponent(nombre)}`,
+        `afecto=${encodeURIComponent(afecto)}`,
+        `proveedor=${encodeURIComponent(proveedor)}`,
+        `costo_unitario=${encodeURIComponent(costo)}`,
+        `precio_venta=${encodeURIComponent(precio)}`,
+        `activo=${encodeURIComponent(activo)}`,
+      ];
+      const url = `${SCRIPT_URL}?${params.join('&')}`;
+      setButtonLoading(productoSave, true);
+      jsonpRequest(url, (data) => {
+        setButtonLoading(productoSave, false);
+        if (!data || !data.ok) {
+          productosStatus.textContent = data && data.error ? data.error : 'No se pudo guardar.';
+          return;
+        }
+        closeProductoModal();
+        loadProductos();
+      }, () => {
+        setButtonLoading(productoSave, false);
+        productosStatus.textContent = 'Error guardando producto.';
+      });
     }
 
     function renderMovimientos() {
@@ -2101,6 +2385,85 @@
         cierresLoadingButton = cierresReload;
         setButtonLoading(cierresReload, true);
         loadCierres();
+      });
+    }
+    if (productosSearch) {
+      productosSearch.addEventListener('input', () => {
+        if (!productosLoaded) {
+          loadProductos();
+        } else {
+          renderProductos();
+        }
+      });
+    }
+    if (productosReload) {
+      productosReload.addEventListener('click', () => {
+        if (productosLoading) return;
+        productosLoadingButton = productosReload;
+        setButtonLoading(productosReload, true);
+        loadProductos();
+      });
+    }
+    if (productosAdd) {
+      productosAdd.addEventListener('click', () => {
+        openProductoModal('create');
+      });
+    }
+    if (productoCancel) {
+      productoCancel.addEventListener('click', () => {
+        closeProductoModal();
+      });
+    }
+    if (productoModal) {
+      productoModal.addEventListener('click', (event) => {
+        if (event.target === productoModal) {
+          closeProductoModal();
+        }
+      });
+    }
+    if (productoSave) {
+      productoSave.addEventListener('click', () => {
+        saveProducto();
+      });
+    }
+    if (productosBody) {
+      productosBody.addEventListener('click', (event) => {
+        const deleteBtn = event.target.closest('button[data-action="producto-eliminar"][data-codigo]');
+        if (deleteBtn) {
+          const codigo = deleteBtn.getAttribute('data-codigo');
+          if (!codigo) return;
+          const confirmed = window.confirm('¿Eliminar este producto?');
+          if (!confirmed) return;
+          setButtonLoading(deleteBtn, true);
+          if (productosStatus) productosStatus.textContent = 'Eliminando producto...';
+          const url = `${SCRIPT_URL}?action=productos_eliminar&codigo=${encodeURIComponent(codigo)}`;
+          jsonpRequest(url, (data) => {
+            if (!data || !data.ok) {
+              if (productosStatus) {
+                productosStatus.textContent = data && data.error ? data.error : 'No se pudo eliminar.';
+              }
+              setButtonLoading(deleteBtn, false);
+              return;
+            }
+            loadProductos();
+          }, () => {
+            if (productosStatus) productosStatus.textContent = 'Error al eliminar.';
+            setButtonLoading(deleteBtn, false);
+          });
+          return;
+        }
+        const editBtn = event.target.closest('button[data-action="producto-editar"][data-codigo]');
+        if (editBtn) {
+          openProductoModal('edit', {
+            codigo: editBtn.getAttribute('data-codigo') || '',
+            nombre: editBtn.getAttribute('data-nombre') || '',
+            afecto: editBtn.getAttribute('data-afecto') || 0,
+            proveedor: editBtn.getAttribute('data-proveedor') || '',
+            costo_unitario: editBtn.getAttribute('data-costo') || 0,
+            precio_venta: editBtn.getAttribute('data-precio') || 0,
+            activo: editBtn.getAttribute('data-activo') || 0,
+          });
+        }
       });
     }
     if (cajaFecha) {

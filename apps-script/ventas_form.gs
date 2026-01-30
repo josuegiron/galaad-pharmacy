@@ -8,12 +8,16 @@ const CAJA_SHEET_NAME = 'caja';
 const LOTES_SHEET_NAME = 'lotes_facturacion';
 const LOTES_ITEMS_SHEET_NAME = 'lotes_items';
 const CIERRES_SHEET_NAME = 'cierres_caja';
+const PRODUCTOS_SHEET_NAME = 'productos';
 const LOTES_HEADERS = [
   'lote_id', 'fecha_creacion', 'fecha_desde', 'fecha_hasta', 'estado', 'fecha_actualizacion',
   'total_items', 'total_monto', 'archivo_nombre', 'archivo_id', 'url', 'nota',
 ];
 const CIERRES_HEADERS = [
   'fecha', 'saldo_inicial', 'total_entradas', 'total_salidas', 'saldo_final', 'timestamp', 'usuario',
+];
+const PRODUCTOS_HEADERS = [
+  'codigo', 'nombre', 'afecto', 'proveedor', 'costo_unitario', 'precio_venta', 'activo',
 ];
 const FACTURACION_FOLDER_ID = '1AK9CZlEeh6oLlnf6PcV_cp5uZMPH2Qqa';
 const FACTURACION_TEMPLATE_ID = '16gxGia3t367ImiAW_2t0dhJ2Zy7D5E5HGooSWAemQ9s';
@@ -57,6 +61,11 @@ function doGet(e) {
       const result = listCaja(payload);
       return callback ? jsonpResponse(result, callback) : jsonResponse(result);
     }
+    if (action === 'productos_listar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = listProductos(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
     if (action === 'cierres_listar') {
       const payload = e && e.parameter ? e.parameter : {};
       const result = listCierres(payload);
@@ -75,6 +84,21 @@ function doGet(e) {
     if (action === 'caja_eliminar') {
       const payload = e && e.parameter ? e.parameter : {};
       const result = deleteCaja(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'productos_crear') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = createProducto(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'productos_actualizar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = updateProducto(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
+    if (action === 'productos_eliminar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = deleteProducto(payload);
       return callback ? jsonpResponse(result, callback) : jsonResponse(result);
     }
     if (action === 'caja_cerrar') {
@@ -117,6 +141,9 @@ function doPost(e) {
     if (action === 'caja_crear') {
       return jsonResponse(createCaja(payload));
     }
+    if (action === 'productos_listar') {
+      return jsonResponse(listProductos(payload));
+    }
     if (action === 'cierres_listar') {
       return jsonResponse(listCierres(payload));
     }
@@ -125,6 +152,15 @@ function doPost(e) {
     }
     if (action === 'caja_eliminar') {
       return jsonResponse(deleteCaja(payload));
+    }
+    if (action === 'productos_crear') {
+      return jsonResponse(createProducto(payload));
+    }
+    if (action === 'productos_actualizar') {
+      return jsonResponse(updateProducto(payload));
+    }
+    if (action === 'productos_eliminar') {
+      return jsonResponse(deleteProducto(payload));
     }
     if (action === 'caja_cerrar') {
       return jsonResponse(closeCaja(payload));
@@ -730,6 +766,169 @@ function listCierres(payload) {
   return { ok: true, items: items };
 }
 
+function listProductos(payload) {
+  const sheet = getProductosSheet();
+  if (!sheet) return { ok: true, items: [] };
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { ok: true, items: [] };
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxCodigo = headers.indexOf('codigo');
+  const idxNombre = headers.indexOf('nombre');
+  const idxAfecto = headers.indexOf('afecto');
+  const idxProveedor = headers.indexOf('proveedor');
+  const idxCosto = headers.indexOf('costo_unitario');
+  const idxPrecio = headers.indexOf('precio_venta');
+  const idxActivo = headers.indexOf('activo');
+  const requiredIdx = [idxCodigo, idxNombre, idxAfecto, idxProveedor, idxCosto, idxPrecio, idxActivo];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en productos.');
+  }
+  const q = payload && payload.q ? String(payload.q).toLowerCase().trim() : '';
+  const items = data.slice(1).map(row => ({
+    codigo: row[idxCodigo],
+    nombre: row[idxNombre],
+    afecto: row[idxAfecto],
+    proveedor: row[idxProveedor],
+    costo_unitario: row[idxCosto],
+    precio_venta: row[idxPrecio],
+    activo: row[idxActivo],
+  })).filter(item => {
+    if (!q) return true;
+    const codigo = String(item.codigo || '').toLowerCase();
+    const nombre = String(item.nombre || '').toLowerCase();
+    const proveedor = String(item.proveedor || '').toLowerCase();
+    return codigo.includes(q) || nombre.includes(q) || proveedor.includes(q);
+  });
+  items.sort((a, b) => Number(a.codigo || 0) - Number(b.codigo || 0));
+  return { ok: true, items: items };
+}
+
+function createProducto(payload) {
+  const sheet = getProductosSheet();
+  if (!sheet) throw new Error('No se encontró la hoja "productos".');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxCodigo = headers.indexOf('codigo');
+  const idxNombre = headers.indexOf('nombre');
+  const idxAfecto = headers.indexOf('afecto');
+  const idxProveedor = headers.indexOf('proveedor');
+  const idxCosto = headers.indexOf('costo_unitario');
+  const idxPrecio = headers.indexOf('precio_venta');
+  const idxActivo = headers.indexOf('activo');
+  const requiredIdx = [idxCodigo, idxNombre, idxAfecto, idxProveedor, idxCosto, idxPrecio, idxActivo];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en productos.');
+  }
+  const codigo = String(payload.codigo || '').trim();
+  const nombre = String(payload.nombre || '').trim();
+  if (!codigo) throw new Error('Código requerido.');
+  if (!nombre) throw new Error('Nombre requerido.');
+  const afecto = payload.afecto !== undefined ? Number(payload.afecto || 0) : 0;
+  const proveedor = String(payload.proveedor || '').trim();
+  const costoUnitario = payload.costo_unitario !== undefined ? Number(payload.costo_unitario || 0) : 0;
+  const precioVenta = payload.precio_venta !== undefined ? Number(payload.precio_venta || 0) : 0;
+  const activo = payload.activo !== undefined ? Number(payload.activo || 0) : 1;
+  if (!isFinite(afecto) || !isFinite(costoUnitario) || !isFinite(precioVenta) || !isFinite(activo)) {
+    throw new Error('Campos numéricos inválidos.');
+  }
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(15000);
+  try {
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i += 1) {
+      if (String(data[i][idxCodigo] || '').trim() === codigo) {
+        throw new Error('Código ya existe.');
+      }
+    }
+    const row = new Array(sheet.getLastColumn()).fill('');
+    row[idxCodigo] = codigo;
+    row[idxNombre] = nombre;
+    row[idxAfecto] = afecto;
+    row[idxProveedor] = proveedor;
+    row[idxCosto] = costoUnitario;
+    row[idxPrecio] = precioVenta;
+    row[idxActivo] = activo;
+    sheet.appendRow(row);
+    return { ok: true, codigo: codigo };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateProducto(payload) {
+  const sheet = getProductosSheet();
+  if (!sheet) throw new Error('No se encontró la hoja "productos".');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxCodigo = headers.indexOf('codigo');
+  const idxNombre = headers.indexOf('nombre');
+  const idxAfecto = headers.indexOf('afecto');
+  const idxProveedor = headers.indexOf('proveedor');
+  const idxCosto = headers.indexOf('costo_unitario');
+  const idxPrecio = headers.indexOf('precio_venta');
+  const idxActivo = headers.indexOf('activo');
+  const requiredIdx = [idxCodigo, idxNombre, idxAfecto, idxProveedor, idxCosto, idxPrecio, idxActivo];
+  if (requiredIdx.some(idx => idx < 0)) {
+    throw new Error('Columnas requeridas faltantes en productos.');
+  }
+  const codigo = String(payload.codigo || '').trim();
+  if (!codigo) throw new Error('Código requerido.');
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(15000);
+  try {
+    const data = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i += 1) {
+      if (String(data[i][idxCodigo] || '').trim() === codigo) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+    if (rowIndex < 0) throw new Error('Producto no encontrado.');
+    const current = data[rowIndex - 1];
+    const nombre = payload.nombre !== undefined ? String(payload.nombre || '').trim() : current[idxNombre];
+    const afecto = payload.afecto !== undefined ? Number(payload.afecto || 0) : current[idxAfecto];
+    const proveedor = payload.proveedor !== undefined ? String(payload.proveedor || '').trim() : current[idxProveedor];
+    const costoUnitario = payload.costo_unitario !== undefined ? Number(payload.costo_unitario || 0) : current[idxCosto];
+    const precioVenta = payload.precio_venta !== undefined ? Number(payload.precio_venta || 0) : current[idxPrecio];
+    const activo = payload.activo !== undefined ? Number(payload.activo || 0) : current[idxActivo];
+    if (!isFinite(afecto) || !isFinite(costoUnitario) || !isFinite(precioVenta) || !isFinite(activo)) {
+      throw new Error('Campos numéricos inválidos.');
+    }
+    sheet.getRange(rowIndex, idxNombre + 1).setValue(nombre);
+    sheet.getRange(rowIndex, idxAfecto + 1).setValue(afecto);
+    sheet.getRange(rowIndex, idxProveedor + 1).setValue(proveedor);
+    sheet.getRange(rowIndex, idxCosto + 1).setValue(costoUnitario);
+    sheet.getRange(rowIndex, idxPrecio + 1).setValue(precioVenta);
+    sheet.getRange(rowIndex, idxActivo + 1).setValue(activo);
+    return { ok: true, codigo: codigo };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteProducto(payload) {
+  const sheet = getProductosSheet();
+  if (!sheet) throw new Error('No se encontró la hoja "productos".');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxCodigo = headers.indexOf('codigo');
+  if (idxCodigo < 0) throw new Error('Columnas requeridas faltantes en productos.');
+  const codigo = String(payload.codigo || '').trim();
+  if (!codigo) throw new Error('Código requerido.');
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(15000);
+  try {
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i += 1) {
+      if (String(data[i][idxCodigo] || '').trim() === codigo) {
+        sheet.deleteRow(i + 1);
+        return { ok: true, codigo: codigo };
+      }
+    }
+    throw new Error('Producto no encontrado.');
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function createCaja(payload) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
   if (!sheet) throw new Error('No se encontró la hoja "caja".');
@@ -1118,7 +1317,31 @@ function getCierresSheet() {
   return sheet;
 }
 
+function getProductosSheet() {
+  const sheet = getOrCreateSheet(PRODUCTOS_SHEET_NAME, PRODUCTOS_HEADERS);
+  ensureProductosHeaders(sheet, PRODUCTOS_HEADERS);
+  return sheet;
+}
+
 function ensureCierresHeaders(sheet, headers) {
+  if (!sheet) return;
+  const lastCol = Math.max(sheet.getLastColumn(), headers.length);
+  const row = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const normalized = row.map(h => String(h).toLowerCase());
+  let changed = false;
+  headers.forEach((header) => {
+    if (!normalized.includes(header)) {
+      row.push(header);
+      normalized.push(header);
+      changed = true;
+    }
+  });
+  if (changed) {
+    sheet.getRange(1, 1, 1, row.length).setValues([row]);
+  }
+}
+
+function ensureProductosHeaders(sheet, headers) {
   if (!sheet) return;
   const lastCol = Math.max(sheet.getLastColumn(), headers.length);
   const row = sheet.getRange(1, 1, 1, lastCol).getValues()[0];

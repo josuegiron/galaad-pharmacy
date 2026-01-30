@@ -784,10 +784,17 @@
           </div>
           <span class="arrow">›</span>
         </button>
-        <button type="button" class="module-item" data-view="inventario-compras">
+        <button type="button" class="module-item" data-view="inventario-compras-crear">
           <div>
-            Compras
-            <span>Registro y gestión de compras.</span>
+            Registrar compra
+            <span>Crear compras con productos.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+        <button type="button" class="module-item" data-view="inventario-compras-listado">
+          <div>
+            Compras registradas
+            <span>Listado y gestión de compras.</span>
           </div>
           <span class="arrow">›</span>
         </button>
@@ -830,10 +837,85 @@
       </div>
     </section>
 
-    <section id="inventario-compras" class="form-wrap view">
-      <h2 class="section-title" style="margin-bottom:10px;">Compras</h2>
-      <div class="module-list">
-        <div class="placeholder">Pronto verás el módulo de compras.</div>
+    <section id="inventario-compras-crear" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Registrar compra</h2>
+      <form id="compraForm">
+        <div class="card date-card">
+          <label class="date-field">
+            Fecha
+            <input type="date" name="fecha" id="compraFecha" required>
+          </label>
+          <div class="checkbox-row-inline">
+            <label class="checkbox-inline">
+              <span>Crédito</span>
+              <input type="checkbox" id="compraCredito">
+            </label>
+          </div>
+        </div>
+
+        <div class="card items-card">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; align-items:flex-end;">
+            <label style="flex:1 1 320px; position:relative;">
+              Buscar producto
+              <input id="compraProductSearch" placeholder="Código o nombre" autocomplete="off">
+              <div id="compraSearchResults" class="search-results" hidden></div>
+            </label>
+            <div id="compraSearchError" class="search-error" hidden>No se encontró el producto en el catálogo.</div>
+            <button type="button" class="btn" id="compraAddSelectedBtn">Agregar producto</button>
+            <button type="button" class="btn" id="compraClearSearchBtn">Limpiar búsqueda</button>
+          </div>
+          <div class="divider"></div>
+          <div id="compraItemsWrapper" class="items-wrapper"></div>
+        </div>
+
+        <div class="total total-line">
+          <div class="total-text">Total: <span id="compraTotal">Q.0.00</span></div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:4px;">
+          <button type="submit" class="btn primary full-width" id="compraSubmitBtn">Guardar compra</button>
+        </div>
+      </form>
+      <div class="message" id="compraMessage"></div>
+    </section>
+
+    <section id="inventario-compras-listado" class="form-wrap view">
+      <h2 class="section-title" style="margin-bottom:10px;">Compras registradas</h2>
+      <div class="card" style="margin-top:16px;">
+        <label>
+          Fecha
+          <input type="date" id="comprasFecha">
+        </label>
+        <p class="hint" style="margin-top:8px;">Filtra compras por fecha.</p>
+      </div>
+      <div class="table-meta">
+        <div id="comprasStatus" class="status-pill">Esperando fecha...</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" class="btn" id="comprasReload">Recargar</button>
+          <div id="comprasCount">0 compras</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Código</th>
+              <th>Cantidad</th>
+              <th>Valor</th>
+              <th>Descuento</th>
+              <th>Total</th>
+              <th>Descripción</th>
+              <th>Crédito</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="comprasBody"></tbody>
+        </table>
+      </div>
+      <div class="card summary-card" style="margin-top:12px;">
+        <div>Total compras</div>
+        <div><span id="comprasTotal">Q.0.00</span></div>
       </div>
     </section>
 
@@ -1087,6 +1169,10 @@
         Cantidad
         <input type="number" id="editCantidad" step="0.01" min="0">
       </label>
+      <label id="editValorRow">
+        Valor unitario
+        <input type="number" id="editValor" step="0.01" min="0">
+      </label>
       <label>
         Descuento
         <input type="number" id="editDescuento" step="0.01" min="0">
@@ -1163,6 +1249,24 @@
     const clearSearchBtn = document.getElementById('clearSearchBtn');
     const searchResults = document.getElementById('searchResults');
     const searchError = document.getElementById('searchError');
+    const compraForm = document.getElementById('compraForm');
+    const compraFecha = document.getElementById('compraFecha');
+    const compraCredito = document.getElementById('compraCredito');
+    const compraProductSearch = document.getElementById('compraProductSearch');
+    const compraClearSearchBtn = document.getElementById('compraClearSearchBtn');
+    const compraSearchResults = document.getElementById('compraSearchResults');
+    const compraSearchError = document.getElementById('compraSearchError');
+    const compraAddSelectedBtn = document.getElementById('compraAddSelectedBtn');
+    const compraItemsWrapper = document.getElementById('compraItemsWrapper');
+    const compraTotalEl = document.getElementById('compraTotal');
+    const compraSubmitBtn = document.getElementById('compraSubmitBtn');
+    const compraMessageEl = document.getElementById('compraMessage');
+    const comprasFecha = document.getElementById('comprasFecha');
+    const comprasStatus = document.getElementById('comprasStatus');
+    const comprasBody = document.getElementById('comprasBody');
+    const comprasCount = document.getElementById('comprasCount');
+    const comprasReload = document.getElementById('comprasReload');
+    const comprasTotal = document.getElementById('comprasTotal');
     const catalogOptions = document.createElement('datalist');
     catalogOptions.id = 'catalogOptions';
     document.body.appendChild(catalogOptions);
@@ -1206,10 +1310,13 @@
     const lotesReload = document.getElementById('lotesReload');
     const editModal = document.getElementById('editModal');
     const editCantidad = document.getElementById('editCantidad');
+    const editValorRow = document.getElementById('editValorRow');
+    const editValor = document.getElementById('editValor');
     const editDescuento = document.getElementById('editDescuento');
     const editFacturado = document.getElementById('editFacturado');
     const editCancel = document.getElementById('editCancel');
     const editSave = document.getElementById('editSave');
+    if (editValorRow) editValorRow.style.display = 'none';
     const cajaFecha = document.getElementById('cajaFecha');
     const cajaStatus = document.getElementById('cajaStatus');
     const cajaBody = document.getElementById('cajaBody');
@@ -1267,7 +1374,8 @@
       'facturacion-lotes': 'Lotes generados',
       'inventario-menu': 'Inventario',
       'inventario-productos': 'Productos',
-      'inventario-compras': 'Compras',
+      'inventario-compras-crear': 'Registrar compra',
+      'inventario-compras-listado': 'Compras registradas',
       'caja-menu': 'Caja',
       'caja-view': 'Movimientos de caja',
       'caja-cierres': 'Cierres de caja',
@@ -1310,6 +1418,19 @@
       if (viewId === 'inventario-productos') {
         loadProductos();
       }
+      if (viewId === 'inventario-compras-crear') {
+        if (!catalog.length) {
+          loadCatalog();
+        }
+      }
+      if (viewId === 'inventario-compras-listado') {
+        if (comprasStatus) comprasStatus.textContent = 'Cargando compras...';
+        if (!movimientosLoaded) {
+          loadMovimientos(true);
+        } else {
+          renderCompras();
+        }
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -1326,6 +1447,8 @@
     if (facturacionFecha) facturacionFecha.value = today;
     if (lotesFecha) lotesFecha.value = today;
     if (cajaFecha) cajaFecha.value = today;
+    if (compraFecha) compraFecha.value = today;
+    if (comprasFecha) comprasFecha.value = today;
     if (cierresDesde) cierresDesde.value = monthStart;
     if (cierresHasta) cierresHasta.value = monthEnd;
 
@@ -1363,7 +1486,8 @@
       card.dataset.codigo = item.codigo || '';
       card.dataset.producto = item.nombre || '';
       card.dataset.proveedor = item.proveedor || '';
-      card.dataset.precio = item.precio_venta || '';
+      const precioDefault = item.valor_unitario || item.precio_venta || 0;
+      card.dataset.precio = precioDefault;
       card.innerHTML = `
         <div class="row">
           <div class="product-meta">
@@ -1374,7 +1498,7 @@
         <div class="controls">
           <label>
             Precio
-            <span class="item-price-value">Q.${item.precio_venta || '0.00'}</span>
+            <input type="number" class="precio" step="0.01" value="${precioDefault}" required>
           </label>
           <label>
             Cantidad
@@ -1398,6 +1522,58 @@
         card.querySelector('.' + cls).addEventListener('input', updateTotal);
       });
       itemsWrapper.appendChild(card);
+    };
+
+    const createCompraItemRow = (item = {}) => {
+      if (!compraItemsWrapper) return;
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.dataset.codigo = item.codigo || '';
+      card.dataset.producto = item.nombre || '';
+      card.dataset.proveedor = item.proveedor || '';
+      const precioDefault = item.valor_unitario || item.precio_venta || 0;
+      card.dataset.precio = precioDefault;
+      card.innerHTML = `
+        <div class="row">
+          <div class="product-meta">
+            <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'} <span class="inline-provider">· ${item.proveedor || '—'}</span></span>
+          </div>
+          <button type="button" class="remove-btn">✕</button>
+        </div>
+        <div class="controls">
+          <label>
+            Precio
+            <input type="number" class="precio" step="0.01" value="${precioDefault}" required>
+          </label>
+          <label>
+            Cantidad
+            <input type="number" class="cantidad" step="0.01" value="${item.cantidad || 1}" required>
+          </label>
+          <label>
+            Descuento
+            <input type="number" class="descuento" step="0.01" value="${item.descuento || 0}">
+          </label>
+          <label>
+            Total
+            <span class="item-total-value">Q.0.00</span>
+          </label>
+        </div>
+      `;
+      card.querySelector('.remove-btn').addEventListener('click', () => {
+        card.remove();
+        updateCompraTotal();
+      });
+      const precioInput = card.querySelector('.precio');
+      if (precioInput) {
+        precioInput.addEventListener('input', () => {
+          card.dataset.precio = precioInput.value;
+          updateCompraTotal();
+        });
+      }
+      ['cantidad', 'descuento'].forEach(cls => {
+        card.querySelector('.' + cls).addEventListener('input', updateCompraTotal);
+      });
+      compraItemsWrapper.appendChild(card);
     };
 
     addSelectedBtn.addEventListener('click', () => {
@@ -1424,12 +1600,39 @@
       updateTotal();
     });
 
+    if (compraAddSelectedBtn) {
+      compraAddSelectedBtn.addEventListener('click', () => {
+        const query = (compraProductSearch ? compraProductSearch.value : '').trim();
+        if (!query) {
+          if (compraSearchError) compraSearchError.hidden = false;
+          return;
+        }
+        const selected = findProduct(query);
+        if (!selected) {
+          if (compraSearchError) compraSearchError.hidden = false;
+          return;
+        }
+        if (compraSearchError) compraSearchError.hidden = true;
+        const item = {
+          codigo: selected.codigo,
+          nombre: selected.nombre,
+          proveedor: selected.proveedor,
+          precio_venta: selected.precio_venta,
+          valor_unitario: selected.precio_venta,
+        };
+        createCompraItemRow(item);
+        if (compraProductSearch) compraProductSearch.value = '';
+        updateCompraTotal();
+      });
+    }
+
     const updateTotal = () => {
       let total = 0;
       itemsWrapper.querySelectorAll('.item-card').forEach(row => {
         const qtyRaw = parseFloat(row.querySelector('.cantidad').value) || 0;
         const qtyDisplay = Math.abs(qtyRaw); // siempre mostramos positivo
-        const valor = parseFloat(row.dataset.precio || '') || 0;
+        const precioInput = row.querySelector('.precio');
+        const valor = precioInput ? (parseFloat(precioInput.value || '') || 0) : (parseFloat(row.dataset.precio || '') || 0);
         const descuento = parseFloat(row.querySelector('.descuento').value) || 0;
         const itemTotal = (qtyDisplay * valor) - descuento;
         const totalEl = row.querySelector('.item-total-value');
@@ -1438,6 +1641,34 @@
       });
       costoTotalEl.textContent = isFinite(total) ? `Q.${total.toFixed(2)}` : 'Q.0.00';
       costoTotalEl.style.color = total > 0 ? '#5ef8b0' : (total < 0 ? '#ffb36b' : 'var(--text)');
+    };
+
+    const updateCompraTotal = () => {
+      if (!compraItemsWrapper || !compraTotalEl) return;
+      let total = 0;
+      compraItemsWrapper.querySelectorAll('.item-card').forEach(row => {
+        const qty = parseFloat(row.querySelector('.cantidad').value) || 0;
+        const precioInput = row.querySelector('.precio');
+        const valor = precioInput ? (parseFloat(precioInput.value || '') || 0) : (parseFloat(row.dataset.precio || '') || 0);
+        const descuento = parseFloat(row.querySelector('.descuento').value) || 0;
+        const itemTotal = (Math.abs(qty) * valor) - descuento;
+        const totalEl = row.querySelector('.item-total-value');
+        if (totalEl) totalEl.textContent = `Q.${itemTotal.toFixed(2)}`;
+        total += itemTotal;
+      });
+      compraTotalEl.textContent = isFinite(total) ? `Q.${total.toFixed(2)}` : 'Q.0.00';
+      compraTotalEl.style.color = total > 0 ? '#5ef8b0' : (total < 0 ? '#ffb36b' : 'var(--text)');
+    };
+
+    const showCompraMessage = (text, isError = false) => {
+      if (!compraMessageEl) return;
+      compraMessageEl.textContent = text;
+      compraMessageEl.classList.toggle('error', isError);
+      compraMessageEl.classList.toggle('success', !isError);
+      compraMessageEl.style.display = 'block';
+      setTimeout(() => {
+        compraMessageEl.style.display = 'none';
+      }, 5000);
     };
 
     form.addEventListener('submit', async (e) => {
@@ -1494,6 +1725,58 @@
         setButtonLoading(submitBtn, false);
       }
     });
+
+    if (compraForm) {
+      compraForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (compraMessageEl) compraMessageEl.style.display = 'none';
+        setButtonLoading(compraSubmitBtn, true);
+        try {
+          const rows = [...(compraItemsWrapper ? compraItemsWrapper.querySelectorAll('.item-card') : [])];
+          if (!rows.length) throw new Error('Agrega al menos un ítem.');
+          const items = rows.map(row => {
+            const qtyRaw = Number(row.querySelector('.cantidad').value || 0);
+            const cantidad = Math.abs(qtyRaw);
+            const precioInput = row.querySelector('.precio');
+            const valor = precioInput ? (parseFloat(precioInput.value || '') || 0) : (parseFloat(row.dataset.precio || '') || 0);
+            const descuento = Number(row.querySelector('.descuento').value || 0);
+            const codigo = (row.dataset.codigo || '').trim();
+            const nombre = (row.dataset.producto || '').trim();
+            const comentario = nombre || 'Compra';
+            const proveedor = (row.dataset.proveedor || '').trim();
+            const precio_venta = valor;
+            return { codigo, tipo: 2, cantidad, valor_unitario: valor, descuento, comentario, proveedor, precio_venta };
+          });
+          const selectedDate = compraFecha ? compraFecha.value : toLocalISODate(new Date());
+          const now = new Date();
+          const time = now.toTimeString().slice(0, 8);
+          const fechaConHora = `${selectedDate} ${time}`;
+          const payload = {
+            fecha: fechaConHora,
+            facturado: 0,
+            credito: compraCredito && compraCredito.checked ? 1 : 0,
+            items,
+          };
+          const fd = new FormData();
+          fd.append('payload', JSON.stringify(payload));
+          await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: fd,
+          });
+          showCompraMessage('¡Compra registrada con éxito!');
+          compraForm.reset();
+          if (compraFecha) compraFecha.value = toLocalISODate(new Date());
+          if (compraItemsWrapper) compraItemsWrapper.innerHTML = '';
+          updateCompraTotal();
+          loadMovimientos(true);
+        } catch (err) {
+          showCompraMessage(err.message || 'No se pudo enviar.', true);
+        } finally {
+          setButtonLoading(compraSubmitBtn, false);
+        }
+      });
+    }
 
     function normalizeNumber(val) {
       if (val === undefined || val === null) return NaN;
@@ -1617,6 +1900,7 @@
         }
         renderMovimientos();
         renderResumen();
+        renderCompras();
       } catch (err) {
         movimientosLoading = false;
         if (ventasStatus) ventasStatus.textContent = 'No se pudo leer la hoja.';
@@ -2120,7 +2404,7 @@
             <td>
               ${canEdit || canDelete ? `
                 <div style="display:flex; gap:6px; flex-wrap:nowrap;">
-                  ${canEdit ? `<button type="button" class="btn compact" data-action="editar" data-numero="${item.numero}" data-cantidad="${cantidad}" data-descuento="${descuento}" data-facturado="${Number(item.facturado) === 1 ? 1 : 0}">Editar</button>` : ''}
+                  ${canEdit ? `<button type="button" class="btn compact" data-action="editar" data-numero="${item.numero}" data-cantidad="${cantidad}" data-descuento="${descuento}" data-valor="${valor}" data-facturado="${Number(item.facturado) === 1 ? 1 : 0}">Editar</button>` : ''}
                   ${canDelete ? `<button type="button" class="btn compact danger" data-action="eliminar" data-numero="${item.numero}">Eliminar</button>` : ''}
                 </div>
               ` : '—'}
@@ -2131,6 +2415,64 @@
       ventasCount.textContent = `${rows.length} ventas`;
       ventasTotal.textContent = `Q.${totalSum.toFixed(2)}`;
       ventasStatus.textContent = 'Actualizado';
+    }
+
+    function renderCompras() {
+      if (!comprasBody || !comprasFecha) return;
+      const selectedDate = comprasFecha.value || toLocalISODate(new Date());
+      if (!movimientosLoaded) {
+        if (comprasStatus) comprasStatus.textContent = 'Cargando compras...';
+        return;
+      }
+      const rows = movimientos.filter(item => {
+        if (Number(item.tipo) !== 2) return false;
+        const dateObj = parseSheetDate(item.fechaRaw);
+        if (!dateObj) return false;
+        return toLocalISODate(dateObj) === selectedDate;
+      });
+
+      if (!rows.length) {
+        comprasBody.innerHTML = '<tr><td colspan="9">Sin compras para esta fecha.</td></tr>';
+        if (comprasCount) comprasCount.textContent = '0 compras';
+        if (comprasTotal) comprasTotal.textContent = 'Q.0.00';
+        if (comprasStatus) comprasStatus.textContent = 'Sin resultados';
+        return;
+      }
+
+      let totalSum = 0;
+      comprasBody.innerHTML = rows.map(item => {
+        const cantidad = Math.abs(item.cantidad || 0);
+        const valor = isFinite(item.valorUnitario) ? item.valorUnitario : 0;
+        const descuento = isFinite(item.descuento) ? item.descuento : 0;
+        const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
+        const isCredito = Number(item.credito) === 1;
+        const canDelete = item.numero !== '' && item.numero !== null && item.numero !== undefined;
+        const canEdit = canDelete;
+        totalSum += total;
+        return `
+          <tr>
+            <td>${formatDateTime(item.fechaRaw)}</td>
+            <td>${item.codigo || ''}</td>
+            <td>${cantidad}</td>
+            <td>Q.${valor.toFixed(2)}</td>
+            <td>Q.${descuento.toFixed(2)}</td>
+            <td>Q.${total.toFixed(2)}</td>
+            <td>${item.comentario || ''}</td>
+            <td>${isCredito ? 'Si' : 'No'}</td>
+            <td>
+              ${canEdit || canDelete ? `
+                <div style="display:flex; gap:6px; flex-wrap:nowrap;">
+                  ${canEdit ? `<button type="button" class="btn compact" data-action="editar" data-numero="${item.numero}" data-cantidad="${cantidad}" data-descuento="${descuento}" data-valor="${valor}" data-facturado="0">Editar</button>` : ''}
+                  ${canDelete ? `<button type="button" class="btn compact danger" data-action="eliminar" data-numero="${item.numero}">Eliminar</button>` : ''}
+                </div>
+              ` : '—'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+      if (comprasCount) comprasCount.textContent = `${rows.length} compras`;
+      if (comprasTotal) comprasTotal.textContent = `Q.${totalSum.toFixed(2)}`;
+      if (comprasStatus) comprasStatus.textContent = 'Actualizado';
     }
 
     function renderResumen() {
@@ -2297,12 +2639,63 @@
       }
     });
 
+    const toggleCompraClear = () => {
+      if (!compraClearSearchBtn || !compraProductSearch) return;
+      compraClearSearchBtn.disabled = !compraProductSearch.value.trim();
+    };
+    function renderCompraResults(query) {
+      if (!compraSearchResults) return;
+      const normalized = query.trim().toLowerCase();
+      if (!normalized) {
+        compraSearchResults.hidden = true;
+        compraSearchResults.innerHTML = '';
+        return;
+      }
+      const results = catalog.filter(p => {
+        const code = String(p.codigo).toLowerCase();
+        const name = String(p.nombre).toLowerCase();
+        const provider = String(p.proveedor || '').toLowerCase();
+        return code.includes(normalized) || name.includes(normalized) || provider.includes(normalized);
+      }).slice(0, 8);
+      if (!results.length) {
+        compraSearchResults.hidden = true;
+        compraSearchResults.innerHTML = '';
+        return;
+      }
+      compraSearchResults.innerHTML = results.map(p => {
+        const label = `${p.codigo} - ${p.nombre} / ${p.proveedor || '—'} / Precio: Q.${p.precio_venta}`;
+        return `<button type="button" data-code="${p.codigo}">${label}</button>`;
+      }).join('');
+      compraSearchResults.hidden = false;
+    }
+
+    if (compraSearchResults) {
+      compraSearchResults.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const code = btn.getAttribute('data-code');
+        const product = catalog.find(p => String(p.codigo) === String(code));
+        if (product && compraProductSearch) {
+          compraProductSearch.value = `${product.codigo} - ${product.nombre} / ${product.proveedor || '—'} / Q.${product.precio_venta}`;
+          toggleCompraClear();
+          compraSearchResults.hidden = true;
+        }
+      });
+    }
+
     productSearch.addEventListener('input', () => {
       currentProduct = findProduct(productSearch.value);
       toggleClear();
       renderResults(productSearch.value);
       searchError.hidden = true;
     });
+    if (compraProductSearch) {
+      compraProductSearch.addEventListener('input', () => {
+        toggleCompraClear();
+        renderCompraResults(compraProductSearch.value);
+        if (compraSearchError) compraSearchError.hidden = true;
+      });
+    }
     const keepSearchVisible = () => {
       const nav = document.querySelector('.nav');
       const offset = nav ? nav.offsetHeight + 12 : 12;
@@ -2335,6 +2728,15 @@
       searchError.hidden = true;
       productSearch.focus();
     });
+    if (compraClearSearchBtn && compraProductSearch) {
+      compraClearSearchBtn.addEventListener('click', () => {
+        compraProductSearch.value = '';
+        toggleCompraClear();
+        renderCompraResults('');
+        if (compraSearchError) compraSearchError.hidden = true;
+        compraProductSearch.focus();
+      });
+    }
 
     if (ventasFecha) {
       ventasFecha.addEventListener('change', () => {
@@ -2385,6 +2787,23 @@
         cierresLoadingButton = cierresReload;
         setButtonLoading(cierresReload, true);
         loadCierres();
+      });
+    }
+    if (comprasFecha) {
+      comprasFecha.addEventListener('change', () => {
+        if (!movimientosLoaded) {
+          loadMovimientos();
+        } else {
+          renderCompras();
+        }
+      });
+    }
+    if (comprasReload) {
+      comprasReload.addEventListener('click', () => {
+        if (movimientosLoading) return;
+        movimientosLoadingButton = comprasReload;
+        setButtonLoading(comprasReload, true);
+        loadMovimientos(true);
       });
     }
     if (productosSearch) {
@@ -2760,11 +3179,65 @@
         if (!numero) return;
         const cantidad = editBtn.getAttribute('data-cantidad') || '0';
         const descuento = editBtn.getAttribute('data-descuento') || '0';
+        const valor = editBtn.getAttribute('data-valor') || '0';
         const facturado = editBtn.getAttribute('data-facturado') || '0';
         editModal.dataset.numero = numero;
+        editModal.dataset.context = 'venta';
         editCantidad.value = cantidad;
+        if (editValor) editValor.value = valor;
         editDescuento.value = descuento;
-        if (editFacturado) editFacturado.checked = facturado === '1';
+        if (editValorRow) editValorRow.style.display = 'none';
+        if (editValor) editValor.disabled = true;
+        if (editFacturado) {
+          editFacturado.checked = facturado === '1';
+          editFacturado.disabled = false;
+        }
+        editModal.classList.add('active');
+      });
+    }
+
+    if (comprasBody) {
+      comprasBody.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action="eliminar"][data-numero]');
+        if (btn) {
+          const numero = btn.getAttribute('data-numero');
+          if (!numero) return;
+          const confirmed = window.confirm('¿Eliminar este movimiento?');
+          if (!confirmed) return;
+          setButtonLoading(btn, true);
+          if (comprasStatus) comprasStatus.textContent = 'Eliminando...';
+          const url = `${SCRIPT_URL}?action=movimiento_eliminar&numero=${encodeURIComponent(numero)}`;
+          jsonpRequest(url, (data) => {
+            if (!data || !data.ok) {
+              if (comprasStatus) comprasStatus.textContent = 'No se pudo eliminar.';
+              setButtonLoading(btn, false);
+              return;
+            }
+            loadMovimientos(true);
+          }, () => {
+            if (comprasStatus) comprasStatus.textContent = 'Error al eliminar.';
+            setButtonLoading(btn, false);
+          });
+          return;
+        }
+        const editBtn = event.target.closest('button[data-action="editar"][data-numero]');
+        if (!editBtn || !editModal) return;
+        const numero = editBtn.getAttribute('data-numero');
+        if (!numero) return;
+        const cantidad = editBtn.getAttribute('data-cantidad') || '0';
+        const descuento = editBtn.getAttribute('data-descuento') || '0';
+        const valor = editBtn.getAttribute('data-valor') || '0';
+        editModal.dataset.numero = numero;
+        editModal.dataset.context = 'compra';
+        editCantidad.value = cantidad;
+        if (editValor) editValor.value = valor;
+        editDescuento.value = descuento;
+        if (editValorRow) editValorRow.style.display = '';
+        if (editValor) editValor.disabled = false;
+        if (editFacturado) {
+          editFacturado.checked = false;
+          editFacturado.disabled = true;
+        }
         editModal.classList.add('active');
       });
     }
@@ -2773,6 +3246,10 @@
       if (!editModal) return;
       editModal.classList.remove('active');
       editModal.dataset.numero = '';
+      editModal.dataset.context = '';
+      if (editFacturado) editFacturado.disabled = false;
+      if (editValorRow) editValorRow.style.display = 'none';
+      if (editValor) editValor.disabled = false;
       if (editSave) setButtonLoading(editSave, false);
     };
 
@@ -2794,29 +3271,49 @@
         if (!numero) return;
         const cantidad = Number(editCantidad.value || 0);
         const descuento = Number(editDescuento.value || 0);
+        const valorUnitario = editValor ? Number(editValor.value || 0) : 0;
         if (!isFinite(cantidad) || !isFinite(descuento)) return;
-        const facturado = editFacturado && editFacturado.checked ? 1 : 0;
+        const context = editModal ? editModal.dataset.context : 'venta';
+        if (context === 'compra' && !isFinite(valorUnitario)) return;
+        const facturado = context === 'compra' ? 0 : (editFacturado && editFacturado.checked ? 1 : 0);
         setButtonLoading(editSave, true);
-        if (ventasStatus) ventasStatus.textContent = 'Actualizando...';
-        const url = `${SCRIPT_URL}?action=movimiento_actualizar&numero=${encodeURIComponent(numero)}&cantidad=${encodeURIComponent(cantidad)}&descuento=${encodeURIComponent(descuento)}&facturado=${encodeURIComponent(facturado)}`;
+        if (context === 'compra') {
+          if (comprasStatus) comprasStatus.textContent = 'Actualizando...';
+        } else if (ventasStatus) {
+          ventasStatus.textContent = 'Actualizando...';
+        }
+        let url = `${SCRIPT_URL}?action=movimiento_actualizar&numero=${encodeURIComponent(numero)}&cantidad=${encodeURIComponent(cantidad)}&descuento=${encodeURIComponent(descuento)}&facturado=${encodeURIComponent(facturado)}`;
+        if (context === 'compra') {
+          url += `&valor_unitario=${encodeURIComponent(valorUnitario)}`;
+        }
         jsonpRequest(url, (data) => {
           if (!data || !data.ok) {
-            if (ventasStatus) ventasStatus.textContent = 'No se pudo actualizar.';
+            if (context === 'compra') {
+              if (comprasStatus) comprasStatus.textContent = 'No se pudo actualizar.';
+            } else if (ventasStatus) {
+              ventasStatus.textContent = 'No se pudo actualizar.';
+            }
             setButtonLoading(editSave, false);
             return;
           }
           closeEditModal();
           loadMovimientos(true);
         }, () => {
-          if (ventasStatus) ventasStatus.textContent = 'Error al actualizar.';
+          if (context === 'compra') {
+            if (comprasStatus) comprasStatus.textContent = 'Error al actualizar.';
+          } else if (ventasStatus) {
+            ventasStatus.textContent = 'Error al actualizar.';
+          }
           setButtonLoading(editSave, false);
         });
       });
     }
 
     toggleClear();
+    toggleCompraClear();
     loadCatalog();
     updateTotal();
+    updateCompraTotal();
   </script>
 </body>
 </html>

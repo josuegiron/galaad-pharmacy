@@ -270,24 +270,30 @@ function insertCaja(payload, rows) {
     const numero = row[0];
     const fecha = row[1];
     const codigo = row[2] || '';
+    const tipo = Number(row[3] || 1);
     const cantidad = Number(row[4]) || 0;
     const valor = Number(row[5]) || 0;
     const descuento = Number(row[6]) || 0;
     const monto = (Math.abs(cantidad) * valor) - descuento;
     const producto = row[8] || payload.concepto || 'Producto';
-    const concepto = `Por venta de ${Math.abs(cantidad)} * ${producto} (${codigo})`;
+    const isCredito = Number(payload.credito || 0) === 1;
+    if (tipo === 2 && isCredito) return null;
+    const concepto = tipo === 2
+      ? `Por compra de ${Math.abs(cantidad)} * ${producto} (${codigo})`
+      : `Por venta de ${Math.abs(cantidad)} * ${producto} (${codigo})`;
     const id = nextId + idx;
     const rowData = [];
     rowData[0] = id;
     rowData[1] = fecha;
-    rowData[2] = 1;
+    rowData[2] = tipo;
     if (idxMonto >= 0) rowData[idxMonto] = monto;
     if (idxConcepto >= 0) rowData[idxConcepto] = concepto;
     if (idxReferencia >= 0) rowData[idxReferencia] = numero;
-    if (idxTipoDescripcion >= 0) rowData[idxTipoDescripcion] = 'venta';
+    if (idxTipoDescripcion >= 0) rowData[idxTipoDescripcion] = tipo === 2 ? 'compra' : 'venta';
     if (idxTimestamp >= 0) rowData[idxTimestamp] = timestamp;
     return rowData;
-  });
+  }).filter(row => row);
+  if (!cajaRows.length) return;
   sheet.getRange(lastRow + 1, 1, cajaRows.length, sheet.getLastColumn()).setValues(cajaRows.map(row => {
     const filled = new Array(sheet.getLastColumn()).fill('');
     row.forEach((val, index) => { filled[index] = val; });
@@ -442,16 +448,19 @@ function deleteMovimiento(payload) {
   const idxNumero = headers.indexOf('numero');
   const idxFecha = headers.indexOf('fecha');
   const idxFacturado = headers.indexOf('facturado');
-  if (idxNumero < 0 || idxFecha < 0 || idxFacturado < 0) {
+  const idxCredito = headers.indexOf('credito');
+  if (idxNumero < 0 || idxFecha < 0 || idxFacturado < 0 || idxCredito < 0) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
   }
   let rowIndex = -1;
   let facturado = 0;
+  let credito = 0;
   let rowDate = null;
   for (let i = 1; i < data.length; i += 1) {
     if (String(data[i][idxNumero] || '') === numero) {
       rowIndex = i + 1;
       facturado = Number(data[i][idxFacturado] || 0);
+      credito = Number(data[i][idxCredito] || 0);
       rowDate = data[i][idxFecha];
       break;
     }
@@ -460,7 +469,7 @@ function deleteMovimiento(payload) {
   if (isDateClosed(rowDate)) throw new Error('Día ya conciliado y cuadrado.');
   if (facturado === 1) throw new Error('No se puede eliminar un movimiento facturado.');
   movimientosSheet.deleteRow(rowIndex);
-  deleteCajaByNumero(numero);
+  if (credito !== 1) deleteCajaByNumero(numero);
   return { ok: true, numero: numero };
 }
 
@@ -471,6 +480,7 @@ function updateMovimiento(payload) {
   const cantidadRaw = payload && payload.cantidad !== undefined ? payload.cantidad : null;
   const descuentoRaw = payload && payload.descuento !== undefined ? payload.descuento : null;
   const facturadoRaw = payload && payload.facturado !== undefined ? payload.facturado : undefined;
+  const valorUnitarioRaw = payload && payload.valor_unitario !== undefined ? payload.valor_unitario : undefined;
   const cantidadInput = Number(cantidadRaw);
   const descuentoInput = Number(descuentoRaw);
   if (!isFinite(cantidadInput) || !isFinite(descuentoInput)) {
@@ -489,13 +499,15 @@ function updateMovimiento(payload) {
   const idxTotal = headers.indexOf('costo_total');
   const idxFacturado = headers.indexOf('facturado');
   const idxTipo = headers.indexOf('tipo');
-  if (idxNumero < 0 || idxFecha < 0 || idxCantidad < 0 || idxValor < 0 || idxDescuento < 0 || idxTotal < 0 || idxFacturado < 0 || idxTipo < 0) {
+  const idxCredito = headers.indexOf('credito');
+  if (idxNumero < 0 || idxFecha < 0 || idxCantidad < 0 || idxValor < 0 || idxDescuento < 0 || idxTotal < 0 || idxFacturado < 0 || idxTipo < 0 || idxCredito < 0) {
     throw new Error('Columnas requeridas faltantes en movimientos.');
   }
   let rowIndex = -1;
   let facturado = 0;
   let valorUnitario = 0;
   let tipo = 0;
+  let credito = 0;
   let rowDate = null;
   for (let i = 1; i < data.length; i += 1) {
     if (String(data[i][idxNumero] || '') === numero) {
@@ -503,6 +515,7 @@ function updateMovimiento(payload) {
       facturado = Number(data[i][idxFacturado] || 0);
       valorUnitario = Number(data[i][idxValor] || 0);
       tipo = Number(data[i][idxTipo] || 0);
+      credito = Number(data[i][idxCredito] || 0);
       rowDate = data[i][idxFecha];
       break;
     }
@@ -517,15 +530,21 @@ function updateMovimiento(payload) {
       throw new Error('Movimiento pertenece a lote confirmado.');
     }
   }
+  let nextValorUnitario = valorUnitario;
+  if (valorUnitarioRaw !== undefined && tipo === 2) {
+    const valorInput = Number(valorUnitarioRaw);
+    if (!isFinite(valorInput)) throw new Error('Valor unitario inválido.');
+    nextValorUnitario = valorInput;
+  }
   const cantidad = tipo === 1 ? -Math.abs(cantidadInput) : cantidadInput;
   const descuento = Math.max(0, descuentoInput);
-  const costoTotal = (Math.abs(cantidad) * valorUnitario) - descuento;
-  movimientosSheet.getRange(rowIndex, idxCantidad + 1, 1, 3).setValues([[cantidad, valorUnitario, descuento]]);
+  const costoTotal = (Math.abs(cantidad) * nextValorUnitario) - descuento;
+  movimientosSheet.getRange(rowIndex, idxCantidad + 1, 1, 3).setValues([[cantidad, nextValorUnitario, descuento]]);
   movimientosSheet.getRange(rowIndex, idxTotal + 1).setValue(costoTotal);
   if (facturadoRaw !== undefined) {
     movimientosSheet.getRange(rowIndex, idxFacturado + 1).setValue(nextFacturado);
   }
-  updateCajaMontoByNumero(numero, costoTotal);
+  if (credito !== 1) updateCajaMontoByNumero(numero, costoTotal);
   return { ok: true, numero: numero, total: costoTotal, facturado: nextFacturado };
 }
 

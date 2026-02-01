@@ -18,7 +18,7 @@ Token efficiency:
 - After applying changes, ask whether to commit. If branch is not specified or previously confirmed, ask which branch to use.
 - If commit is approved, create it, then ask whether to push. Only push after explicit approval.
 - Use repo-defined commit conventions; if none are found, default to Conventional Commits.
-- Conventional Commits format: type(scope): description. Scope optional. Use type from: feat|fix|docs|refactor|test|chore. Description in present tense, lowercase. Use ! for breaking changes or add BREAKING CHANGE: in footer when needed.
+- Conventional Commits format: type(scope): description. Scope optional. Use type from: feat|fix|docs|refactor|test|chore. Description in present tense, lowercase. Use ! for breaking changes or add BREAKING CHANGE: in footer when needed. All messages in English.
 
 Explicit triggers:
 - REVIEW

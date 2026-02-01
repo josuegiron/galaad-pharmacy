@@ -40,6 +40,9 @@
       --primary-border: transparent;
       --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.22);
       --tab-active-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+      --dropdown-bg: #1a1f2b;
+      --dropdown-hover: rgba(255, 255, 255, 0.06);
+      --dropdown-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
     }
     [data-theme="light"] {
       --bg: #f5f7fb;
@@ -71,6 +74,9 @@
       --primary-border: rgba(15, 23, 42, 0.12);
       --card-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
       --tab-active-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+      --dropdown-bg: #f8fafc;
+      --dropdown-hover: rgba(15, 23, 42, 0.06);
+      --dropdown-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
     }
     * { box-sizing: border-box; }
     html {
@@ -378,12 +384,12 @@
       right: 0;
       top: calc(100% + 6px);
       z-index: 20;
-      background: #1a1f2b;
+      background: var(--dropdown-bg);
       border: 1px solid var(--stroke);
       border-radius: 12px;
       max-height: 280px;
       overflow-y: auto;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+      box-shadow: var(--dropdown-shadow);
     }
     .search-results button {
       width: 100%;
@@ -396,7 +402,7 @@
       cursor: pointer;
     }
     .search-results button:hover {
-      background: rgba(255,255,255,0.06);
+      background: var(--dropdown-hover);
     }
     .search-error {
       width: 100%;
@@ -576,6 +582,16 @@
     }
     .module-item:hover { border-color: rgba(233, 255, 112, 0.4); transform: translateY(-1px); }
     .module-item .arrow { color: var(--muted); font-size: 18px; }
+    .module-group-title {
+      margin-top: 6px;
+      padding: 2px 6px 0;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .module-group-title:first-child { margin-top: 0; }
     [hidden] { display: none !important; }
     .tab-bar {
       position: fixed;
@@ -628,6 +644,10 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+    .modal-scroll {
+      max-height: min(60vh, 420px);
+      overflow: auto;
     }
     .modal h3 {
       margin: 0;
@@ -744,6 +764,26 @@
       border-color: rgba(255, 122, 122, 0.55);
       background: rgba(255, 122, 122, 0.12);
       color: #ffd0d0;
+    }
+    .status-help {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      margin-left: 8px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: help;
+    }
+    .status-help:hover {
+      border-color: rgba(233, 255, 112, 0.4);
+      color: var(--text);
     }
     .muted-count {
       color: var(--muted);
@@ -903,7 +943,7 @@
             </label>
             <div id="searchError" class="search-error" hidden>No se encontró el producto en el catálogo.</div>
             <button type="button" class="btn" id="addSelectedBtn">Agregar producto</button>
-            <button type="button" class="btn" id="clearSearchBtn">Limpiar búsqueda</button>
+            <button type="button" class="btn" id="clearSearchBtn">Limpiar</button>
           </div>
           <div class="divider"></div>
           <div id="itemsWrapper" class="items-wrapper"></div>
@@ -1032,36 +1072,10 @@
               <th>Fecha</th>
               <th>Total</th>
               <th>Estado</th>
-              <th>Credito</th>
-              <th>Saldo</th>
-              <th>Detalle</th>
-              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="ventasTransBody"></tbody>
         </table>
-      </div>
-      <div class="card" id="ventasTransDetail" style="margin-top:12px;" hidden>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <h3 id="ventasTransDetailTitle" style="margin:0; font-size:16px;">Detalle de transacción</h3>
-          <button type="button" class="btn compact" id="ventasTransDetailClose">Cerrar</button>
-        </div>
-        <div class="table-wrap" style="margin-top:10px;">
-          <table>
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Valor</th>
-                <th>Descuento</th>
-                <th>Total</th>
-                <th>Descripción</th>
-                <th>Confirmado</th>
-              </tr>
-            </thead>
-            <tbody id="ventasTransDetailBody"></tbody>
-          </table>
-        </div>
       </div>
     </section>
 
@@ -1309,6 +1323,7 @@
         <button type="button" class="help-btn" data-help="inventario-menu" aria-label="Ayuda de inventario">?</button>
       </div>
       <div class="module-list">
+        <div class="module-group-title">Inventario</div>
         <button type="button" class="module-item" data-view="inventario-productos">
           <div>
             Catálogo de productos
@@ -1316,6 +1331,7 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <div class="module-group-title">Compras</div>
         <button type="button" class="module-item" data-view="inventario-compras-crear">
           <div>
             Nueva compra
@@ -1330,6 +1346,14 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <button type="button" class="module-item" data-view="caja-transacciones">
+          <div>
+            Historico de compras
+            <span>Agrupadas por ID con total y estado.</span>
+          </div>
+          <span class="arrow">›</span>
+        </button>
+        <div class="module-group-title">Ajustes</div>
         <button type="button" class="module-item" data-view="inventario-ajustes-crear">
           <div>
             Ajustes de inventario
@@ -1341,13 +1365,6 @@
           <div>
             Ajustes del día
             <span>Listado de ajustes por fecha.</span>
-          </div>
-          <span class="arrow">›</span>
-        </button>
-        <button type="button" class="module-item" data-view="caja-transacciones">
-          <div>
-            Historico de compras
-            <span>Agrupadas por ID con total y estado.</span>
           </div>
           <span class="arrow">›</span>
         </button>
@@ -1991,6 +2008,31 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="ventasTransDetail" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ventasTransDetailTitle" style="width: min(980px, 94vw);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <h3 id="ventasTransDetailTitle">Detalle de venta</h3>
+        <button type="button" class="btn compact" id="ventasTransDetailClose">Cerrar</button>
+      </div>
+      <div class="table-wrap modal-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Cantidad</th>
+              <th>Valor</th>
+              <th>Descuento</th>
+              <th>Total</th>
+              <th>Descripción</th>
+              <th>Confirmado</th>
+            </tr>
+          </thead>
+          <tbody id="ventasTransDetailBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxeDwDO7I9Sv1SsiRTiO804f1rs9oaHkDwyTevYd7ZGDuWDdYDGG6Wpz9uylQtBx5Q/exec';
@@ -2234,7 +2276,7 @@
         applyTheme(stored);
         return;
       }
-      applyTheme('light');
+      applyTheme('dark');
     }
     initTheme();
 
@@ -2300,7 +2342,7 @@
         desc: 'Historico de ventas por fecha.',
         bullets: [
           'Filtrar por rango de fechas.',
-          'Abrir detalle para ver items y estado.',
+          'Revisar el estado de cada transacción.',
         ],
       },
       'facturacion-menu': {
@@ -2538,8 +2580,35 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const isValidView = (viewId) => views.some(view => view.id === viewId);
+    const navigateTo = (viewId, { push = true } = {}) => {
+      if (!isValidView(viewId)) return;
+      setActiveView(viewId);
+      if (push) {
+        history.pushState({ view: viewId }, '', window.location.pathname);
+      }
+    };
+    const initHistory = () => {
+      const activeView = views.find(view => view.classList.contains('active'));
+      const initialView = activeView ? activeView.id : (views[0] ? views[0].id : '');
+      if (!initialView) return;
+      history.replaceState({ view: initialView }, '', window.location.pathname);
+    };
+
+    window.addEventListener('popstate', (event) => {
+      const viewId = event.state && event.state.view ? event.state.view : '';
+      if (isValidView(viewId)) {
+        setActiveView(viewId);
+        return;
+      }
+      const activeView = views.find(view => view.classList.contains('active'));
+      if (activeView) setActiveView(activeView.id);
+    });
+
+    initHistory();
+
     viewButtons.forEach(btn => {
-      btn.addEventListener('click', () => setActiveView(btn.dataset.view));
+      btn.addEventListener('click', () => navigateTo(btn.dataset.view));
     });
     helpButtons.forEach((btn) => {
       btn.addEventListener('click', (event) => {
@@ -2553,6 +2622,11 @@
     if (helpModal) {
       helpModal.addEventListener('click', (event) => {
         if (event.target === helpModal) closeHelp();
+      });
+    }
+    if (ventasTransDetail) {
+      ventasTransDetail.addEventListener('click', (event) => {
+        if (event.target === ventasTransDetail) closeTransaccionDetalleModal();
       });
     }
 
@@ -3213,6 +3287,19 @@
       document.body.appendChild(script);
     }
 
+    function openTransaccionDetalleModal() {
+      if (!ventasTransDetail) return;
+      // Mantiene el detalle en modal para evitar cambios de layout en el histórico.
+      ventasTransDetail.classList.add('active');
+      ventasTransDetail.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeTransaccionDetalleModal() {
+      if (!ventasTransDetail) return;
+      ventasTransDetail.classList.remove('active');
+      ventasTransDetail.setAttribute('aria-hidden', 'true');
+    }
+
     function showTransaccionDetalle(transaccionId) {
       if (!ventasTransDetail || !ventasTransDetailBody || !ventasTransDetailTitle) return;
       if (!movimientosLoaded) {
@@ -3221,10 +3308,10 @@
         return;
       }
       const rows = movimientos.filter(item => Number(item.transaccionId) === Number(transaccionId) && Number(item.tipo) === 1);
-      ventasTransDetailTitle.textContent = `Detalle de transaccion #${transaccionId}`;
+      ventasTransDetailTitle.textContent = `Detalle de venta #${transaccionId}`;
       if (!rows.length) {
         ventasTransDetailBody.innerHTML = '<tr><td colspan="7">Sin items para esta transaccion.</td></tr>';
-        ventasTransDetail.hidden = false;
+        openTransaccionDetalleModal();
         return;
       }
       ventasTransDetailBody.innerHTML = rows.map(item => {
@@ -3244,7 +3331,7 @@
           </tr>
         `;
       }).join('');
-      ventasTransDetail.hidden = false;
+      openTransaccionDetalleModal();
     }
 
     function showCompraDetalle(transaccionId, target = 'transacciones') {
@@ -3646,20 +3733,29 @@
     function renderTransaccionesVenta(items) {
       if (!ventasTransBody || !ventasTransStatus || !ventasTransCount) return;
       if (!items.length) {
-        ventasTransBody.innerHTML = '<tr><td colspan="5">Sin transacciones.</td></tr>';
+        ventasTransBody.innerHTML = '<tr><td colspan="4">Sin transacciones.</td></tr>';
         ventasTransCount.textContent = '0 transacciones';
         ventasTransStatus.textContent = 'Sin resultados';
         return;
       }
       ventasTransBody.innerHTML = items.map(item => {
         const total = Number(item.total || 0);
+        const estadoRaw = String(item.estado || '—');
+        const estadoNorm = estadoRaw.toLowerCase();
+        const estadoHelp = estadoNorm === 'confirmada' || estadoNorm === 'confirmado'
+          ? 'Confirmada: venta registrada y cerrada.'
+          : estadoNorm === 'pendiente'
+            ? 'Pendiente: venta aún sin confirmar.'
+            : 'Estado informado por el sistema.';
         return `
           <tr>
             <td>${item.id || ''}</td>
             <td>${formatDate(item.fecha)}</td>
             <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
-            <td>${item.estado || '—'}</td>
-            <td><button type="button" class="btn compact" data-action="transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
+            <td>
+              <span>${estadoRaw}</span>
+              <span class="status-help" role="img" aria-label="${estadoHelp}" title="${estadoHelp}">?</span>
+            </td>
           </tr>
         `;
       }).join('');
@@ -3750,7 +3846,7 @@
       const hastaEl = isVenta ? ventasTransHasta : cajaTransHasta;
       const reloadBtn = isVenta ? ventasTransReload : cajaTransReload;
       if (!statusEl) return;
-      if (isVenta && ventasTransDetail) ventasTransDetail.hidden = true;
+      if (isVenta) closeTransaccionDetalleModal();
       if (!isVenta && cajaTransDetail) cajaTransDetail.hidden = true;
       if (isVenta && ventasTransLoading) return;
       if (!isVenta && cajaTransLoading) return;
@@ -4811,7 +4907,7 @@
     }
     if (ventasTransDetailClose) {
       ventasTransDetailClose.addEventListener('click', () => {
-        if (ventasTransDetail) ventasTransDetail.hidden = true;
+        closeTransaccionDetalleModal();
       });
     }
     if (cajaTransDetailClose) {

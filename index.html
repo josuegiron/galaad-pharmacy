@@ -765,6 +765,18 @@
       justify-content: space-between;
       gap: 10px;
     }
+    .filter-clear-link {
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: var(--muted);
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .filter-clear-link:hover {
+      color: var(--text);
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -808,6 +820,7 @@
       color: var(--filter-badge-text);
       font-size: 12px;
       font-weight: 600;
+      width: 100%;
     }
     .table-meta.stacked {
       flex-direction: column;
@@ -1167,9 +1180,16 @@
           <div id="ventasTransCount">0 transacciones</div>
         </div>
       </div>
-      <div id="ventasTransFilterBadge" class="filter-badge" hidden style="margin:8px 0 14px;">
-        <span id="ventasTransFilterSummary">Filtrado</span>
-        <button type="button" class="btn compact" id="ventasTransFilterClear">Limpiar</button>
+      <div id="ventasTransFilterBadge" class="filter-badge" hidden style="margin:8px 0 14px; flex-direction:column; align-items:flex-start; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <strong>Ordenado por:</strong>
+          <div style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;" id="ventasTransSortChips"></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <strong>Filtrado:</strong>
+          <div style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;" id="ventasTransFilterChips"></div>
+          <button type="button" class="filter-clear-link" id="ventasTransFilterClear">Limpiar todo</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
@@ -2309,8 +2329,9 @@
     const ventasTransFilterTitle = document.getElementById('ventasTransFilterTitle');
     const ventasTransFilterFields = document.getElementById('ventasTransFilterFields');
     const ventasTransFilterBadge = document.getElementById('ventasTransFilterBadge');
-    const ventasTransFilterSummary = document.getElementById('ventasTransFilterSummary');
     const ventasTransFilterClear = document.getElementById('ventasTransFilterClear');
+    const ventasTransSortChips = document.getElementById('ventasTransSortChips');
+    const ventasTransFilterChips = document.getElementById('ventasTransFilterChips');
     const ventasResumenDetail = document.getElementById('ventasResumenDetail');
     const ventasResumenDetailTitle = document.getElementById('ventasResumenDetailTitle');
     const ventasResumenDetailSubtitle = document.getElementById('ventasResumenDetailSubtitle');
@@ -3692,7 +3713,7 @@
     let ventasTransLoading = false;
     let ventasTransItems = [];
     const ventasTransFilterState = {};
-    let ventasTransSort = null;
+    let ventasTransSortStack = [];
     let ventasTransActiveFilter = null;
     let cajaTransLoading = false;
     let cajaCredLoading = false;
@@ -4054,23 +4075,30 @@
           });
         });
       }
-      if (ventasTransSort && ventasTransSort.key) {
-        const { key, dir, type } = ventasTransSort;
-        const factor = dir === 'asc' ? 1 : -1;
+      if (ventasTransSortStack.length) {
         result.sort((a, b) => {
-          if (type === 'number') {
-            return (Number(a[key] || 0) - Number(b[key] || 0)) * factor;
+          for (const { key, dir, type } of ventasTransSortStack) {
+            const factor = dir === 'asc' ? 1 : -1;
+            if (type === 'number') {
+              const delta = (Number(a[key] || 0) - Number(b[key] || 0)) * factor;
+              if (delta !== 0) return delta;
+              continue;
+            }
+            if (type === 'date') {
+              const aDate = parseSheetDate(a.fecha);
+              const bDate = parseSheetDate(b.fecha);
+              const aVal = aDate ? aDate.getTime() : 0;
+              const bVal = bDate ? bDate.getTime() : 0;
+              const delta = (aVal - bVal) * factor;
+              if (delta !== 0) return delta;
+              continue;
+            }
+            const aVal = String(a[key] ?? '').toLowerCase();
+            const bVal = String(b[key] ?? '').toLowerCase();
+            const delta = aVal.localeCompare(bVal, 'es', { sensitivity: 'base' }) * factor;
+            if (delta !== 0) return delta;
           }
-          if (type === 'date') {
-            const aDate = parseSheetDate(a.fecha);
-            const bDate = parseSheetDate(b.fecha);
-            const aVal = aDate ? aDate.getTime() : 0;
-            const bVal = bDate ? bDate.getTime() : 0;
-            return (aVal - bVal) * factor;
-          }
-          const aVal = String(a[key] ?? '').toLowerCase();
-          const bVal = String(b[key] ?? '').toLowerCase();
-          return aVal.localeCompare(bVal, 'es', { sensitivity: 'base' }) * factor;
+          return 0;
         });
       }
       return result;
@@ -4080,51 +4108,69 @@
       document.querySelectorAll('button.filter-btn[data-filter]').forEach(btn => {
         const key = btn.getAttribute('data-filter');
         const hasFilter = Boolean(ventasTransFilterState[key]);
-        const hasSort = ventasTransSort && ventasTransSort.key === key;
+        const hasSort = ventasTransSortStack.some(sort => sort.key === key);
         btn.classList.toggle('active', hasFilter || hasSort);
       });
     }
 
     function updateVentasTransFilterBadge() {
-      if (!ventasTransFilterBadge || !ventasTransFilterSummary) return;
-      const parts = [];
-      Object.entries(ventasTransFilterState).forEach(([key, filter]) => {
+      if (!ventasTransFilterBadge) return;
+      if (ventasTransSortChips) ventasTransSortChips.innerHTML = '';
+      if (ventasTransFilterChips) ventasTransFilterChips.innerHTML = '';
+
+      const filterEntries = Object.entries(ventasTransFilterState);
+      filterEntries.forEach(([key, filter]) => {
         const col = ventasTransColumns[key];
-        if (!col) return;
-        if (filter.type === 'text') {
-          if (filter.value) parts.push(`${col.label}: "${filter.value}"`);
+        if (!col || !ventasTransFilterChips) return;
+        let label = '';
+        if (filter.type === 'text' && filter.value) {
+          label = `${col.label}: "${filter.value}"`;
         } else if (filter.type === 'number') {
           const min = isFinite(filter.min) ? filter.min : null;
           const max = isFinite(filter.max) ? filter.max : null;
-          if (min !== null && max !== null) parts.push(`${col.label}: ${min} - ${max}`);
-          else if (min !== null) parts.push(`${col.label}: >= ${min}`);
-          else if (max !== null) parts.push(`${col.label}: <= ${max}`);
+          if (min !== null && max !== null) label = `${col.label}: ${min} - ${max}`;
+          else if (min !== null) label = `${col.label}: >= ${min}`;
+          else if (max !== null) label = `${col.label}: <= ${max}`;
         } else if (filter.type === 'date') {
           const min = filter.minValue || '';
           const max = filter.maxValue || '';
-          if (min && max) parts.push(`${col.label}: ${min} - ${max}`);
-          else if (min) parts.push(`${col.label}: desde ${min}`);
-          else if (max) parts.push(`${col.label}: hasta ${max}`);
+          if (min && max) label = `${col.label}: ${min} - ${max}`;
+          else if (min) label = `${col.label}: desde ${min}`;
+          else if (max) label = `${col.label}: hasta ${max}`;
         }
+        if (!label) return;
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'btn compact';
+        chip.setAttribute('data-filter-key', key);
+        chip.textContent = `${label} ×`;
+        ventasTransFilterChips.appendChild(chip);
       });
-      if (ventasTransSort && ventasTransSort.key) {
-        const col = ventasTransColumns[ventasTransSort.key];
-        if (col) {
-          const dir = ventasTransSort.dir === 'asc' ? 'asc' : 'desc';
-          parts.push(`Orden: ${col.label} ${dir}`);
-        }
+
+      if (ventasTransSortChips) {
+        ventasTransSortStack.forEach((sort, index) => {
+          const col = ventasTransColumns[sort.key];
+          const label = col ? col.label : sort.key;
+          const dir = sort.dir === 'asc' ? 'asc' : 'desc';
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'btn compact';
+          chip.setAttribute('data-sort-key', sort.key);
+          chip.textContent = `${index + 1}.${label} ${dir} ×`;
+          ventasTransSortChips.appendChild(chip);
+        });
       }
-      if (!parts.length) {
+
+      if (!filterEntries.length && !ventasTransSortStack.length) {
         ventasTransFilterBadge.hidden = true;
         return;
       }
-      ventasTransFilterSummary.textContent = `Filtrado: ${parts.join(' · ')}`;
       ventasTransFilterBadge.hidden = false;
     }
 
     function resetVentasTransFilters() {
       Object.keys(ventasTransFilterState).forEach(key => delete ventasTransFilterState[key]);
-      ventasTransSort = null;
+      ventasTransSortStack = [];
       ventasTransActiveFilter = null;
       if (ventasTransFilterMenu) ventasTransFilterMenu.hidden = true;
       updateVentasTransFilterButtons();
@@ -4256,7 +4302,7 @@
         `;
       }).join('');
       ventasTransCount.textContent = `${displayItems.length} transacciones`;
-      ventasTransStatus.textContent = (Object.keys(ventasTransFilterState).length || ventasTransSort) ? 'Filtrado' : 'Actualizado';
+      ventasTransStatus.textContent = (Object.keys(ventasTransFilterState).length || ventasTransSortStack.length) ? 'Filtrado' : 'Actualizado';
       updateVentasTransFilterBadge();
     }
 
@@ -5444,10 +5490,16 @@
         if (!col) return;
         if (action === 'sort-asc' || action === 'sort-desc') {
           const dir = action === 'sort-asc' ? 'asc' : 'desc';
-          if (ventasTransSort && ventasTransSort.key === key && ventasTransSort.dir === dir) {
-            ventasTransSort = null;
+          const existingIndex = ventasTransSortStack.findIndex(sort => sort.key === key);
+          if (existingIndex !== -1) {
+            const existing = ventasTransSortStack[existingIndex];
+            if (existing.dir === dir) {
+              ventasTransSortStack.splice(existingIndex, 1);
+            } else {
+              ventasTransSortStack[existingIndex] = { key, dir, type: col.type };
+            }
           } else {
-            ventasTransSort = { key, dir, type: col.type };
+            ventasTransSortStack.push({ key, dir, type: col.type });
           }
           updateVentasTransFilterButtons();
           updateVentasTransFilterBadge();
@@ -5520,6 +5572,30 @@
     if (ventasTransFilterClear) {
       ventasTransFilterClear.addEventListener('click', () => {
         resetVentasTransFilters();
+      });
+    }
+    if (ventasTransSortChips) {
+      ventasTransSortChips.addEventListener('click', (event) => {
+        const chip = event.target.closest('button[data-sort-key]');
+        if (!chip) return;
+        const key = chip.getAttribute('data-sort-key');
+        if (!key) return;
+        ventasTransSortStack = ventasTransSortStack.filter(sort => sort.key !== key);
+        updateVentasTransFilterButtons();
+        updateVentasTransFilterBadge();
+        renderTransaccionesVenta();
+      });
+    }
+    if (ventasTransFilterChips) {
+      ventasTransFilterChips.addEventListener('click', (event) => {
+        const chip = event.target.closest('button[data-filter-key]');
+        if (!chip) return;
+        const key = chip.getAttribute('data-filter-key');
+        if (!key) return;
+        delete ventasTransFilterState[key];
+        updateVentasTransFilterButtons();
+        updateVentasTransFilterBadge();
+        renderTransaccionesVenta();
       });
     }
     if (ventasResumenBody) {

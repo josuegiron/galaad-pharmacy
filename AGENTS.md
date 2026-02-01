@@ -27,9 +27,9 @@ Explicit triggers:
 - VERIFY
 
 Default (no trigger):
-- Respond briefly.
-- If ambiguous, ask 1 concise question.
-- Offer max 2 options (1/2) in 1–2 lines; only ask to choose if a decision is needed, in the user's language.
+- Restate the request.
+- End with a direct confirmation question (yes/no).
+- Do not inspect or search code.
 
 Code inspection:
 - You may freely inspect/analyze the codebase; no permission needed.

@@ -1039,6 +1039,7 @@
               <th>Cantidad total</th>
               <th>Descuento</th>
               <th>Total</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="ventasResumenBody"></tbody>
@@ -1193,28 +1194,6 @@
           </thead>
           <tbody id="cajaTransBody"></tbody>
         </table>
-      </div>
-      <div class="card" id="cajaTransDetail" style="margin-top:12px;" hidden>
-        <div class="card-head">
-          <h3 id="cajaTransDetailTitle" style="margin:0; font-size:16px;">Detalle de compra</h3>
-          <button type="button" class="btn compact" id="cajaTransDetailClose">Cerrar</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Cantidad</th>
-                <th>Valor</th>
-                <th>Descuento</th>
-                <th>Total</th>
-                <th>Descripción</th>
-                <th>Confirmado</th>
-              </tr>
-            </thead>
-            <tbody id="cajaTransDetailBody"></tbody>
-          </table>
-        </div>
       </div>
     </section>
 
@@ -2023,6 +2002,31 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="cajaTransDetail" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cajaTransDetailTitle" style="width: min(980px, 94vw);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <h3 id="cajaTransDetailTitle">Detalle de compra</h3>
+        <button type="button" class="btn compact" id="cajaTransDetailClose">Cerrar</button>
+      </div>
+      <div class="table-wrap modal-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Cantidad</th>
+              <th>Valor</th>
+              <th>Descuento</th>
+              <th>Total</th>
+              <th>Descripción</th>
+              <th>Confirmado</th>
+            </tr>
+          </thead>
+          <tbody id="cajaTransDetailBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="ventasTransDetail" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ventasTransDetailTitle" style="width: min(980px, 94vw);">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
@@ -2045,6 +2049,34 @@
           <tbody id="ventasTransDetailBody"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="ventasResumenDetail" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ventasResumenDetailTitle" style="width: min(980px, 94vw);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div>
+          <h3 id="ventasResumenDetailTitle">Detalle de producto</h3>
+          <div class="hint" id="ventasResumenDetailSubtitle">Producto</div>
+        </div>
+        <button type="button" class="btn compact" id="ventasResumenDetailClose">Cerrar</button>
+      </div>
+      <div class="table-wrap modal-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Venta</th>
+              <th>Cantidad</th>
+              <th>Valor</th>
+              <th>Descuento</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="ventasResumenDetailBody"></tbody>
+        </table>
+      </div>
+      <div id="ventasResumenDetailCount" class="muted-count">0 ventas</div>
     </div>
   </div>
 
@@ -2112,6 +2144,7 @@
     let movimientosLoading = false;
     let pendingTransaccionDetalle = null;
     let pendingCompraDetalle = null;
+    let pendingResumenDetalle = null;
     let pendingCompraDetalleTarget = 'transacciones';
     const gvizHandlers = [];
 
@@ -2136,6 +2169,12 @@
     const ventasTransDetailTitle = document.getElementById('ventasTransDetailTitle');
     const ventasTransDetailBody = document.getElementById('ventasTransDetailBody');
     const ventasTransDetailClose = document.getElementById('ventasTransDetailClose');
+    const ventasResumenDetail = document.getElementById('ventasResumenDetail');
+    const ventasResumenDetailTitle = document.getElementById('ventasResumenDetailTitle');
+    const ventasResumenDetailSubtitle = document.getElementById('ventasResumenDetailSubtitle');
+    const ventasResumenDetailBody = document.getElementById('ventasResumenDetailBody');
+    const ventasResumenDetailClose = document.getElementById('ventasResumenDetailClose');
+    const ventasResumenDetailCount = document.getElementById('ventasResumenDetailCount');
     const facturacionFecha = document.getElementById('facturacionFecha');
     const facturacionGenerar = document.getElementById('facturacionGenerar');
     const facturacionDescargar = document.getElementById('facturacionDescargar');
@@ -2642,6 +2681,16 @@
     if (ventasTransDetail) {
       ventasTransDetail.addEventListener('click', (event) => {
         if (event.target === ventasTransDetail) closeTransaccionDetalleModal();
+      });
+    }
+    if (cajaTransDetail) {
+      cajaTransDetail.addEventListener('click', (event) => {
+        if (event.target === cajaTransDetail) closeCompraDetalleModal();
+      });
+    }
+    if (ventasResumenDetail) {
+      ventasResumenDetail.addEventListener('click', (event) => {
+        if (event.target === ventasResumenDetail) closeResumenDetalleModal();
       });
     }
 
@@ -3272,6 +3321,11 @@
           pendingCompraDetalleTarget = 'transacciones';
           showCompraDetalle(targetId, targetView);
         }
+        if (pendingResumenDetalle) {
+          const pending = pendingResumenDetalle;
+          pendingResumenDetalle = null;
+          showResumenDetalle(pending.codigo, pending.nombre);
+        }
       } catch (err) {
         movimientosLoading = false;
         if (ventasStatus) ventasStatus.textContent = 'No se pudo leer la hoja.';
@@ -3315,6 +3369,18 @@
       ventasTransDetail.setAttribute('aria-hidden', 'true');
     }
 
+    function openCompraDetalleModal() {
+      if (!cajaTransDetail) return;
+      cajaTransDetail.classList.add('active');
+      cajaTransDetail.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeCompraDetalleModal() {
+      if (!cajaTransDetail) return;
+      cajaTransDetail.classList.remove('active');
+      cajaTransDetail.setAttribute('aria-hidden', 'true');
+    }
+
     function showTransaccionDetalle(transaccionId) {
       if (!ventasTransDetail || !ventasTransDetailBody || !ventasTransDetailTitle) return;
       if (!movimientosLoaded) {
@@ -3349,6 +3415,65 @@
       openTransaccionDetalleModal();
     }
 
+    function openResumenDetalleModal() {
+      if (!ventasResumenDetail) return;
+      ventasResumenDetail.classList.add('active');
+      ventasResumenDetail.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeResumenDetalleModal() {
+      if (!ventasResumenDetail) return;
+      ventasResumenDetail.classList.remove('active');
+      ventasResumenDetail.setAttribute('aria-hidden', 'true');
+    }
+
+    function showResumenDetalle(codigo, nombre = '') {
+      if (!ventasResumenDetail || !ventasResumenDetailBody || !ventasResumenDetailTitle) return;
+      if (!movimientosLoaded) {
+        pendingResumenDetalle = { codigo, nombre };
+        loadMovimientos(true);
+        return;
+      }
+      const catalogItem = (catalog || []).find(item => String(item.codigo || '').trim() === String(codigo || '').trim());
+      const resolvedName = nombre || (catalogItem && catalogItem.nombre) || 'Producto';
+      const selectedDate = ventasResumenFecha ? ventasResumenFecha.value : '';
+      const rows = movimientos.filter(item => {
+        if (Number(item.tipo) !== 1) return false;
+        if (String(item.codigo || '').trim() !== String(codigo || '').trim()) return false;
+        if (!selectedDate) return true;
+        const dateObj = parseSheetDate(item.fechaRaw);
+        return dateObj && toLocalISODate(dateObj) === selectedDate;
+      });
+      ventasResumenDetailTitle.textContent = `Detalle de producto ${codigo ? `#${codigo}` : ''}`.trim();
+      if (ventasResumenDetailSubtitle) {
+        ventasResumenDetailSubtitle.textContent = resolvedName;
+      }
+      if (!rows.length) {
+        ventasResumenDetailBody.innerHTML = '<tr><td colspan="6">Sin ventas para este producto.</td></tr>';
+        if (ventasResumenDetailCount) ventasResumenDetailCount.textContent = '0 ventas';
+        openResumenDetalleModal();
+        return;
+      }
+      ventasResumenDetailBody.innerHTML = rows.map(item => {
+        const cantidad = Math.abs(item.cantidad || 0);
+        const valor = isFinite(item.valorUnitario) ? item.valorUnitario : 0;
+        const descuento = isFinite(item.descuento) ? item.descuento : 0;
+        const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
+        return `
+          <tr>
+            <td>${formatDateTime(item.fechaRaw)}</td>
+            <td>${item.transaccionId || ''}</td>
+            <td>${cantidad}</td>
+            <td>Q.${valor.toFixed(2)}</td>
+            <td>Q.${descuento.toFixed(2)}</td>
+            <td>Q.${total.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('');
+      if (ventasResumenDetailCount) ventasResumenDetailCount.textContent = `${rows.length} ventas`;
+      openResumenDetalleModal();
+    }
+
     function showCompraDetalle(transaccionId, target = 'transacciones') {
       const isCuentas = target === 'cuentas';
       const detail = isCuentas ? cajaCredDetail : cajaTransDetail;
@@ -3365,7 +3490,11 @@
       detailTitle.textContent = `Detalle de compra #${transaccionId}`;
       if (!rows.length) {
         detailBody.innerHTML = '<tr><td colspan="7">Sin items para esta compra.</td></tr>';
-        detail.hidden = false;
+        if (isCuentas) {
+          detail.hidden = false;
+        } else {
+          openCompraDetalleModal();
+        }
         return;
       }
       detailBody.innerHTML = rows.map(item => {
@@ -3385,7 +3514,11 @@
           </tr>
         `;
       }).join('');
-      detail.hidden = false;
+      if (isCuentas) {
+        detail.hidden = false;
+      } else {
+        openCompraDetalleModal();
+      }
     }
 
     function formatDateTime(value) {
@@ -3863,7 +3996,7 @@
       const reloadBtn = isVenta ? ventasTransReload : cajaTransReload;
       if (!statusEl) return;
       if (isVenta) closeTransaccionDetalleModal();
-      if (!isVenta && cajaTransDetail) cajaTransDetail.hidden = true;
+      if (!isVenta) closeCompraDetalleModal();
       if (isVenta && ventasTransLoading) return;
       if (!isVenta && cajaTransLoading) return;
       if (isVenta) {
@@ -4564,7 +4697,7 @@
       }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
       if (!rows.length) {
-        ventasResumenBody.innerHTML = '<tr><td colspan="4">Sin ventas para esta fecha.</td></tr>';
+        ventasResumenBody.innerHTML = '<tr><td colspan="6">Sin ventas para esta fecha.</td></tr>';
         ventasResumenCount.textContent = '0 productos';
         ventasResumenTotal.textContent = 'Q.0.00';
         ventasResumenStatus.textContent = 'Sin resultados';
@@ -4581,6 +4714,7 @@
             <td>${row.cantidad}</td>
             <td>Q.${row.descuento.toFixed(2)}</td>
             <td>Q.${row.total.toFixed(2)}</td>
+            <td><button type="button" class="btn compact" data-action="resumen-detalle" data-codigo="${row.codigo}">Ver detalle</button></td>
           </tr>
         `;
       }).join('');
@@ -4926,9 +5060,14 @@
         closeTransaccionDetalleModal();
       });
     }
+    if (ventasResumenDetailClose) {
+      ventasResumenDetailClose.addEventListener('click', () => {
+        closeResumenDetalleModal();
+      });
+    }
     if (cajaTransDetailClose) {
       cajaTransDetailClose.addEventListener('click', () => {
-        if (cajaTransDetail) cajaTransDetail.hidden = true;
+        closeCompraDetalleModal();
       });
     }
     if (cajaCredDetailClose) {
@@ -4943,6 +5082,16 @@
         const transaccionId = btn.getAttribute('data-id');
         if (!transaccionId) return;
         showTransaccionDetalle(transaccionId);
+      });
+    }
+    if (ventasResumenBody) {
+      ventasResumenBody.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action="resumen-detalle"][data-codigo]');
+        if (!btn) return;
+        const codigo = btn.getAttribute('data-codigo');
+        const nombre = btn.getAttribute('data-nombre') || '';
+        if (!codigo) return;
+        showResumenDetalle(codigo, nombre);
       });
     }
     if (cajaTransBody) {

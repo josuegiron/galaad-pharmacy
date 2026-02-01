@@ -1083,6 +1083,7 @@
               <th>Fecha</th>
               <th>Total</th>
               <th>Estado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="ventasTransBody"></tbody>
@@ -3747,7 +3748,7 @@
     function renderTransaccionesVenta(items) {
       if (!ventasTransBody || !ventasTransStatus || !ventasTransCount) return;
       if (!items.length) {
-        ventasTransBody.innerHTML = '<tr><td colspan="4">Sin transacciones.</td></tr>';
+        ventasTransBody.innerHTML = '<tr><td colspan="5">Sin transacciones.</td></tr>';
         ventasTransCount.textContent = '0 transacciones';
         ventasTransStatus.textContent = 'Sin resultados';
         return;
@@ -3764,12 +3765,13 @@
         return `
           <tr>
             <td>${item.id || ''}</td>
-            <td>${formatDate(item.fecha)}</td>
+            <td>${formatDateTime(item.fecha)}</td>
             <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
             <td>
               <span>${estadoRaw}</span>
               <span class="status-help" role="img" aria-label="${estadoHelp}" title="${estadoHelp}">?</span>
             </td>
+            <td><button type="button" class="btn compact" data-action="transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
           </tr>
         `;
       }).join('');

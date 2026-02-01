@@ -1180,15 +1180,15 @@
           <div id="ventasTransCount">0 transacciones</div>
         </div>
       </div>
-      <div id="ventasTransFilterBadge" class="filter-badge" hidden style="margin:8px 0 14px; flex-direction:column; align-items:flex-start; gap:8px;">
+      <div class="filter-badge" data-table="ventasTransBody" hidden style="margin:8px 0 14px; flex-direction:column; align-items:flex-start; gap:8px;">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <strong>Ordenado por:</strong>
-          <div style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;" id="ventasTransSortChips"></div>
+          <div class="filter-sort-chips" style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;"></div>
         </div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <strong>Filtrado:</strong>
-          <div style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;" id="ventasTransFilterChips"></div>
-          <button type="button" class="filter-clear-link" id="ventasTransFilterClear">Limpiar todo</button>
+          <div class="filter-filter-chips" style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;"></div>
+          <button type="button" class="filter-clear-link filter-clear">Limpiar todo</button>
         </div>
       </div>
       <div class="table-wrap">
@@ -2325,13 +2325,9 @@
     const ventasTransDetailTitle = document.getElementById('ventasTransDetailTitle');
     const ventasTransDetailBody = document.getElementById('ventasTransDetailBody');
     const ventasTransDetailClose = document.getElementById('ventasTransDetailClose');
-    const ventasTransFilterMenu = document.getElementById('ventasTransFilterMenu');
-    const ventasTransFilterTitle = document.getElementById('ventasTransFilterTitle');
-    const ventasTransFilterFields = document.getElementById('ventasTransFilterFields');
-    const ventasTransFilterBadge = document.getElementById('ventasTransFilterBadge');
-    const ventasTransFilterClear = document.getElementById('ventasTransFilterClear');
-    const ventasTransSortChips = document.getElementById('ventasTransSortChips');
-    const ventasTransFilterChips = document.getElementById('ventasTransFilterChips');
+    const tableFilterMenu = document.getElementById('ventasTransFilterMenu');
+    const tableFilterTitle = document.getElementById('ventasTransFilterTitle');
+    const tableFilterFields = document.getElementById('ventasTransFilterFields');
     const ventasResumenDetail = document.getElementById('ventasResumenDetail');
     const ventasResumenDetailTitle = document.getElementById('ventasResumenDetailTitle');
     const ventasResumenDetailSubtitle = document.getElementById('ventasResumenDetailSubtitle');
@@ -3711,10 +3707,8 @@
     let cierresData = [];
     let cierresLoadingButton = null;
     let ventasTransLoading = false;
-    let ventasTransItems = [];
-    const ventasTransFilterState = {};
-    let ventasTransSortStack = [];
-    let ventasTransActiveFilter = null;
+    const tableFilters = new Map();
+    let activeTableFilter = null;
     let cajaTransLoading = false;
     let cajaCredLoading = false;
     let cajaPagosLoading = false;
@@ -4045,83 +4039,251 @@
       cierresStatus.textContent = 'Actualizado';
     }
 
-    function applyVentasTransFilters(items) {
-      let result = items.slice();
-      const hasFilters = Object.keys(ventasTransFilterState).length > 0;
-      if (hasFilters) {
-        result = result.filter(item => {
-          return Object.entries(ventasTransFilterState).every(([key, filter]) => {
-            if (!filter) return true;
-            if (filter.type === 'text') {
-              const raw = String(item[key] ?? '').toLowerCase();
-              const needle = String(filter.value || '').toLowerCase();
-              return !needle || raw.includes(needle);
-            }
-            if (filter.type === 'number') {
-              const value = Number(item[key] || 0);
-              if (isFinite(filter.min) && value < filter.min) return false;
-              if (isFinite(filter.max) && value > filter.max) return false;
-              return true;
-            }
-            if (filter.type === 'date') {
-              const parsed = parseSheetDate(item.fecha);
-              if (!parsed || isNaN(parsed.getTime())) return false;
-              const time = parsed.getTime();
-              if (filter.minDate && time < filter.minDate) return false;
-              if (filter.maxDate && time > filter.maxDate) return false;
-              return true;
-            }
-            return true;
-          });
-        });
+    function parseDateInputValue(value, isEnd = false) {
+      if (!value) return null;
+      const [yyyy, mm, dd] = value.split('-').map(Number);
+      if (!yyyy || !mm || !dd) return null;
+      return new Date(yyyy, mm - 1, dd, isEnd ? 23 : 0, isEnd ? 59 : 0, isEnd ? 59 : 0, isEnd ? 999 : 0).getTime();
+    }
+
+    function parseNumberFromText(value) {
+      if (value === null || value === undefined) return 0;
+      const cleaned = String(value).replace(/[^\d.-]/g, '');
+      const parsed = Number(cleaned);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+
+    function parseDateFromText(value) {
+      const parsed = parseSheetDate(String(value || '').trim());
+      if (!parsed || isNaN(parsed.getTime())) return null;
+      return parsed.getTime();
+    }
+
+    function inferColumnType(label) {
+      const normalized = label.toLowerCase();
+      if (normalized.includes('fecha') || normalized.includes('hora')) return 'date';
+      if (
+        normalized.includes('total') ||
+        normalized.includes('monto') ||
+        normalized.includes('saldo') ||
+        normalized.includes('cantidad') ||
+        normalized.includes('descuento') ||
+        normalized.includes('valor') ||
+        normalized.includes('precio') ||
+        normalized.includes('costo') ||
+        normalized.includes('credito')
+      ) return 'number';
+      return 'text';
+    }
+
+    function isFilterableLabel(label) {
+      const normalized = label.toLowerCase();
+      if (!normalized) return false;
+      return !(
+        normalized.includes('acciones') ||
+        normalized.includes('detalle') ||
+        normalized.includes('pagar') ||
+        normalized.includes('ver ') ||
+        normalized.includes('ver') && normalized.length <= 4
+      );
+    }
+
+    function ensureFilterBadge(tbodyId, table) {
+      let badge = document.querySelector(`.filter-badge[data-table="${tbodyId}"]`);
+      if (badge) return badge;
+      badge = document.createElement('div');
+      badge.className = 'filter-badge';
+      badge.setAttribute('data-table', tbodyId);
+      badge.hidden = true;
+      badge.style.margin = '8px 0 14px';
+      badge.style.flexDirection = 'column';
+      badge.style.alignItems = 'flex-start';
+      badge.style.gap = '8px';
+      badge.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <strong>Ordenado por:</strong>
+          <div class="filter-sort-chips" style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;"></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <strong>Filtrado:</strong>
+          <div class="filter-filter-chips" style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;"></div>
+          <button type="button" class="filter-clear-link filter-clear">Limpiar todo</button>
+        </div>
+      `;
+      const tableWrap = table.closest('.table-wrap');
+      if (tableWrap && tableWrap.parentNode) {
+        tableWrap.parentNode.insertBefore(badge, tableWrap);
+      } else if (table.parentNode) {
+        table.parentNode.insertBefore(badge, table);
       }
-      if (ventasTransSortStack.length) {
-        result.sort((a, b) => {
-          for (const { key, dir, type } of ventasTransSortStack) {
+      return badge;
+    }
+
+    function initTableFilter(tbodyId) {
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+      const table = tbody.closest('table');
+      if (!table) return;
+      const headerRow = table.querySelector('thead tr');
+      if (!headerRow) return;
+      const ths = Array.from(headerRow.children);
+      const columns = ths.map((th, index) => {
+        const label = th.textContent.trim();
+        const type = inferColumnType(label);
+        const filterable = isFilterableLabel(label);
+        const key = `c${index}`;
+        th.innerHTML = '';
+        if (filterable) {
+          const wrap = document.createElement('div');
+          wrap.className = 'th-inner';
+          const span = document.createElement('span');
+          span.textContent = label || '';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'filter-btn';
+          btn.setAttribute('data-table', tbodyId);
+          btn.setAttribute('data-key', key);
+          btn.setAttribute('aria-label', `Filtrar por ${label || 'columna'}`);
+          btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3V5zm4 6h10v2H7v-2zm3 6h4v2h-4v-2z"/></svg>';
+          wrap.appendChild(span);
+          wrap.appendChild(btn);
+          th.appendChild(wrap);
+        } else {
+          th.textContent = label;
+        }
+        return { key, label, type, index, filterable };
+      });
+      const badge = ensureFilterBadge(tbodyId, table);
+      tableFilters.set(tbodyId, {
+        tbody,
+        table,
+        columns,
+        badge,
+        filters: {},
+        sortStack: [],
+        isApplying: false,
+      });
+      updateTableFilterButtons(tbodyId);
+      updateTableFilterBadge(tbodyId);
+      const observer = new MutationObserver(() => {
+        const current = tableFilters.get(tbodyId);
+        if (current && current.isApplying) return;
+        applyTableFilters(tbodyId);
+      });
+      observer.observe(tbody, { childList: true });
+    }
+
+    function applyTableFilters(tbodyId) {
+      const state = tableFilters.get(tbodyId);
+      if (!state) return;
+      if (state.isApplying) return;
+      const rows = Array.from(state.tbody.querySelectorAll('tr'));
+      if (!rows.length) return;
+      if (rows.length === 1 && rows[0].cells.length === 1) return;
+      state.isApplying = true;
+
+      rows.forEach((row, index) => {
+        if (!row.dataset.originalIndex) {
+          row.dataset.originalIndex = String(index);
+        }
+      });
+
+      const matchesFilter = (row) => {
+        return Object.entries(state.filters).every(([key, filter]) => {
+          const col = state.columns.find(item => item.key === key);
+          if (!col) return true;
+          const cell = row.cells[col.index];
+          const raw = cell ? cell.textContent.trim() : '';
+          if (filter.type === 'text') {
+            const needle = String(filter.value || '').toLowerCase();
+            return !needle || raw.toLowerCase().includes(needle);
+          }
+          if (filter.type === 'number') {
+            const value = parseNumberFromText(raw);
+            if (isFinite(filter.min) && value < filter.min) return false;
+            if (isFinite(filter.max) && value > filter.max) return false;
+            return true;
+          }
+          if (filter.type === 'date') {
+            const time = parseDateFromText(raw);
+            if (!time) return false;
+            if (filter.minDate && time < filter.minDate) return false;
+            if (filter.maxDate && time > filter.maxDate) return false;
+            return true;
+          }
+          return true;
+        });
+      };
+
+      const sorted = rows.slice();
+      if (state.sortStack.length) {
+        sorted.sort((a, b) => {
+          for (const { key, dir } of state.sortStack) {
+            const col = state.columns.find(item => item.key === key);
+            if (!col) continue;
+            const aCell = a.cells[col.index];
+            const bCell = b.cells[col.index];
+            const aRaw = aCell ? aCell.textContent.trim() : '';
+            const bRaw = bCell ? bCell.textContent.trim() : '';
             const factor = dir === 'asc' ? 1 : -1;
-            if (type === 'number') {
-              const delta = (Number(a[key] || 0) - Number(b[key] || 0)) * factor;
+            if (col.type === 'number') {
+              const delta = (parseNumberFromText(aRaw) - parseNumberFromText(bRaw)) * factor;
               if (delta !== 0) return delta;
               continue;
             }
-            if (type === 'date') {
-              const aDate = parseSheetDate(a.fecha);
-              const bDate = parseSheetDate(b.fecha);
-              const aVal = aDate ? aDate.getTime() : 0;
-              const bVal = bDate ? bDate.getTime() : 0;
+            if (col.type === 'date') {
+              const aVal = parseDateFromText(aRaw) || 0;
+              const bVal = parseDateFromText(bRaw) || 0;
               const delta = (aVal - bVal) * factor;
               if (delta !== 0) return delta;
               continue;
             }
-            const aVal = String(a[key] ?? '').toLowerCase();
-            const bVal = String(b[key] ?? '').toLowerCase();
-            const delta = aVal.localeCompare(bVal, 'es', { sensitivity: 'base' }) * factor;
+            const delta = aRaw.toLowerCase().localeCompare(bRaw.toLowerCase(), 'es', { sensitivity: 'base' }) * factor;
             if (delta !== 0) return delta;
           }
-          return 0;
+          return Number(a.dataset.originalIndex || 0) - Number(b.dataset.originalIndex || 0);
         });
+      } else {
+        sorted.sort((a, b) => Number(a.dataset.originalIndex || 0) - Number(b.dataset.originalIndex || 0));
       }
-      return result;
+
+      sorted.forEach(row => {
+        row.hidden = !matchesFilter(row);
+        state.tbody.appendChild(row);
+      });
+
+      updateTableFilterButtons(tbodyId);
+      updateTableFilterBadge(tbodyId);
+      setTimeout(() => {
+        const current = tableFilters.get(tbodyId);
+        if (current) current.isApplying = false;
+      }, 0);
     }
 
-    function updateVentasTransFilterButtons() {
-      document.querySelectorAll('button.filter-btn[data-filter]').forEach(btn => {
-        const key = btn.getAttribute('data-filter');
-        const hasFilter = Boolean(ventasTransFilterState[key]);
-        const hasSort = ventasTransSortStack.some(sort => sort.key === key);
+    function updateTableFilterButtons(tbodyId) {
+      const state = tableFilters.get(tbodyId);
+      if (!state) return;
+      state.columns.forEach(col => {
+        if (!col.filterable) return;
+        const btn = state.table.querySelector(`button.filter-btn[data-table="${tbodyId}"][data-key="${col.key}"]`);
+        if (!btn) return;
+        const hasFilter = Boolean(state.filters[col.key]);
+        const hasSort = state.sortStack.some(sort => sort.key === col.key);
         btn.classList.toggle('active', hasFilter || hasSort);
       });
     }
 
-    function updateVentasTransFilterBadge() {
-      if (!ventasTransFilterBadge) return;
-      if (ventasTransSortChips) ventasTransSortChips.innerHTML = '';
-      if (ventasTransFilterChips) ventasTransFilterChips.innerHTML = '';
+    function updateTableFilterBadge(tbodyId) {
+      const state = tableFilters.get(tbodyId);
+      if (!state || !state.badge) return;
+      const sortChips = state.badge.querySelector('.filter-sort-chips');
+      const filterChips = state.badge.querySelector('.filter-filter-chips');
+      if (sortChips) sortChips.innerHTML = '';
+      if (filterChips) filterChips.innerHTML = '';
 
-      const filterEntries = Object.entries(ventasTransFilterState);
-      filterEntries.forEach(([key, filter]) => {
-        const col = ventasTransColumns[key];
-        if (!col || !ventasTransFilterChips) return;
+      Object.entries(state.filters).forEach(([key, filter]) => {
+        const col = state.columns.find(item => item.key === key);
+        if (!col || !filterChips) return;
         let label = '';
         if (filter.type === 'text' && filter.value) {
           label = `${col.label}: "${filter.value}"`;
@@ -4143,106 +4305,99 @@
         chip.type = 'button';
         chip.className = 'btn compact';
         chip.setAttribute('data-filter-key', key);
+        chip.setAttribute('data-table', tbodyId);
         chip.textContent = `${label} ×`;
-        ventasTransFilterChips.appendChild(chip);
+        filterChips.appendChild(chip);
       });
 
-      if (ventasTransSortChips) {
-        ventasTransSortStack.forEach((sort, index) => {
-          const col = ventasTransColumns[sort.key];
+      if (sortChips) {
+        state.sortStack.forEach((sort, index) => {
+          const col = state.columns.find(item => item.key === sort.key);
           const label = col ? col.label : sort.key;
           const dir = sort.dir === 'asc' ? 'asc' : 'desc';
           const chip = document.createElement('button');
           chip.type = 'button';
           chip.className = 'btn compact';
           chip.setAttribute('data-sort-key', sort.key);
+          chip.setAttribute('data-table', tbodyId);
           chip.textContent = `${index + 1}.${label} ${dir} ×`;
-          ventasTransSortChips.appendChild(chip);
+          sortChips.appendChild(chip);
         });
       }
 
-      if (!filterEntries.length && !ventasTransSortStack.length) {
-        ventasTransFilterBadge.hidden = true;
-        return;
-      }
-      ventasTransFilterBadge.hidden = false;
+      const hasFilters = Object.keys(state.filters).length > 0;
+      const hasSort = state.sortStack.length > 0;
+      state.badge.hidden = !(hasFilters || hasSort);
     }
 
-    function resetVentasTransFilters() {
-      Object.keys(ventasTransFilterState).forEach(key => delete ventasTransFilterState[key]);
-      ventasTransSortStack = [];
-      ventasTransActiveFilter = null;
-      if (ventasTransFilterMenu) ventasTransFilterMenu.hidden = true;
-      updateVentasTransFilterButtons();
-      updateVentasTransFilterBadge();
-      if (ventasTransItems.length) renderTransaccionesVenta();
+    function resetTableFilters(tbodyId) {
+      const state = tableFilters.get(tbodyId);
+      if (!state) return;
+      state.filters = {};
+      state.sortStack = [];
+      updateTableFilterButtons(tbodyId);
+      updateTableFilterBadge(tbodyId);
+      applyTableFilters(tbodyId);
     }
 
-    const ventasTransColumns = {
-      id: { label: 'ID', type: 'text' },
-      fecha: { label: 'Fecha', type: 'date' },
-      total: { label: 'Total', type: 'number' },
-      estado: { label: 'Estado', type: 'text' },
-    };
-
-    function buildVentasTransFilterFields(key) {
-      if (!ventasTransFilterFields) return;
-      const col = ventasTransColumns[key];
+    function buildTableFilterFields(tableId, key) {
+      if (!tableFilterFields) return;
+      const state = tableFilters.get(tableId);
+      if (!state) return;
+      const col = state.columns.find(item => item.key === key);
       if (!col) return;
-      const state = ventasTransFilterState[key] || {};
+      const current = state.filters[key] || {};
       if (col.type === 'text') {
-        ventasTransFilterFields.innerHTML = `
+        tableFilterFields.innerHTML = `
           <label>
             Contiene
-            <input type="text" id="ventasTransFilterText" value="${state.value ? String(state.value) : ''}">
+            <input type="text" id="tableFilterText" value="${current.value ? String(current.value) : ''}">
           </label>
         `;
         return;
       }
       if (col.type === 'number') {
-        ventasTransFilterFields.innerHTML = `
+        tableFilterFields.innerHTML = `
           <label>
             Mínimo
-            <input type="number" id="ventasTransFilterMin" value="${isFinite(state.min) ? state.min : ''}">
+            <input type="number" id="tableFilterMin" value="${isFinite(current.min) ? current.min : ''}">
           </label>
           <label>
             Máximo
-            <input type="number" id="ventasTransFilterMax" value="${isFinite(state.max) ? state.max : ''}">
+            <input type="number" id="tableFilterMax" value="${isFinite(current.max) ? current.max : ''}">
           </label>
         `;
         return;
       }
       if (col.type === 'date') {
-        ventasTransFilterFields.innerHTML = `
+        tableFilterFields.innerHTML = `
           <label>
             Desde
-            <input type="date" id="ventasTransFilterDateMin" value="${state.minValue || ''}">
+            <input type="date" id="tableFilterDateMin" value="${current.minValue || ''}">
           </label>
           <label>
             Hasta
-            <input type="date" id="ventasTransFilterDateMax" value="${state.maxValue || ''}">
+            <input type="date" id="tableFilterDateMax" value="${current.maxValue || ''}">
           </label>
         `;
       }
     }
 
-    function openVentasTransFilterMenu(button) {
-      if (!ventasTransFilterMenu || !ventasTransFilterTitle) return;
-      const key = button.getAttribute('data-filter');
-      const col = ventasTransColumns[key];
+    function openTableFilterMenu(button) {
+      if (!tableFilterMenu || !tableFilterTitle) return;
+      const tableId = button.getAttribute('data-table');
+      const key = button.getAttribute('data-key');
+      const state = tableFilters.get(tableId || '');
+      if (!state || !key) return;
+      const col = state.columns.find(item => item.key === key);
       if (!col) return;
-      ventasTransActiveFilter = key;
-      ventasTransFilterTitle.textContent = `Filtrar por ${col.label}`;
-      const sortAscBtn = ventasTransFilterMenu.querySelector('button[data-action="sort-asc"]');
-      const sortDescBtn = ventasTransFilterMenu.querySelector('button[data-action="sort-desc"]');
-      if (sortAscBtn && sortDescBtn) {
-        sortAscBtn.textContent = 'Ordenar asc';
-        sortDescBtn.textContent = 'Ordenar desc';
-      }
-      buildVentasTransFilterFields(key);
-      ventasTransFilterMenu.setAttribute('data-col', key);
-      ventasTransFilterMenu.hidden = false;
-      const menuRect = ventasTransFilterMenu.getBoundingClientRect();
+      activeTableFilter = { tableId, key };
+      tableFilterTitle.textContent = `Filtrar por ${col.label}`;
+      buildTableFilterFields(tableId, key);
+      tableFilterMenu.setAttribute('data-table', tableId);
+      tableFilterMenu.setAttribute('data-col', key);
+      tableFilterMenu.hidden = false;
+      const menuRect = tableFilterMenu.getBoundingClientRect();
       const btnRect = button.getBoundingClientRect();
       let left = Math.min(btnRect.left, window.innerWidth - menuRect.width - 12);
       left = Math.max(12, left);
@@ -4251,35 +4406,47 @@
         top = btnRect.top - menuRect.height - 8;
       }
       if (top < 12) top = 12;
-      ventasTransFilterMenu.style.left = `${left}px`;
-      ventasTransFilterMenu.style.top = `${top}px`;
+      tableFilterMenu.style.left = `${left}px`;
+      tableFilterMenu.style.top = `${top}px`;
     }
 
-    function closeVentasTransFilterMenu() {
-      if (!ventasTransFilterMenu) return;
-      ventasTransFilterMenu.hidden = true;
-      ventasTransActiveFilter = null;
+    function closeTableFilterMenu() {
+      if (!tableFilterMenu) return;
+      tableFilterMenu.hidden = true;
+      activeTableFilter = null;
     }
 
-    function parseDateInputValue(value, isEnd = false) {
-      if (!value) return null;
-      const [yyyy, mm, dd] = value.split('-').map(Number);
-      if (!yyyy || !mm || !dd) return null;
-      return new Date(yyyy, mm - 1, dd, isEnd ? 23 : 0, isEnd ? 59 : 0, isEnd ? 59 : 0, isEnd ? 999 : 0).getTime();
-    }
+    const filterTableBodies = [
+      'ventasBody',
+      'ventasResumenBody',
+      'ventasTransBody',
+      'cajaTransBody',
+      'cajaCredBody',
+      'cajaCredDetailBody',
+      'cajaPagosBody',
+      'productosBody',
+      'comprasBody',
+      'ajustesBody',
+      'cajaBody',
+      'cierresBody',
+      'lotesBody',
+      'pagosCreditoBody',
+      'cajaTransDetailBody',
+      'ventasTransDetailBody',
+      'ventasResumenDetailBody',
+    ];
+
+    filterTableBodies.forEach(initTableFilter);
 
     function renderTransaccionesVenta(items) {
       if (!ventasTransBody || !ventasTransStatus || !ventasTransCount) return;
-      if (Array.isArray(items)) ventasTransItems = items;
-      const sourceItems = Array.isArray(items) ? items : ventasTransItems;
-      const displayItems = applyVentasTransFilters(sourceItems);
-      if (!displayItems.length) {
+      if (!items.length) {
         ventasTransBody.innerHTML = '<tr><td colspan="5">Sin transacciones.</td></tr>';
         ventasTransCount.textContent = '0 transacciones';
         ventasTransStatus.textContent = 'Sin resultados';
         return;
       }
-      ventasTransBody.innerHTML = displayItems.map(item => {
+      ventasTransBody.innerHTML = items.map(item => {
         const total = Number(item.total || 0);
         const estadoRaw = String(item.estado || '—');
         const estadoNorm = estadoRaw.toLowerCase();
@@ -4301,9 +4468,9 @@
           </tr>
         `;
       }).join('');
-      ventasTransCount.textContent = `${displayItems.length} transacciones`;
-      ventasTransStatus.textContent = (Object.keys(ventasTransFilterState).length || ventasTransSortStack.length) ? 'Filtrado' : 'Actualizado';
-      updateVentasTransFilterBadge();
+      ventasTransCount.textContent = `${items.length} transacciones`;
+      ventasTransStatus.textContent = 'Actualizado';
+      applyTableFilters('ventasTransBody');
     }
 
     function renderTransaccionesCompra(items) {
@@ -5434,13 +5601,13 @@
     }
     if (ventasTransDesde) {
       ventasTransDesde.addEventListener('change', () => {
-        resetVentasTransFilters();
+        resetTableFilters('ventasTransBody');
         loadTransacciones('venta');
       });
     }
     if (ventasTransHasta) {
       ventasTransHasta.addEventListener('change', () => {
-        resetVentasTransFilters();
+        resetTableFilters('ventasTransBody');
         loadTransacciones('venta');
       });
     }
@@ -5480,124 +5647,120 @@
         showTransaccionDetalle(transaccionId);
       });
     }
-    if (ventasTransFilterMenu) {
-      ventasTransFilterMenu.addEventListener('click', (event) => {
+    if (tableFilterMenu) {
+      tableFilterMenu.addEventListener('click', (event) => {
         const actionBtn = event.target.closest('button[data-action]');
         if (!actionBtn) return;
         const action = actionBtn.getAttribute('data-action');
-        const key = ventasTransFilterMenu.getAttribute('data-col');
-        const col = key ? ventasTransColumns[key] : null;
+        const tableId = tableFilterMenu.getAttribute('data-table');
+        const key = tableFilterMenu.getAttribute('data-col');
+        const state = tableFilters.get(tableId || '');
+        if (!state || !key) return;
+        const col = state.columns.find(item => item.key === key);
         if (!col) return;
         if (action === 'sort-asc' || action === 'sort-desc') {
           const dir = action === 'sort-asc' ? 'asc' : 'desc';
-          const existingIndex = ventasTransSortStack.findIndex(sort => sort.key === key);
+          const existingIndex = state.sortStack.findIndex(sort => sort.key === key);
           if (existingIndex !== -1) {
-            const existing = ventasTransSortStack[existingIndex];
+            const existing = state.sortStack[existingIndex];
             if (existing.dir === dir) {
-              ventasTransSortStack.splice(existingIndex, 1);
+              state.sortStack.splice(existingIndex, 1);
             } else {
-              ventasTransSortStack[existingIndex] = { key, dir, type: col.type };
+              state.sortStack[existingIndex] = { key, dir };
             }
           } else {
-            ventasTransSortStack.push({ key, dir, type: col.type });
+            state.sortStack.push({ key, dir });
           }
-          updateVentasTransFilterButtons();
-          updateVentasTransFilterBadge();
-          renderTransaccionesVenta();
-          closeVentasTransFilterMenu();
+          applyTableFilters(tableId);
+          closeTableFilterMenu();
           return;
         }
         if (action === 'clear') {
-          delete ventasTransFilterState[key];
-          updateVentasTransFilterButtons();
-          updateVentasTransFilterBadge();
-          renderTransaccionesVenta();
-          closeVentasTransFilterMenu();
+          delete state.filters[key];
+          applyTableFilters(tableId);
+          closeTableFilterMenu();
           return;
         }
         if (action === 'apply') {
           if (col.type === 'text') {
-            const input = document.getElementById('ventasTransFilterText');
+            const input = document.getElementById('tableFilterText');
             const value = input ? input.value.trim() : '';
             if (value) {
-              ventasTransFilterState[key] = { type: 'text', value };
+              state.filters[key] = { type: 'text', value };
             } else {
-              delete ventasTransFilterState[key];
+              delete state.filters[key];
             }
           } else if (col.type === 'number') {
-            const minInput = document.getElementById('ventasTransFilterMin');
-            const maxInput = document.getElementById('ventasTransFilterMax');
+            const minInput = document.getElementById('tableFilterMin');
+            const maxInput = document.getElementById('tableFilterMax');
             const min = minInput ? Number(minInput.value) : NaN;
             const max = maxInput ? Number(maxInput.value) : NaN;
             if (isFinite(min) || isFinite(max)) {
-              ventasTransFilterState[key] = { type: 'number', min, max };
+              state.filters[key] = { type: 'number', min, max };
             } else {
-              delete ventasTransFilterState[key];
+              delete state.filters[key];
             }
           } else if (col.type === 'date') {
-            const minInput = document.getElementById('ventasTransFilterDateMin');
-            const maxInput = document.getElementById('ventasTransFilterDateMax');
+            const minInput = document.getElementById('tableFilterDateMin');
+            const maxInput = document.getElementById('tableFilterDateMax');
             const minValue = minInput ? minInput.value : '';
             const maxValue = maxInput ? maxInput.value : '';
             const minDate = parseDateInputValue(minValue, false);
             const maxDate = parseDateInputValue(maxValue, true);
             if (minDate || maxDate) {
-              ventasTransFilterState[key] = { type: 'date', minDate, maxDate, minValue, maxValue };
+              state.filters[key] = { type: 'date', minDate, maxDate, minValue, maxValue };
             } else {
-              delete ventasTransFilterState[key];
+              delete state.filters[key];
             }
           }
-          updateVentasTransFilterButtons();
-          updateVentasTransFilterBadge();
-          renderTransaccionesVenta();
-          closeVentasTransFilterMenu();
+          applyTableFilters(tableId);
+          closeTableFilterMenu();
         }
       });
-      document.addEventListener('click', (event) => {
-        const filterBtn = event.target.closest('button.filter-btn[data-filter]');
-        if (filterBtn) {
-          const key = filterBtn.getAttribute('data-filter');
-          if (!ventasTransFilterMenu.hidden && ventasTransActiveFilter === key) {
-            closeVentasTransFilterMenu();
-            return;
-          }
-          openVentasTransFilterMenu(filterBtn);
+    }
+    document.addEventListener('click', (event) => {
+      const filterBtn = event.target.closest('button.filter-btn[data-table][data-key]');
+      if (filterBtn) {
+        const tableId = filterBtn.getAttribute('data-table');
+        const key = filterBtn.getAttribute('data-key');
+        if (activeTableFilter && activeTableFilter.tableId === tableId && activeTableFilter.key === key && !tableFilterMenu.hidden) {
+          closeTableFilterMenu();
           return;
         }
-        if (!ventasTransFilterMenu.hidden && !event.target.closest('#ventasTransFilterMenu')) {
-          closeVentasTransFilterMenu();
-        }
-      });
-    }
-    if (ventasTransFilterClear) {
-      ventasTransFilterClear.addEventListener('click', () => {
-        resetVentasTransFilters();
-      });
-    }
-    if (ventasTransSortChips) {
-      ventasTransSortChips.addEventListener('click', (event) => {
-        const chip = event.target.closest('button[data-sort-key]');
-        if (!chip) return;
-        const key = chip.getAttribute('data-sort-key');
-        if (!key) return;
-        ventasTransSortStack = ventasTransSortStack.filter(sort => sort.key !== key);
-        updateVentasTransFilterButtons();
-        updateVentasTransFilterBadge();
-        renderTransaccionesVenta();
-      });
-    }
-    if (ventasTransFilterChips) {
-      ventasTransFilterChips.addEventListener('click', (event) => {
-        const chip = event.target.closest('button[data-filter-key]');
-        if (!chip) return;
-        const key = chip.getAttribute('data-filter-key');
-        if (!key) return;
-        delete ventasTransFilterState[key];
-        updateVentasTransFilterButtons();
-        updateVentasTransFilterBadge();
-        renderTransaccionesVenta();
-      });
-    }
+        openTableFilterMenu(filterBtn);
+        return;
+      }
+      const clearBtn = event.target.closest('button.filter-clear');
+      if (clearBtn) {
+        const badge = clearBtn.closest('.filter-badge');
+        const tableId = badge ? badge.getAttribute('data-table') : null;
+        if (tableId) resetTableFilters(tableId);
+        return;
+      }
+      const sortChip = event.target.closest('button[data-sort-key][data-table]');
+      if (sortChip) {
+        const tableId = sortChip.getAttribute('data-table');
+        const key = sortChip.getAttribute('data-sort-key');
+        const state = tableFilters.get(tableId || '');
+        if (!state || !key) return;
+        state.sortStack = state.sortStack.filter(sort => sort.key !== key);
+        applyTableFilters(tableId);
+        return;
+      }
+      const filterChip = event.target.closest('button[data-filter-key][data-table]');
+      if (filterChip) {
+        const tableId = filterChip.getAttribute('data-table');
+        const key = filterChip.getAttribute('data-filter-key');
+        const state = tableFilters.get(tableId || '');
+        if (!state || !key) return;
+        delete state.filters[key];
+        applyTableFilters(tableId);
+        return;
+      }
+      if (tableFilterMenu && !tableFilterMenu.hidden && !event.target.closest('#ventasTransFilterMenu')) {
+        closeTableFilterMenu();
+      }
+    });
     if (ventasResumenBody) {
       ventasResumenBody.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-action="resumen-detalle"][data-codigo]');

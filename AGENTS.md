@@ -10,6 +10,10 @@ Token efficiency:
 - Before implementing, validate key assumptions; if critical info is missing, ask once.
 - If feasible, run a minimal check before claiming something works; skip if it adds cost without certainty.
 - Respond in the user's language unless they request otherwise.
+- Prefer readable formatting (short sections, bullets, and bold labels when helpful), without expanding content.
+- After applying changes, ask whether to commit. If branch is not specified or previously confirmed, ask which branch to use.
+- If commit is approved, create it, then ask whether to push. Only push after explicit approval.
+- Use repo-defined commit conventions; if none are found, default to Conventional Commits.
 
 Explicit triggers:
 - REVIEW
@@ -67,6 +71,11 @@ Process:
 5. Two approaches with changes + trade-offs.
 6. Recommend one approach with justification.
 Length: 8 lines max.
+
+If the user asks to expand options in DESIGN:
+- Add only new detail (no repeats).
+- Include: concrete steps, risks, and decision signals (when to choose each).
+- Limit to 6–8 lines, using short bullets.
 
 Rules:
 - Do NOT write or modify code without explicit approval.

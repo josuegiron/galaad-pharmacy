@@ -82,7 +82,8 @@ Stage 2 — Assumptions/Questions:
 - Wait for confirmation.
 
 Stage 3 — Approaches + Recommendation:
-- If current code context is not already loaded, ask for 1 hint (file/module) before searching.
+- If current code context is already loaded, do not ask for a hint.
+- If context is not loaded, ask for 1 hint (file/module) before searching.
 - Then inspect the current implementation with a minimal, targeted search.
 - Base approaches on existing code, not assumptions.
 - If relevant code is not found, say so; propose a generic approach and ask to confirm.

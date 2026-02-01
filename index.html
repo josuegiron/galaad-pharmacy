@@ -592,6 +592,14 @@
       text-transform: uppercase;
     }
     .module-group-title:first-child { margin-top: 0; }
+    .summary-card { padding: 10px; }
+    .summary-card .cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .summary-card .mini-card { padding: 10px; }
+    .summary-card .mini-title { font-size: 11px; letter-spacing: 0.04em; }
+    .summary-card .mini-value { font-size: 16px; }
     [hidden] { display: none !important; }
     .tab-bar {
       position: fixed;
@@ -1088,8 +1096,8 @@
         <h2 class="section-title">Caja</h2>
         <button type="button" class="help-btn" data-help="caja-menu" aria-label="Ayuda de caja">?</button>
       </div>
-      <div class="card" style="margin-bottom:14px;">
-        <div class="cards" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+      <div class="card summary-card" style="margin-bottom:14px;">
+        <div class="cards">
           <div class="mini-card">
             <div class="mini-title">Dinero en caja (hoy)</div>
             <div class="mini-value" id="cajaResumenDisponible">Q.0.00</div>
@@ -1105,6 +1113,7 @@
         </div>
       </div>
       <div class="module-list">
+        <div class="module-group-title">Operación</div>
         <button type="button" class="module-item" data-view="caja-view">
           <div>
             Caja del día
@@ -1112,6 +1121,7 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <div class="module-group-title">Cuentas y pagos</div>
         <button type="button" class="module-item" data-view="caja-cuentas">
           <div>
             Cuentas por pagar
@@ -1126,6 +1136,7 @@
           </div>
           <span class="arrow">›</span>
         </button>
+        <div class="module-group-title">Cierres</div>
         <button type="button" class="module-item" data-view="caja-cierres">
           <div>
             Cierres diarios

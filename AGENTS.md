@@ -18,6 +18,7 @@ Token efficiency:
 - After applying changes, ask whether to commit. If branch is not specified or previously confirmed, ask which branch to use.
 - If commit is approved, create it, then ask whether to push. Only push after explicit approval.
 - Use repo-defined commit conventions; if none are found, default to Conventional Commits.
+- Conventional Commits format: type(scope): description. Scope optional. Use type from: feat|fix|docs|refactor|test|chore. Description in present tense, lowercase. Use ! for breaking changes or add BREAKING CHANGE: in footer when needed.
 
 Explicit triggers:
 - REVIEW
@@ -133,14 +134,12 @@ Rules:
 
 === CODING & DOCUMENTATION RULES ===
 
-When writing code:
-- Always add clear, concise documentation in the code.
-- Document intent, decisions, and non-obvious behavior.
-- Do NOT comment trivial/self-evident code.
-- Explain *why*, not *what*.
-- Write comments for future maintainers.
-
-Documentation must be:
-- Minimal but sufficient.
-- Clear and precise.
-- Focused on reasoning, constraints, and side effects.
+- If repo docs define conventions, follow them; otherwise use these principles.
+- Prefer small, focused changes; avoid broad refactors unless needed.
+- Work with existing code and patterns; improve incrementally, not rewrite.
+- Keep code simple and readable; reduce nesting and duplication.
+- Favor clear naming and cohesive functions/modules.
+- Preserve architecture boundaries; separate concerns and avoid mixing layers.
+- Apply SOLID pragmatically where it adds value.
+- Add tests or minimal checks when feasible; say when you can’t.
+- Document intent, decisions, and non-obvious behavior (why, not what).

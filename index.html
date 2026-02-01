@@ -43,6 +43,13 @@
       --dropdown-bg: #1a1f2b;
       --dropdown-hover: rgba(255, 255, 255, 0.06);
       --dropdown-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      --filter-menu-bg: #1b2333;
+      --filter-menu-border: rgba(255, 255, 255, 0.14);
+      --filter-menu-text: #e9eefb;
+      --filter-menu-shadow: rgba(0, 0, 0, 0.45);
+      --filter-badge-bg: rgba(233, 255, 112, 0.12);
+      --filter-badge-border: rgba(233, 255, 112, 0.45);
+      --filter-badge-text: #e9eefb;
     }
     [data-theme="light"] {
       --bg: #f5f7fb;
@@ -77,6 +84,13 @@
       --dropdown-bg: #f8fafc;
       --dropdown-hover: rgba(15, 23, 42, 0.06);
       --dropdown-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+      --filter-menu-bg: #edf1f6;
+      --filter-menu-border: rgba(15, 23, 42, 0.16);
+      --filter-menu-text: #0f172a;
+      --filter-menu-shadow: rgba(15, 23, 42, 0.18);
+      --filter-badge-bg: rgba(233, 255, 112, 0.2);
+      --filter-badge-border: rgba(233, 255, 112, 0.5);
+      --filter-badge-text: #0f172a;
     }
     * { box-sizing: border-box; }
     html {
@@ -686,6 +700,71 @@
       border: 1px solid var(--stroke);
       background: var(--table-bg);
     }
+    .th-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .filter-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      padding: 0;
+      cursor: pointer;
+    }
+    .filter-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+    .filter-btn.active,
+    .filter-btn:hover {
+      border-color: rgba(233, 255, 112, 0.4);
+      color: var(--text);
+    }
+    .filter-menu {
+      position: fixed;
+      min-width: 240px;
+      max-width: 320px;
+      background: var(--filter-menu-bg);
+      border: 1px solid var(--filter-menu-border);
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: 0 18px 40px var(--filter-menu-shadow);
+      color: var(--filter-menu-text);
+      z-index: 40;
+    }
+    .filter-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .filter-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .filter-fields {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .filter-fields input {
+      width: 100%;
+    }
+    .filter-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -717,6 +796,18 @@
       margin: 12px 0 8px;
       color: var(--muted);
       font-size: 13px;
+    }
+    .filter-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--filter-badge-border);
+      background: var(--filter-badge-bg);
+      color: var(--filter-badge-text);
+      font-size: 12px;
+      font-weight: 600;
     }
     .table-meta.stacked {
       flex-direction: column;
@@ -1076,14 +1167,46 @@
           <div id="ventasTransCount">0 transacciones</div>
         </div>
       </div>
+      <div id="ventasTransFilterBadge" class="filter-badge" hidden style="margin:8px 0 14px;">
+        <span id="ventasTransFilterSummary">Filtrado</span>
+        <button type="button" class="btn compact" id="ventasTransFilterClear">Limpiar</button>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Fecha</th>
-              <th>Total</th>
-              <th>Estado</th>
+              <th data-col="id" data-type="text">
+                <div class="th-inner">
+                  <span>ID</span>
+                  <button type="button" class="filter-btn" data-filter="id" aria-label="Filtrar por ID">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3V5zm4 6h10v2H7v-2zm3 6h4v2h-4v-2z"/></svg>
+                  </button>
+                </div>
+              </th>
+              <th data-col="fecha" data-type="date">
+                <div class="th-inner">
+                  <span>Fecha</span>
+                  <button type="button" class="filter-btn" data-filter="fecha" aria-label="Filtrar por fecha">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3V5zm4 6h10v2H7v-2zm3 6h4v2h-4v-2z"/></svg>
+                  </button>
+                </div>
+              </th>
+              <th data-col="total" data-type="number">
+                <div class="th-inner">
+                  <span>Total</span>
+                  <button type="button" class="filter-btn" data-filter="total" aria-label="Filtrar por total">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3V5zm4 6h10v2H7v-2zm3 6h4v2h-4v-2z"/></svg>
+                  </button>
+                </div>
+              </th>
+              <th data-col="estado" data-type="text">
+                <div class="th-inner">
+                  <span>Estado</span>
+                  <button type="button" class="filter-btn" data-filter="estado" aria-label="Filtrar por estado">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3V5zm4 6h10v2H7v-2zm3 6h4v2h-4v-2z"/></svg>
+                  </button>
+                </div>
+              </th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -1992,6 +2115,19 @@
     </div>
   </div>
 
+  <div id="ventasTransFilterMenu" class="filter-menu" hidden>
+    <div class="filter-title" id="ventasTransFilterTitle">Filtrar</div>
+    <div class="filter-actions">
+      <button type="button" class="btn compact" data-action="sort-asc">Ordenar asc</button>
+      <button type="button" class="btn compact" data-action="sort-desc">Ordenar desc</button>
+    </div>
+    <div class="filter-fields" id="ventasTransFilterFields"></div>
+    <div class="filter-footer">
+      <button type="button" class="btn compact" data-action="clear">Borrar filtro</button>
+      <button type="button" class="btn compact primary" data-action="apply">Aplicar</button>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="helpModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
       <h3 id="helpModalTitle">Ayuda</h3>
@@ -2169,6 +2305,12 @@
     const ventasTransDetailTitle = document.getElementById('ventasTransDetailTitle');
     const ventasTransDetailBody = document.getElementById('ventasTransDetailBody');
     const ventasTransDetailClose = document.getElementById('ventasTransDetailClose');
+    const ventasTransFilterMenu = document.getElementById('ventasTransFilterMenu');
+    const ventasTransFilterTitle = document.getElementById('ventasTransFilterTitle');
+    const ventasTransFilterFields = document.getElementById('ventasTransFilterFields');
+    const ventasTransFilterBadge = document.getElementById('ventasTransFilterBadge');
+    const ventasTransFilterSummary = document.getElementById('ventasTransFilterSummary');
+    const ventasTransFilterClear = document.getElementById('ventasTransFilterClear');
     const ventasResumenDetail = document.getElementById('ventasResumenDetail');
     const ventasResumenDetailTitle = document.getElementById('ventasResumenDetailTitle');
     const ventasResumenDetailSubtitle = document.getElementById('ventasResumenDetailSubtitle');
@@ -3548,6 +3690,10 @@
     let cierresData = [];
     let cierresLoadingButton = null;
     let ventasTransLoading = false;
+    let ventasTransItems = [];
+    const ventasTransFilterState = {};
+    let ventasTransSort = null;
+    let ventasTransActiveFilter = null;
     let cajaTransLoading = false;
     let cajaCredLoading = false;
     let cajaPagosLoading = false;
@@ -3878,15 +4024,216 @@
       cierresStatus.textContent = 'Actualizado';
     }
 
+    function applyVentasTransFilters(items) {
+      let result = items.slice();
+      const hasFilters = Object.keys(ventasTransFilterState).length > 0;
+      if (hasFilters) {
+        result = result.filter(item => {
+          return Object.entries(ventasTransFilterState).every(([key, filter]) => {
+            if (!filter) return true;
+            if (filter.type === 'text') {
+              const raw = String(item[key] ?? '').toLowerCase();
+              const needle = String(filter.value || '').toLowerCase();
+              return !needle || raw.includes(needle);
+            }
+            if (filter.type === 'number') {
+              const value = Number(item[key] || 0);
+              if (isFinite(filter.min) && value < filter.min) return false;
+              if (isFinite(filter.max) && value > filter.max) return false;
+              return true;
+            }
+            if (filter.type === 'date') {
+              const parsed = parseSheetDate(item.fecha);
+              if (!parsed || isNaN(parsed.getTime())) return false;
+              const time = parsed.getTime();
+              if (filter.minDate && time < filter.minDate) return false;
+              if (filter.maxDate && time > filter.maxDate) return false;
+              return true;
+            }
+            return true;
+          });
+        });
+      }
+      if (ventasTransSort && ventasTransSort.key) {
+        const { key, dir, type } = ventasTransSort;
+        const factor = dir === 'asc' ? 1 : -1;
+        result.sort((a, b) => {
+          if (type === 'number') {
+            return (Number(a[key] || 0) - Number(b[key] || 0)) * factor;
+          }
+          if (type === 'date') {
+            const aDate = parseSheetDate(a.fecha);
+            const bDate = parseSheetDate(b.fecha);
+            const aVal = aDate ? aDate.getTime() : 0;
+            const bVal = bDate ? bDate.getTime() : 0;
+            return (aVal - bVal) * factor;
+          }
+          const aVal = String(a[key] ?? '').toLowerCase();
+          const bVal = String(b[key] ?? '').toLowerCase();
+          return aVal.localeCompare(bVal, 'es', { sensitivity: 'base' }) * factor;
+        });
+      }
+      return result;
+    }
+
+    function updateVentasTransFilterButtons() {
+      document.querySelectorAll('button.filter-btn[data-filter]').forEach(btn => {
+        const key = btn.getAttribute('data-filter');
+        const hasFilter = Boolean(ventasTransFilterState[key]);
+        const hasSort = ventasTransSort && ventasTransSort.key === key;
+        btn.classList.toggle('active', hasFilter || hasSort);
+      });
+    }
+
+    function updateVentasTransFilterBadge() {
+      if (!ventasTransFilterBadge || !ventasTransFilterSummary) return;
+      const parts = [];
+      Object.entries(ventasTransFilterState).forEach(([key, filter]) => {
+        const col = ventasTransColumns[key];
+        if (!col) return;
+        if (filter.type === 'text') {
+          if (filter.value) parts.push(`${col.label}: "${filter.value}"`);
+        } else if (filter.type === 'number') {
+          const min = isFinite(filter.min) ? filter.min : null;
+          const max = isFinite(filter.max) ? filter.max : null;
+          if (min !== null && max !== null) parts.push(`${col.label}: ${min} - ${max}`);
+          else if (min !== null) parts.push(`${col.label}: >= ${min}`);
+          else if (max !== null) parts.push(`${col.label}: <= ${max}`);
+        } else if (filter.type === 'date') {
+          const min = filter.minValue || '';
+          const max = filter.maxValue || '';
+          if (min && max) parts.push(`${col.label}: ${min} - ${max}`);
+          else if (min) parts.push(`${col.label}: desde ${min}`);
+          else if (max) parts.push(`${col.label}: hasta ${max}`);
+        }
+      });
+      if (ventasTransSort && ventasTransSort.key) {
+        const col = ventasTransColumns[ventasTransSort.key];
+        if (col) {
+          const dir = ventasTransSort.dir === 'asc' ? 'asc' : 'desc';
+          parts.push(`Orden: ${col.label} ${dir}`);
+        }
+      }
+      if (!parts.length) {
+        ventasTransFilterBadge.hidden = true;
+        return;
+      }
+      ventasTransFilterSummary.textContent = `Filtrado: ${parts.join(' · ')}`;
+      ventasTransFilterBadge.hidden = false;
+    }
+
+    function resetVentasTransFilters() {
+      Object.keys(ventasTransFilterState).forEach(key => delete ventasTransFilterState[key]);
+      ventasTransSort = null;
+      ventasTransActiveFilter = null;
+      if (ventasTransFilterMenu) ventasTransFilterMenu.hidden = true;
+      updateVentasTransFilterButtons();
+      updateVentasTransFilterBadge();
+      if (ventasTransItems.length) renderTransaccionesVenta();
+    }
+
+    const ventasTransColumns = {
+      id: { label: 'ID', type: 'text' },
+      fecha: { label: 'Fecha', type: 'date' },
+      total: { label: 'Total', type: 'number' },
+      estado: { label: 'Estado', type: 'text' },
+    };
+
+    function buildVentasTransFilterFields(key) {
+      if (!ventasTransFilterFields) return;
+      const col = ventasTransColumns[key];
+      if (!col) return;
+      const state = ventasTransFilterState[key] || {};
+      if (col.type === 'text') {
+        ventasTransFilterFields.innerHTML = `
+          <label>
+            Contiene
+            <input type="text" id="ventasTransFilterText" value="${state.value ? String(state.value) : ''}">
+          </label>
+        `;
+        return;
+      }
+      if (col.type === 'number') {
+        ventasTransFilterFields.innerHTML = `
+          <label>
+            Mínimo
+            <input type="number" id="ventasTransFilterMin" value="${isFinite(state.min) ? state.min : ''}">
+          </label>
+          <label>
+            Máximo
+            <input type="number" id="ventasTransFilterMax" value="${isFinite(state.max) ? state.max : ''}">
+          </label>
+        `;
+        return;
+      }
+      if (col.type === 'date') {
+        ventasTransFilterFields.innerHTML = `
+          <label>
+            Desde
+            <input type="date" id="ventasTransFilterDateMin" value="${state.minValue || ''}">
+          </label>
+          <label>
+            Hasta
+            <input type="date" id="ventasTransFilterDateMax" value="${state.maxValue || ''}">
+          </label>
+        `;
+      }
+    }
+
+    function openVentasTransFilterMenu(button) {
+      if (!ventasTransFilterMenu || !ventasTransFilterTitle) return;
+      const key = button.getAttribute('data-filter');
+      const col = ventasTransColumns[key];
+      if (!col) return;
+      ventasTransActiveFilter = key;
+      ventasTransFilterTitle.textContent = `Filtrar por ${col.label}`;
+      const sortAscBtn = ventasTransFilterMenu.querySelector('button[data-action="sort-asc"]');
+      const sortDescBtn = ventasTransFilterMenu.querySelector('button[data-action="sort-desc"]');
+      if (sortAscBtn && sortDescBtn) {
+        sortAscBtn.textContent = 'Ordenar asc';
+        sortDescBtn.textContent = 'Ordenar desc';
+      }
+      buildVentasTransFilterFields(key);
+      ventasTransFilterMenu.setAttribute('data-col', key);
+      ventasTransFilterMenu.hidden = false;
+      const menuRect = ventasTransFilterMenu.getBoundingClientRect();
+      const btnRect = button.getBoundingClientRect();
+      let left = Math.min(btnRect.left, window.innerWidth - menuRect.width - 12);
+      left = Math.max(12, left);
+      let top = btnRect.bottom + 8;
+      if (top + menuRect.height > window.innerHeight - 12) {
+        top = btnRect.top - menuRect.height - 8;
+      }
+      if (top < 12) top = 12;
+      ventasTransFilterMenu.style.left = `${left}px`;
+      ventasTransFilterMenu.style.top = `${top}px`;
+    }
+
+    function closeVentasTransFilterMenu() {
+      if (!ventasTransFilterMenu) return;
+      ventasTransFilterMenu.hidden = true;
+      ventasTransActiveFilter = null;
+    }
+
+    function parseDateInputValue(value, isEnd = false) {
+      if (!value) return null;
+      const [yyyy, mm, dd] = value.split('-').map(Number);
+      if (!yyyy || !mm || !dd) return null;
+      return new Date(yyyy, mm - 1, dd, isEnd ? 23 : 0, isEnd ? 59 : 0, isEnd ? 59 : 0, isEnd ? 999 : 0).getTime();
+    }
+
     function renderTransaccionesVenta(items) {
       if (!ventasTransBody || !ventasTransStatus || !ventasTransCount) return;
-      if (!items.length) {
+      if (Array.isArray(items)) ventasTransItems = items;
+      const sourceItems = Array.isArray(items) ? items : ventasTransItems;
+      const displayItems = applyVentasTransFilters(sourceItems);
+      if (!displayItems.length) {
         ventasTransBody.innerHTML = '<tr><td colspan="5">Sin transacciones.</td></tr>';
         ventasTransCount.textContent = '0 transacciones';
         ventasTransStatus.textContent = 'Sin resultados';
         return;
       }
-      ventasTransBody.innerHTML = items.map(item => {
+      ventasTransBody.innerHTML = displayItems.map(item => {
         const total = Number(item.total || 0);
         const estadoRaw = String(item.estado || '—');
         const estadoNorm = estadoRaw.toLowerCase();
@@ -3908,8 +4255,9 @@
           </tr>
         `;
       }).join('');
-      ventasTransCount.textContent = `${items.length} transacciones`;
-      ventasTransStatus.textContent = 'Actualizado';
+      ventasTransCount.textContent = `${displayItems.length} transacciones`;
+      ventasTransStatus.textContent = (Object.keys(ventasTransFilterState).length || ventasTransSort) ? 'Filtrado' : 'Actualizado';
+      updateVentasTransFilterBadge();
     }
 
     function renderTransaccionesCompra(items) {
@@ -5040,11 +5388,13 @@
     }
     if (ventasTransDesde) {
       ventasTransDesde.addEventListener('change', () => {
+        resetVentasTransFilters();
         loadTransacciones('venta');
       });
     }
     if (ventasTransHasta) {
       ventasTransHasta.addEventListener('change', () => {
+        resetVentasTransFilters();
         loadTransacciones('venta');
       });
     }
@@ -5082,6 +5432,94 @@
         const transaccionId = btn.getAttribute('data-id');
         if (!transaccionId) return;
         showTransaccionDetalle(transaccionId);
+      });
+    }
+    if (ventasTransFilterMenu) {
+      ventasTransFilterMenu.addEventListener('click', (event) => {
+        const actionBtn = event.target.closest('button[data-action]');
+        if (!actionBtn) return;
+        const action = actionBtn.getAttribute('data-action');
+        const key = ventasTransFilterMenu.getAttribute('data-col');
+        const col = key ? ventasTransColumns[key] : null;
+        if (!col) return;
+        if (action === 'sort-asc' || action === 'sort-desc') {
+          const dir = action === 'sort-asc' ? 'asc' : 'desc';
+          if (ventasTransSort && ventasTransSort.key === key && ventasTransSort.dir === dir) {
+            ventasTransSort = null;
+          } else {
+            ventasTransSort = { key, dir, type: col.type };
+          }
+          updateVentasTransFilterButtons();
+          updateVentasTransFilterBadge();
+          renderTransaccionesVenta();
+          closeVentasTransFilterMenu();
+          return;
+        }
+        if (action === 'clear') {
+          delete ventasTransFilterState[key];
+          updateVentasTransFilterButtons();
+          updateVentasTransFilterBadge();
+          renderTransaccionesVenta();
+          closeVentasTransFilterMenu();
+          return;
+        }
+        if (action === 'apply') {
+          if (col.type === 'text') {
+            const input = document.getElementById('ventasTransFilterText');
+            const value = input ? input.value.trim() : '';
+            if (value) {
+              ventasTransFilterState[key] = { type: 'text', value };
+            } else {
+              delete ventasTransFilterState[key];
+            }
+          } else if (col.type === 'number') {
+            const minInput = document.getElementById('ventasTransFilterMin');
+            const maxInput = document.getElementById('ventasTransFilterMax');
+            const min = minInput ? Number(minInput.value) : NaN;
+            const max = maxInput ? Number(maxInput.value) : NaN;
+            if (isFinite(min) || isFinite(max)) {
+              ventasTransFilterState[key] = { type: 'number', min, max };
+            } else {
+              delete ventasTransFilterState[key];
+            }
+          } else if (col.type === 'date') {
+            const minInput = document.getElementById('ventasTransFilterDateMin');
+            const maxInput = document.getElementById('ventasTransFilterDateMax');
+            const minValue = minInput ? minInput.value : '';
+            const maxValue = maxInput ? maxInput.value : '';
+            const minDate = parseDateInputValue(minValue, false);
+            const maxDate = parseDateInputValue(maxValue, true);
+            if (minDate || maxDate) {
+              ventasTransFilterState[key] = { type: 'date', minDate, maxDate, minValue, maxValue };
+            } else {
+              delete ventasTransFilterState[key];
+            }
+          }
+          updateVentasTransFilterButtons();
+          updateVentasTransFilterBadge();
+          renderTransaccionesVenta();
+          closeVentasTransFilterMenu();
+        }
+      });
+      document.addEventListener('click', (event) => {
+        const filterBtn = event.target.closest('button.filter-btn[data-filter]');
+        if (filterBtn) {
+          const key = filterBtn.getAttribute('data-filter');
+          if (!ventasTransFilterMenu.hidden && ventasTransActiveFilter === key) {
+            closeVentasTransFilterMenu();
+            return;
+          }
+          openVentasTransFilterMenu(filterBtn);
+          return;
+        }
+        if (!ventasTransFilterMenu.hidden && !event.target.closest('#ventasTransFilterMenu')) {
+          closeVentasTransFilterMenu();
+        }
+      });
+    }
+    if (ventasTransFilterClear) {
+      ventasTransFilterClear.addEventListener('click', () => {
+        resetVentasTransFilters();
       });
     }
     if (ventasResumenBody) {

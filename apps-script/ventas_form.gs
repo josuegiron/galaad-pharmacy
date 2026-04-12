@@ -2512,7 +2512,7 @@ function buildFacturacionFile(summaryRows, fileName) {
   }
   const rows = summaryRows.map(item => ([
     'CF',
-    'servicio',
+    'bien',
     'FACT',
     item.cantidad,
     `Por venta de ${item.cantidad} * ${item.nombre} (${item.codigo})`,

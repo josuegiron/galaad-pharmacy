@@ -710,11 +710,15 @@ function deleteCajaByTransaccionId(transaccionId) {
 
 function generateFacturacion(payload) {
   const dateRaw = payload.fecha;
+  const filterType = String(payload.tipo || 'todos').toLowerCase();
   if (!dateRaw) throw new Error('Fecha requerida.');
   const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
   const dateTarget = parseDateValue(dateRaw);
   if (!dateTarget) throw new Error('Fecha inválida.');
   const dateKey = Utilities.formatDate(dateTarget, tz, 'yyyy-MM-dd');
+  if (['todos', 'afectos', 'no_afectos'].indexOf(filterType) < 0) {
+    throw new Error('Tipo de facturación inválido.');
+  }
 
   const movimientosSheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
   if (!movimientosSheet) throw new Error(`No se encontró la hoja "${SHEET_NAME}".`);
@@ -738,6 +742,7 @@ function generateFacturacion(payload) {
   }
 
   const catalogMap = loadCatalogMap();
+  const afectoMap = loadCatalogAfectoMap();
   const summary = {};
   const loteItems = [];
   let totalMonto = 0;
@@ -748,6 +753,9 @@ function generateFacturacion(payload) {
     const codigo = String(row[idxCodigo] || '').trim();
     const numero = row[idxNumero];
     if (!codigo || tipo !== 1 || confirmado !== 0) return;
+    const afecto = Number(afectoMap[codigo] || 0) === 1;
+    if (filterType === 'afectos' && !afecto) return;
+    if (filterType === 'no_afectos' && afecto) return;
     const rowDate = parseDateValue(row[idxFecha]);
     if (!rowDate) return;
     const rowKey = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
@@ -796,7 +804,8 @@ function generateFacturacion(payload) {
   }
   appendLoteItems(loteItems);
 
-  const fileName = `facturacion_${dateKey}_lote${loteId}.xlsx`;
+  const fileSuffix = filterType === 'todos' ? 'todos' : filterType;
+  const fileName = `facturacion_${dateKey}_${fileSuffix}_lote${loteId}.xlsx`;
   const fileId = buildFacturacionFile(summaryRows, fileName);
   updateLoteFile(loteRowIndex, fileName, fileId);
 
@@ -2581,6 +2590,22 @@ function loadCatalogMap() {
     }
   }
   return {};
+}
+
+function loadCatalogAfectoMap() {
+  const sheet = getProductosSheet();
+  if (!sheet || sheet.getLastRow() < 2) return {};
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).toLowerCase());
+  const idxCodigo = headers.indexOf('codigo');
+  const idxAfecto = headers.indexOf('afecto');
+  if (idxCodigo < 0 || idxAfecto < 0) return {};
+  const map = {};
+  data.slice(1).forEach(row => {
+    const codigo = String(row[idxCodigo] || '').trim();
+    if (codigo) map[codigo] = Number(row[idxAfecto] || 0);
+  });
+  return map;
 }
 
 function parsePayload(e) {

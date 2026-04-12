@@ -1846,9 +1846,11 @@
           Fecha
           <input type="date" id="facturacionFecha">
         </label>
-        <p class="hint" style="margin-top:8px;">Genera un archivo con ventas no facturadas.</p>
+        <p class="hint" style="margin-top:8px;">Genera un archivo con ventas no facturadas por afectos, no afectos o todas.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-          <button type="button" class="btn primary" id="facturacionGenerar">Generar archivo</button>
+          <button type="button" class="btn primary" id="facturacionGenerarAfectos" data-tipo="afectos">Generar plantilla SAT afectos</button>
+          <button type="button" class="btn" id="facturacionGenerarNoAfectos" data-tipo="no_afectos">Generar plantilla SAT no afectos</button>
+          <button type="button" class="btn" id="facturacionGenerarTodos" data-tipo="todos">Generar plantilla SAT completa</button>
         </div>
       </div>
       <div class="card summary-card" id="facturacionLoteCard" style="margin-top:12px;" hidden>
@@ -2238,7 +2240,7 @@
 
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxeDwDO7I9Sv1SsiRTiO804f1rs9oaHkDwyTevYd7ZGDuWDdYDGG6Wpz9uylQtBx5Q/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzyyeASu5vnYLB3SRXfUurCMbMLT4j64Kc1lsmI_z9fk6gX9JfFkCgSTUc17lsdgAtg/exec';
     const SHEET_NAME = 'movimientos';
 
     const form = document.getElementById('ventaForm');
@@ -2301,6 +2303,7 @@
     let pendingTransaccionDetalle = null;
     let pendingCompraDetalle = null;
     let pendingResumenDetalle = null;
+    let pendingAjusteCheck = null;
     let pendingCompraDetalleTarget = 'transacciones';
     const gvizHandlers = [];
 
@@ -2335,7 +2338,7 @@
     const ventasResumenDetailClose = document.getElementById('ventasResumenDetailClose');
     const ventasResumenDetailCount = document.getElementById('ventasResumenDetailCount');
     const facturacionFecha = document.getElementById('facturacionFecha');
-    const facturacionGenerar = document.getElementById('facturacionGenerar');
+    const facturacionGenerarButtons = Array.from(document.querySelectorAll('#facturacion-generar [data-tipo]'));
     const facturacionDescargar = document.getElementById('facturacionDescargar');
     const facturacionConfirmar = document.getElementById('facturacionConfirmar');
     const facturacionLote = document.getElementById('facturacionLote');
@@ -2471,7 +2474,6 @@
     const helpModalBody = document.getElementById('helpModalBody');
     const helpModalClose = document.getElementById('helpModalClose');
     const helpButtons = [...document.querySelectorAll('.help-btn')];
-    const facturacionGenerarLabel = facturacionGenerar ? facturacionGenerar.textContent.trim() : 'Generar archivo';
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
 
@@ -2946,7 +2948,7 @@
       ['cantidad', 'descuento'].forEach(cls => {
         card.querySelector('.' + cls).addEventListener('input', updateTotal);
       });
-      itemsWrapper.appendChild(card);
+      itemsWrapper.prepend(card);
     };
 
     const createCompraItemRow = (item = {}) => {
@@ -2998,7 +3000,7 @@
       ['cantidad', 'descuento'].forEach(cls => {
         card.querySelector('.' + cls).addEventListener('input', updateCompraTotal);
       });
-      compraItemsWrapper.appendChild(card);
+      compraItemsWrapper.prepend(card);
     };
 
     const createAjusteItemRow = (item = {}) => {
@@ -3030,7 +3032,7 @@
       ['cantidad'].forEach(cls => {
         card.querySelector('.' + cls).addEventListener('input', updateAjusteTotal);
       });
-      ajusteItemsWrapper.appendChild(card);
+      ajusteItemsWrapper.prepend(card);
     };
 
     addSelectedBtn.addEventListener('click', () => {
@@ -3326,7 +3328,12 @@
             mode: 'no-cors',
             body: fd,
           });
-          showAjusteMessage('¡Ajuste registrado con éxito!');
+          showAjusteMessage('Verificando ajuste...', false);
+          pendingAjusteCheck = {
+            items: items.map(item => ({ codigo: item.codigo, cantidad: item.cantidad })),
+            fechaKey: selectedDate,
+            source: 'form',
+          };
           ajusteForm.reset();
           if (ajusteFecha) ajusteFecha.value = toLocalISODate(new Date());
           if (ajusteItemsWrapper) ajusteItemsWrapper.innerHTML = '';
@@ -3484,6 +3491,28 @@
           const pending = pendingResumenDetalle;
           pendingResumenDetalle = null;
           showResumenDetalle(pending.codigo, pending.nombre);
+        }
+        if (pendingAjusteCheck) {
+          const { items, fechaKey, source } = pendingAjusteCheck;
+          pendingAjusteCheck = null;
+          const matches = items.map(item => {
+            return movimientos.some(row => {
+              if (Number(row.tipo) !== 3) return false;
+              if (String(row.codigo || '').trim() !== String(item.codigo || '').trim()) return false;
+              if (Number(row.cantidad || 0) !== Number(item.cantidad || 0)) return false;
+              const dateObj = parseSheetDate(row.fechaRaw);
+              if (!dateObj) return false;
+              return toLocalISODate(dateObj) === fechaKey;
+            });
+          });
+          const ok = matches.every(Boolean);
+          if (source === 'modal') {
+            if (productosStatus) {
+              productosStatus.textContent = ok ? 'Ajuste registrado.' : 'No se pudo registrar el ajuste (día cerrado o error).';
+            }
+          } else if (source === 'form') {
+            showAjusteMessage(ok ? '¡Ajuste registrado con éxito!' : 'No se pudo registrar el ajuste (día cerrado o error).', !ok);
+          }
         }
       } catch (err) {
         movimientosLoading = false;
@@ -6022,7 +6051,12 @@
             body: fd,
           });
           closeAjusteModal();
-          if (productosStatus) productosStatus.textContent = 'Ajuste registrado.';
+          if (productosStatus) productosStatus.textContent = 'Verificando ajuste...';
+          pendingAjusteCheck = {
+            items: [{ codigo, cantidad }],
+            fechaKey: fecha,
+            source: 'modal',
+          };
           loadMovimientos(true);
           loadProductos();
         } catch (err) {
@@ -6321,54 +6355,60 @@
     }
     let facturacionLoteId = null;
     let facturacionLink = null;
-    if (facturacionGenerar) {
-      facturacionGenerar.addEventListener('click', () => {
-        const fecha = facturacionFecha ? facturacionFecha.value : '';
-        if (!fecha) {
-          showFacturacionMessage('Selecciona una fecha.', true);
-          return;
-        }
-        if (facturacionLoteCard) facturacionLoteCard.hidden = true;
-        setButtonLoading(facturacionGenerar, true);
-        if (facturacionEstado) facturacionEstado.textContent = 'Generando...';
-        if (facturacionFechaLabel) facturacionFechaLabel.textContent = `Fecha: ${fecha}`;
-        showFacturacionMessage('Generando archivo...');
-        const url = `${SCRIPT_URL}?action=facturacion_generar&fecha=${encodeURIComponent(fecha)}`;
-        jsonpRequest(url, (data) => {
-          setButtonLoading(facturacionGenerar, false);
-          if (!data || !data.ok) {
-            if (facturacionEstado) facturacionEstado.textContent = 'Error';
-            showFacturacionMessage((data && data.error) || 'No se pudo generar.', true);
+    if (facturacionGenerarButtons.length) {
+      facturacionGenerarButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const tipo = button.getAttribute('data-tipo') || 'todos';
+          const tipoLabel = tipo === 'afectos'
+            ? 'afectos'
+            : (tipo === 'no_afectos' ? 'no afectos' : 'todos');
+          const fecha = facturacionFecha ? facturacionFecha.value : '';
+          if (!fecha) {
+            showFacturacionMessage('Selecciona una fecha.', true);
             return;
           }
-          if (facturacionLoteCard) facturacionLoteCard.hidden = false;
-          facturacionLoteId = data.lote_id;
-          facturacionLink = data.link || null;
-          if (facturacionLote) facturacionLote.textContent = `Lote ${data.lote_id}`;
-          if (facturacionEstado) facturacionEstado.textContent = 'Pendiente';
-          if (facturacionLinkEl) {
-            if (facturacionLink) {
-              facturacionLinkEl.href = facturacionLink;
-              facturacionLinkEl.style.display = 'inline-flex';
-              facturacionLinkEl.setAttribute('target', '_blank');
-              facturacionLinkEl.setAttribute('rel', 'noopener');
-            } else {
-              facturacionLinkEl.style.display = 'none';
+          if (facturacionLoteCard) facturacionLoteCard.hidden = true;
+          setButtonLoading(button, true);
+          if (facturacionEstado) facturacionEstado.textContent = 'Generando...';
+          if (facturacionFechaLabel) facturacionFechaLabel.textContent = `Fecha: ${fecha}`;
+          showFacturacionMessage(`Generando archivo de ${tipoLabel}...`);
+          const url = `${SCRIPT_URL}?action=facturacion_generar&fecha=${encodeURIComponent(fecha)}&tipo=${encodeURIComponent(tipo)}`;
+          jsonpRequest(url, (data) => {
+            setButtonLoading(button, false);
+            if (!data || !data.ok) {
+              if (facturacionEstado) facturacionEstado.textContent = 'Error';
+              showFacturacionMessage((data && data.error) || 'No se pudo generar.', true);
+              return;
             }
-          }
-          if (facturacionConfirmar) facturacionConfirmar.disabled = false;
-          if (facturacionDescargar) {
-            facturacionDescargar.disabled = !facturacionLink;
-          }
-          if (facturacionLink) {
-            showFacturacionMessage('Archivo generado. Usa "Descargar archivo".');
-          } else {
-            showFacturacionMessage('Archivo generado.');
-          }
-        }, () => {
-          setButtonLoading(facturacionGenerar, false);
-          if (facturacionEstado) facturacionEstado.textContent = 'Error';
-          showFacturacionMessage('Error al generar el archivo.', true);
+            if (facturacionLoteCard) facturacionLoteCard.hidden = false;
+            facturacionLoteId = data.lote_id;
+            facturacionLink = data.link || null;
+            if (facturacionLote) facturacionLote.textContent = `Lote ${data.lote_id}`;
+            if (facturacionEstado) facturacionEstado.textContent = 'Pendiente';
+            if (facturacionLinkEl) {
+              if (facturacionLink) {
+                facturacionLinkEl.href = facturacionLink;
+                facturacionLinkEl.style.display = 'inline-flex';
+                facturacionLinkEl.setAttribute('target', '_blank');
+                facturacionLinkEl.setAttribute('rel', 'noopener');
+              } else {
+                facturacionLinkEl.style.display = 'none';
+              }
+            }
+            if (facturacionConfirmar) facturacionConfirmar.disabled = false;
+            if (facturacionDescargar) {
+              facturacionDescargar.disabled = !facturacionLink;
+            }
+            if (facturacionLink) {
+              showFacturacionMessage('Archivo generado. Usa "Descargar archivo".');
+            } else {
+              showFacturacionMessage('Archivo generado.');
+            }
+          }, () => {
+            setButtonLoading(button, false);
+            if (facturacionEstado) facturacionEstado.textContent = 'Error';
+            showFacturacionMessage('Error al generar el archivo.', true);
+          });
         });
       });
     }

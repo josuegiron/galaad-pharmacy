@@ -463,6 +463,34 @@
       background: rgba(94, 248, 176, 0.08);
       color: #b7ffd9;
     }
+    .copyable-cell {
+      cursor: pointer;
+      user-select: text;
+    }
+    .copyable-cell:active {
+      background: rgba(233, 255, 112, 0.1);
+    }
+    .copy-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 96px;
+      transform: translateX(-50%) translateY(12px);
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(94, 248, 176, 0.42);
+      background: rgba(16, 28, 24, 0.92);
+      color: #b7ffd9;
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 60;
+    }
+    .copy-toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
     .items-card { padding: 12px; }
     .items-wrapper { display:flex; flex-direction:column; gap:14px; }
     .item-card {
@@ -2239,6 +2267,8 @@
     </div>
   </div>
 
+  <div id="copyToast" class="copy-toast" aria-live="polite">Copiado</div>
+
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4LQ1n7jvjAvgJVRpJkwnqA17RINqBDX5ZtRnzPQhyjje-XOYjqjVV8zOWCNYlm8pq/exec';
@@ -2338,6 +2368,7 @@
     const ventasResumenDetailBody = document.getElementById('ventasResumenDetailBody');
     const ventasResumenDetailClose = document.getElementById('ventasResumenDetailClose');
     const ventasResumenDetailCount = document.getElementById('ventasResumenDetailCount');
+    const copyToast = document.getElementById('copyToast');
     const facturacionFecha = document.getElementById('facturacionFecha');
     const facturacionGenerarButtons = Array.from(document.querySelectorAll('#facturacion-generar [data-tipo]'));
     const facturacionDescargar = document.getElementById('facturacionDescargar');
@@ -3661,6 +3692,7 @@
           </tr>
         `;
       }).join('');
+      markCopyableCells(ventasResumenDetailBody);
       if (ventasResumenDetailCount) ventasResumenDetailCount.textContent = `${rows.length} ventas`;
       openResumenDetalleModal();
     }
@@ -5319,6 +5351,7 @@
           </tr>
         `;
       }).join('');
+      markCopyableCells(ventasResumenBody);
       ventasResumenCount.textContent = `${rows.length} productos`;
       ventasResumenTotal.textContent = `Q.${totalGeneral.toFixed(2)}`;
       ventasResumenStatus.textContent = 'Actualizado';
@@ -5333,6 +5366,72 @@
       setTimeout(() => {
         facturacionMessage.style.display = 'none';
       }, 5000);
+    }
+
+    let copyToastTimeout = null;
+    function showCopyToast(text = 'Copiado') {
+      if (!copyToast) return;
+      copyToast.textContent = text;
+      copyToast.classList.add('visible');
+      if (copyToastTimeout) clearTimeout(copyToastTimeout);
+      copyToastTimeout = setTimeout(() => {
+        copyToast.classList.remove('visible');
+      }, 1200);
+    }
+
+    async function copyTextToClipboard(text) {
+      const value = String(text || '').trim();
+      if (!value) return false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(value);
+          return true;
+        }
+      } catch (err) {
+      }
+      const input = document.createElement('textarea');
+      input.value = value;
+      input.setAttribute('readonly', 'readonly');
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      input.setSelectionRange(0, input.value.length);
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch (err) {
+        copied = false;
+      }
+      input.remove();
+      return copied;
+    }
+
+    function bindSummaryCopy(tableBody) {
+      if (!tableBody) return;
+      tableBody.addEventListener('click', async (event) => {
+        if (event.target.closest('button')) return;
+        const cell = event.target.closest('td');
+        if (!cell) return;
+        const text = cell.textContent || '';
+        if (!text.trim()) return;
+        cell.classList.add('copyable-cell');
+        const copied = await copyTextToClipboard(text);
+        if (copied) showCopyToast(`Copiado: ${text.trim()}`);
+      });
+    }
+
+    function markCopyableCells(tableBody) {
+      if (!tableBody) return;
+      tableBody.querySelectorAll('td').forEach((cell) => {
+        if (cell.querySelector('button')) {
+          cell.classList.remove('copyable-cell');
+          return;
+        }
+        if (String(cell.textContent || '').trim()) {
+          cell.classList.add('copyable-cell');
+        }
+      });
     }
 
     function jsonpRequest(url, onSuccess, onError) {
@@ -5802,6 +5901,7 @@
       }
     });
     if (ventasResumenBody) {
+      bindSummaryCopy(ventasResumenBody);
       ventasResumenBody.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-action="resumen-detalle"][data-codigo]');
         if (!btn) return;
@@ -5810,6 +5910,9 @@
         if (!codigo) return;
         showResumenDetalle(codigo, nombre);
       });
+    }
+    if (ventasResumenDetailBody) {
+      bindSummaryCopy(ventasResumenDetailBody);
     }
     if (cajaTransBody) {
       cajaTransBody.addEventListener('click', (event) => {

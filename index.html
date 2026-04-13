@@ -1205,7 +1205,7 @@
               <th>Código</th>
               <th>Producto</th>
               <th>Afecto</th>
-              <th>Stock actual</th>
+              <th>Existencia actual</th>
               <th>Costo unitario</th>
               <th>Cantidad total</th>
               <th>Descuento</th>
@@ -1609,7 +1609,7 @@
               <th>Proveedor</th>
               <th>Costo</th>
               <th>Precio</th>
-              <th>Stock</th>
+              <th>Existencia</th>
               <th>Activo</th>
               <th>Acciones</th>
             </tr>
@@ -1718,7 +1718,7 @@
             Fecha
             <input type="date" name="fecha" id="ajusteFecha" required>
           </label>
-          <p class="hint" style="margin-top:8px;">Usa cantidades positivas o negativas para ajustar el stock.</p>
+          <p class="hint" style="margin-top:8px;">Usa cantidades positivas o negativas para ajustar la existencia.</p>
         </div>
 
         <div class="card items-card">
@@ -2667,16 +2667,16 @@
         title: 'Inventario',
         desc: 'Centro de catálogo, compras y ajustes.',
         bullets: [
-          'Gestionar productos y stock.',
+          'Gestionar productos y existencia.',
           'Registrar compras y ajustes.',
         ],
       },
       'inventario-productos': {
         title: 'Catálogo de productos',
-        desc: 'Catálogo completo con precios y stock.',
+        desc: 'Catálogo completo con precios y existencia.',
         bullets: [
           'Buscar, crear y editar productos.',
-          'Ajustar stock desde acciones.',
+          'Ajustar existencia desde acciones.',
         ],
       },
       'inventario-compras-crear': {
@@ -2697,7 +2697,7 @@
       },
       'inventario-ajustes-crear': {
         title: 'Ajustes de inventario',
-        desc: 'Aumenta o reduce stock manualmente.',
+        desc: 'Aumenta o reduce existencia manualmente.',
         bullets: [
           'Usar cantidad positiva o negativa.',
           'El ajuste no afecta caja.',
@@ -2870,6 +2870,7 @@
           renderAjustes();
         }
       }
+      requestAnimationFrame(syncVentasResumenStickyHead);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -5529,7 +5530,7 @@
       const navBottom = nav ? nav.getBoundingClientRect().bottom : 0;
       const wrapRect = ventasResumenTableWrap.getBoundingClientRect();
       const headRect = thead.getBoundingClientRect();
-      const shouldShow = wrapRect.top < navBottom && wrapRect.bottom > navBottom + headRect.height;
+      const shouldShow = headRect.top < navBottom && wrapRect.bottom > navBottom + headRect.height;
       if (!shouldShow) {
         ventasResumenStickyHead.hidden = true;
         return;

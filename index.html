@@ -1180,6 +1180,13 @@
             </tr>
           </thead>
           <tbody id="ventasResumenBody"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5"><strong>Suma visible</strong></td>
+              <td id="ventasResumenVisibleTotal">Q.0.00</td>
+              <td>—</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </section>
@@ -2349,6 +2356,7 @@
     const ventasResumenBody = document.getElementById('ventasResumenBody');
     const ventasResumenCount = document.getElementById('ventasResumenCount');
     const ventasResumenTotal = document.getElementById('ventasResumenTotal');
+    const ventasResumenVisibleTotal = document.getElementById('ventasResumenVisibleTotal');
     const ventasTransDesde = document.getElementById('ventasTransDesde');
     const ventasTransHasta = document.getElementById('ventasTransHasta');
     const ventasTransStatus = document.getElementById('ventasTransStatus');
@@ -4316,6 +4324,10 @@
         state.tbody.appendChild(row);
       });
 
+      if (tbodyId === 'ventasResumenBody') {
+        updateResumenVisibleTotal();
+      }
+
       updateTableFilterButtons(tbodyId);
       updateTableFilterBadge(tbodyId);
       setTimeout(() => {
@@ -4392,6 +4404,19 @@
       const hasFilters = Object.keys(state.filters).length > 0;
       const hasSort = state.sortStack.length > 0;
       state.badge.hidden = !(hasFilters || hasSort);
+    }
+
+    function updateResumenVisibleTotal() {
+      if (!ventasResumenBody || !ventasResumenVisibleTotal) return;
+      const total = Array.from(ventasResumenBody.querySelectorAll('tr'))
+        .filter(row => !row.hidden && row.cells.length > 5)
+        .reduce((sum, row) => {
+          const raw = row.cells[5] ? String(row.cells[5].textContent || '').trim() : '0';
+          const normalized = raw.replace(/^Q\./, '');
+          const value = Number(normalized);
+          return sum + (isFinite(value) ? value : 0);
+        }, 0);
+      ventasResumenVisibleTotal.textContent = `Q.${total.toFixed(2)}`;
     }
 
     function resetTableFilters(tbodyId) {
@@ -5332,6 +5357,7 @@
         ventasResumenBody.innerHTML = '<tr><td colspan="7">Sin ventas para esta fecha.</td></tr>';
         ventasResumenCount.textContent = '0 productos';
         ventasResumenTotal.textContent = 'Q.0.00';
+        if (ventasResumenVisibleTotal) ventasResumenVisibleTotal.textContent = 'Q.0.00';
         ventasResumenStatus.textContent = 'Sin resultados';
         return;
       }
@@ -5354,6 +5380,7 @@
       markCopyableCells(ventasResumenBody);
       ventasResumenCount.textContent = `${rows.length} productos`;
       ventasResumenTotal.textContent = `Q.${totalGeneral.toFixed(2)}`;
+      updateResumenVisibleTotal();
       ventasResumenStatus.textContent = 'Actualizado';
     }
 

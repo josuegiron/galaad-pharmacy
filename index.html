@@ -2991,12 +2991,14 @@
       card.dataset.codigo = item.codigo || '';
       card.dataset.producto = item.nombre || '';
       card.dataset.proveedor = item.proveedor || '';
+      card.dataset.stock = item.stock_actual !== undefined ? item.stock_actual : '';
       const precioDefault = item.valor_unitario || item.precio_venta || 0;
+      const stockActual = Number(item.stock_actual || 0);
       card.dataset.precio = precioDefault;
       card.innerHTML = `
         <div class="row">
           <div class="product-meta">
-            <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'} <span class="inline-provider">· ${item.proveedor || '—'}</span></span>
+            <span class="product-name">${item.codigo || '—'} - ${item.nombre || 'Sin nombre'} <span class="inline-provider">· ${item.proveedor || '—'} (exist: <strong>${isFinite(stockActual) ? stockActual : 0}</strong>)</span></span>
           </div>
           <button type="button" class="remove-btn">✕</button>
         </div>
@@ -3129,6 +3131,7 @@
         codigo: currentProduct.codigo,
         nombre: currentProduct.nombre,
         proveedor: currentProduct.proveedor,
+        stock_actual: currentProduct.stock_actual,
         precio_venta: currentProduct.precio_venta,
         valor_unitario: currentProduct.precio_venta,
       };
@@ -3154,6 +3157,7 @@
           codigo: selected.codigo,
           nombre: selected.nombre,
           proveedor: selected.proveedor,
+          stock_actual: selected.stock_actual,
           precio_venta: selected.precio_venta,
           valor_unitario: selected.precio_venta,
         };

@@ -843,6 +843,16 @@
     .sticky-table-head thead th {
       background: var(--table-bg);
     }
+    #productosTable thead th {
+      position: sticky;
+      top: var(--productos-sticky-top, 0px);
+      z-index: 2;
+      background: rgba(24, 30, 46, 0.96);
+      backdrop-filter: blur(10px);
+    }
+    [data-theme="light"] #productosTable thead th {
+      background: rgba(248, 250, 252, 0.96);
+    }
     tbody td {
       padding: 10px 12px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -1154,8 +1164,8 @@
           <div id="ventasCount">0 ventas</div>
         </div>
       </div>
-      <div class="table-wrap">
-        <table>
+      <div class="table-wrap" id="ventasHistoricoTableWrap">
+        <table id="ventasHistoricoTable">
           <thead>
             <tr>
               <th>Fecha</th>
@@ -1172,6 +1182,7 @@
           <tbody id="ventasBody"></tbody>
         </table>
       </div>
+      <div id="ventasHistoricoStickyHead" class="sticky-table-head" hidden></div>
       <div class="card summary-card" id="ventasTotalCard" style="margin-top:12px;" hidden>
         <div>Total en caja</div>
         <div><span id="ventasTotal">Q.0.00</span></div>
@@ -1205,9 +1216,9 @@
               <th>Código</th>
               <th>Producto</th>
               <th>Afecto</th>
-              <th>Existencia actual</th>
-              <th>Costo unitario</th>
-              <th>Cantidad total</th>
+              <th>Existencia</th>
+              <th>Costo (c/u)</th>
+              <th>Cantidad</th>
               <th>Descuento</th>
               <th>Total</th>
               <th>Acciones</th>
@@ -1392,8 +1403,8 @@
           <div id="cajaTransCount">0 transacciones</div>
         </div>
       </div>
-      <div class="table-wrap">
-        <table>
+      <div class="table-wrap" id="productosTableWrap">
+        <table id="productosTable">
           <thead>
             <tr>
               <th>ID</th>
@@ -1617,6 +1628,7 @@
           <tbody id="productosBody"></tbody>
         </table>
       </div>
+      <div id="productosStickyHead" class="sticky-table-head" hidden></div>
     </section>
 
     <section id="inventario-compras-crear" class="form-wrap view">
@@ -2386,6 +2398,9 @@
     const ventasCount = document.getElementById('ventasCount');
     const ventasTotal = document.getElementById('ventasTotal');
     const ventasReload = document.getElementById('ventasReload');
+    const ventasHistoricoTableWrap = document.getElementById('ventasHistoricoTableWrap');
+    const ventasHistoricoTable = document.getElementById('ventasHistoricoTable');
+    const ventasHistoricoStickyHead = document.getElementById('ventasHistoricoStickyHead');
     const ventasResumenFecha = document.getElementById('ventasResumenFecha');
     const ventasResumenStatus = document.getElementById('ventasResumenStatus');
     const ventasResumenBody = document.getElementById('ventasResumenBody');
@@ -2415,6 +2430,9 @@
     const ventasResumenDetailClose = document.getElementById('ventasResumenDetailClose');
     const ventasResumenDetailCount = document.getElementById('ventasResumenDetailCount');
     const copyToast = document.getElementById('copyToast');
+    const productosTableWrap = document.getElementById('productosTableWrap');
+    const productosTable = document.getElementById('productosTable');
+    const productosStickyHead = document.getElementById('productosStickyHead');
     const facturacionFecha = document.getElementById('facturacionFecha');
     const facturacionGenerarButtons = Array.from(document.querySelectorAll('#facturacion-generar [data-tipo]'));
     const facturacionDescargar = document.getElementById('facturacionDescargar');
@@ -2795,6 +2813,12 @@
 
     if (facturacionLoteCard) facturacionLoteCard.hidden = true;
 
+    function updateProductosStickyOffset() {
+      const nav = document.querySelector('.nav');
+      const navBottom = nav ? nav.getBoundingClientRect().bottom : 0;
+      document.documentElement.style.setProperty('--productos-sticky-top', `${Math.max(navBottom, 0)}px`);
+    }
+
     const setActiveView = (viewId) => {
       const rootView = viewId.startsWith('ventas') ? 'ventas-menu'
         : viewId.startsWith('facturacion') ? 'facturacion-menu'
@@ -2870,7 +2894,10 @@
           renderAjustes();
         }
       }
-      requestAnimationFrame(syncVentasResumenStickyHead);
+      requestAnimationFrame(() => {
+        updateProductosStickyOffset();
+        syncStickyHeads();
+      });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -4573,12 +4600,16 @@
     ];
 
     filterTableBodies.forEach(initTableFilter);
-    syncVentasResumenStickyHead();
-    window.addEventListener('scroll', syncVentasResumenStickyHead, { passive: true });
-    window.addEventListener('resize', syncVentasResumenStickyHead);
-    if (ventasResumenTableWrap) {
-      ventasResumenTableWrap.addEventListener('scroll', syncVentasResumenStickyHead, { passive: true });
-    }
+    updateProductosStickyOffset();
+    syncStickyHeads();
+    window.addEventListener('scroll', syncStickyHeads, { passive: true });
+    window.addEventListener('resize', () => {
+      updateProductosStickyOffset();
+      syncStickyHeads();
+    });
+    [ventasHistoricoTableWrap, ventasResumenTableWrap, productosTableWrap].forEach((wrap) => {
+      if (wrap) wrap.addEventListener('scroll', syncStickyHeads, { passive: true });
+    });
 
     function renderTransaccionesVenta(items) {
       if (!ventasTransBody || !ventasTransStatus || !ventasTransCount) return;
@@ -4954,6 +4985,7 @@
         productosBody.innerHTML = '<tr><td colspan="9">Sin productos para este filtro.</td></tr>';
         productosCount.textContent = '0 productos';
         productosStatus.textContent = q ? 'Sin resultados' : 'Sin registros';
+        syncStickyHeads();
         return;
       }
       productosBody.innerHTML = rows.map(item => {
@@ -4984,6 +5016,7 @@
       }).join('');
       productosCount.textContent = `${rows.length} productos`;
       productosStatus.textContent = q ? 'Filtrado' : 'Actualizado';
+      syncStickyHeads();
     }
 
     function openProductoModal(mode, data = {}) {
@@ -5439,7 +5472,7 @@
       ventasResumenTotal.textContent = `Q.${totalGeneral.toFixed(2)}`;
       updateResumenVisibleTotal();
       ventasResumenStatus.textContent = 'Actualizado';
-      syncVentasResumenStickyHead();
+      syncStickyHeads();
     }
 
     function showFacturacionMessage(text, isError = false) {
@@ -5519,31 +5552,31 @@
       });
     }
 
-    function syncVentasResumenStickyHead() {
-      if (!ventasResumenTableWrap || !ventasResumenTable || !ventasResumenStickyHead) return;
-      const thead = ventasResumenTable.querySelector('thead');
-      if (!thead || ventasResumenTable.offsetParent === null) {
-        ventasResumenStickyHead.hidden = true;
+    function syncSingleStickyHead(tableWrap, table, stickyHead) {
+      if (!tableWrap || !table || !stickyHead) return;
+      const thead = table.querySelector('thead');
+      if (!thead || table.offsetParent === null) {
+        stickyHead.hidden = true;
         return;
       }
       const nav = document.querySelector('.nav');
       const navBottom = nav ? nav.getBoundingClientRect().bottom : 0;
-      const wrapRect = ventasResumenTableWrap.getBoundingClientRect();
+      const wrapRect = tableWrap.getBoundingClientRect();
       const headRect = thead.getBoundingClientRect();
       const shouldShow = headRect.top < navBottom && wrapRect.bottom > navBottom + headRect.height;
       if (!shouldShow) {
-        ventasResumenStickyHead.hidden = true;
+        stickyHead.hidden = true;
         return;
       }
 
       const signature = thead.innerHTML;
-      if (ventasResumenStickyHead.dataset.signature !== signature) {
-        ventasResumenStickyHead.innerHTML = `<table aria-hidden="true"><thead>${signature}</thead></table>`;
-        ventasResumenStickyHead.dataset.signature = signature;
+      if (stickyHead.dataset.signature !== signature) {
+        stickyHead.innerHTML = `<table aria-hidden="true"><thead>${signature}</thead></table>`;
+        stickyHead.dataset.signature = signature;
       }
 
       const sourceCells = Array.from(thead.querySelectorAll('th'));
-      const cloneTable = ventasResumenStickyHead.querySelector('table');
+      const cloneTable = stickyHead.querySelector('table');
       const cloneCells = cloneTable ? Array.from(cloneTable.querySelectorAll('th')) : [];
       sourceCells.forEach((cell, index) => {
         const width = cell.getBoundingClientRect().width;
@@ -5554,14 +5587,19 @@
         }
       });
       if (cloneTable) {
-        cloneTable.style.width = `${ventasResumenTable.getBoundingClientRect().width}px`;
-        cloneTable.style.transform = `translateX(${-ventasResumenTableWrap.scrollLeft}px)`;
+        cloneTable.style.width = `${table.getBoundingClientRect().width}px`;
+        cloneTable.style.transform = `translateX(${-tableWrap.scrollLeft}px)`;
       }
 
-      ventasResumenStickyHead.style.top = `${navBottom}px`;
-      ventasResumenStickyHead.style.left = `${wrapRect.left}px`;
-      ventasResumenStickyHead.style.width = `${wrapRect.width}px`;
-      ventasResumenStickyHead.hidden = false;
+      stickyHead.style.top = `${navBottom}px`;
+      stickyHead.style.left = `${wrapRect.left}px`;
+      stickyHead.style.width = `${wrapRect.width}px`;
+      stickyHead.hidden = false;
+    }
+
+    function syncStickyHeads() {
+      syncSingleStickyHead(ventasHistoricoTableWrap, ventasHistoricoTable, ventasHistoricoStickyHead);
+      syncSingleStickyHead(ventasResumenTableWrap, ventasResumenTable, ventasResumenStickyHead);
     }
 
     function jsonpRequest(url, onSuccess, onError) {

@@ -819,6 +819,30 @@
       border-bottom: 1px solid var(--stroke);
       white-space: nowrap;
     }
+    .sticky-table-head {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 25;
+      overflow: hidden;
+      border: 1px solid var(--stroke);
+      border-bottom: none;
+      border-radius: 16px 16px 0 0;
+      background: var(--table-bg);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(6px);
+    }
+    .sticky-table-head[hidden] {
+      display: none;
+    }
+    .sticky-table-head table {
+      margin: 0;
+      min-width: 0;
+      background: transparent;
+    }
+    .sticky-table-head thead th {
+      background: var(--table-bg);
+    }
     tbody td {
       padding: 10px 12px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -828,6 +852,14 @@
       background: var(--row-alt);
     }
     tbody tr:last-child td { border-bottom: none; }
+    tfoot td {
+      padding: 16px 12px;
+      font-size: 15px;
+      font-weight: 700;
+      border-top: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      white-space: nowrap;
+    }
     .table-meta {
       display: flex;
       align-items: center;
@@ -1166,13 +1198,15 @@
         <div>Total vendido del día</div>
         <div><span id="ventasResumenTotal">Q.0.00</span></div>
       </div>
-      <div class="table-wrap">
-        <table>
+      <div class="table-wrap" id="ventasResumenTableWrap">
+        <table id="ventasResumenTable">
           <thead>
             <tr>
               <th>Código</th>
               <th>Producto</th>
               <th>Afecto</th>
+              <th>Stock actual</th>
+              <th>Costo unitario</th>
               <th>Cantidad total</th>
               <th>Descuento</th>
               <th>Total</th>
@@ -1182,13 +1216,14 @@
           <tbody id="ventasResumenBody"></tbody>
           <tfoot>
             <tr>
-              <td colspan="5"><strong>Suma visible</strong></td>
+              <td colspan="7"><strong>Suma visible</strong></td>
               <td id="ventasResumenVisibleTotal">Q.0.00</td>
               <td>—</td>
             </tr>
           </tfoot>
         </table>
       </div>
+      <div id="ventasResumenStickyHead" class="sticky-table-head" hidden></div>
     </section>
 
     <section id="ventas-transacciones" class="form-wrap view">
@@ -2357,6 +2392,9 @@
     const ventasResumenCount = document.getElementById('ventasResumenCount');
     const ventasResumenTotal = document.getElementById('ventasResumenTotal');
     const ventasResumenVisibleTotal = document.getElementById('ventasResumenVisibleTotal');
+    const ventasResumenTableWrap = document.getElementById('ventasResumenTableWrap');
+    const ventasResumenTable = document.getElementById('ventasResumenTable');
+    const ventasResumenStickyHead = document.getElementById('ventasResumenStickyHead');
     const ventasTransDesde = document.getElementById('ventasTransDesde');
     const ventasTransHasta = document.getElementById('ventasTransHasta');
     const ventasTransStatus = document.getElementById('ventasTransStatus');
@@ -3399,6 +3437,8 @@
         const idxCodigo = cols.findIndex(cell => cell.includes('codigo'));
         const idxNombre = cols.findIndex(cell => cell.includes('nombre'));
         const idxAfecto = cols.findIndex(cell => cell.includes('afecto'));
+        const idxStock = cols.findIndex(cell => cell.includes('stock'));
+        const idxCosto = cols.findIndex(cell => cell.includes('costo'));
         const idxPrecio = cols.findIndex(cell => cell.includes('precio'));
         const idxProveedor = cols.findIndex(cell => cell.includes('proveedor'));
         catalog = json.table.rows.map(row => {
@@ -3407,6 +3447,8 @@
             codigo: cell(idxCodigo),
             nombre: cell(idxNombre),
             afecto: cell(idxAfecto),
+            stock_actual: normalizeNumber(cell(idxStock)) || 0,
+            costo_unitario: normalizeNumber(cell(idxCosto)) || 0,
             precio_venta: normalizeNumber(cell(idxPrecio)) || 0,
             proveedor: cell(idxProveedor),
           };
@@ -4409,9 +4451,9 @@
     function updateResumenVisibleTotal() {
       if (!ventasResumenBody || !ventasResumenVisibleTotal) return;
       const total = Array.from(ventasResumenBody.querySelectorAll('tr'))
-        .filter(row => !row.hidden && row.cells.length > 5)
+        .filter(row => !row.hidden && row.cells.length > 7)
         .reduce((sum, row) => {
-          const raw = row.cells[5] ? String(row.cells[5].textContent || '').trim() : '0';
+          const raw = row.cells[7] ? String(row.cells[7].textContent || '').trim() : '0';
           const normalized = raw.replace(/^Q\./, '');
           const value = Number(normalized);
           return sum + (isFinite(value) ? value : 0);
@@ -4526,6 +4568,12 @@
     ];
 
     filterTableBodies.forEach(initTableFilter);
+    syncVentasResumenStickyHead();
+    window.addEventListener('scroll', syncVentasResumenStickyHead, { passive: true });
+    window.addEventListener('resize', syncVentasResumenStickyHead);
+    if (ventasResumenTableWrap) {
+      ventasResumenTableWrap.addEventListener('scroll', syncVentasResumenStickyHead, { passive: true });
+    }
 
     function renderTransaccionesVenta(items) {
       if (!ventasTransBody || !ventasTransStatus || !ventasTransCount) return;
@@ -5347,6 +5395,8 @@
           codigo,
           nombre: name,
           afecto: Number(catalogItem.afecto || 0) === 1 ? 'SI' : 'NO',
+          stock_actual: Number(catalogItem.stock_actual || 0),
+          costo_unitario: Number(catalogItem.costo_unitario || 0),
           cantidad: data.cantidad,
           total: data.total,
           descuento: data.descuento,
@@ -5354,7 +5404,7 @@
       }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
       if (!rows.length) {
-        ventasResumenBody.innerHTML = '<tr><td colspan="7">Sin ventas para esta fecha.</td></tr>';
+        ventasResumenBody.innerHTML = '<tr><td colspan="9">Sin ventas para esta fecha.</td></tr>';
         ventasResumenCount.textContent = '0 productos';
         ventasResumenTotal.textContent = 'Q.0.00';
         if (ventasResumenVisibleTotal) ventasResumenVisibleTotal.textContent = 'Q.0.00';
@@ -5370,6 +5420,8 @@
             <td>${row.codigo}</td>
             <td>${row.nombre}</td>
             <td>${row.afecto}</td>
+            <td>${isFinite(row.stock_actual) ? row.stock_actual : 0}</td>
+            <td>Q.${isFinite(row.costo_unitario) ? row.costo_unitario.toFixed(2) : '0.00'}</td>
             <td>${row.cantidad}</td>
             <td>Q.${row.descuento.toFixed(2)}</td>
             <td>Q.${row.total.toFixed(2)}</td>
@@ -5382,6 +5434,7 @@
       ventasResumenTotal.textContent = `Q.${totalGeneral.toFixed(2)}`;
       updateResumenVisibleTotal();
       ventasResumenStatus.textContent = 'Actualizado';
+      syncVentasResumenStickyHead();
     }
 
     function showFacturacionMessage(text, isError = false) {
@@ -5459,6 +5512,51 @@
           cell.classList.add('copyable-cell');
         }
       });
+    }
+
+    function syncVentasResumenStickyHead() {
+      if (!ventasResumenTableWrap || !ventasResumenTable || !ventasResumenStickyHead) return;
+      const thead = ventasResumenTable.querySelector('thead');
+      if (!thead || ventasResumenTable.offsetParent === null) {
+        ventasResumenStickyHead.hidden = true;
+        return;
+      }
+      const nav = document.querySelector('.nav');
+      const navBottom = nav ? nav.getBoundingClientRect().bottom : 0;
+      const wrapRect = ventasResumenTableWrap.getBoundingClientRect();
+      const headRect = thead.getBoundingClientRect();
+      const shouldShow = wrapRect.top < navBottom && wrapRect.bottom > navBottom + headRect.height;
+      if (!shouldShow) {
+        ventasResumenStickyHead.hidden = true;
+        return;
+      }
+
+      const signature = thead.innerHTML;
+      if (ventasResumenStickyHead.dataset.signature !== signature) {
+        ventasResumenStickyHead.innerHTML = `<table aria-hidden="true"><thead>${signature}</thead></table>`;
+        ventasResumenStickyHead.dataset.signature = signature;
+      }
+
+      const sourceCells = Array.from(thead.querySelectorAll('th'));
+      const cloneTable = ventasResumenStickyHead.querySelector('table');
+      const cloneCells = cloneTable ? Array.from(cloneTable.querySelectorAll('th')) : [];
+      sourceCells.forEach((cell, index) => {
+        const width = cell.getBoundingClientRect().width;
+        if (cloneCells[index]) {
+          cloneCells[index].style.width = `${width}px`;
+          cloneCells[index].style.minWidth = `${width}px`;
+          cloneCells[index].style.maxWidth = `${width}px`;
+        }
+      });
+      if (cloneTable) {
+        cloneTable.style.width = `${ventasResumenTable.getBoundingClientRect().width}px`;
+        cloneTable.style.transform = `translateX(${-ventasResumenTableWrap.scrollLeft}px)`;
+      }
+
+      ventasResumenStickyHead.style.top = `${navBottom}px`;
+      ventasResumenStickyHead.style.left = `${wrapRect.left}px`;
+      ventasResumenStickyHead.style.width = `${wrapRect.width}px`;
+      ventasResumenStickyHead.hidden = false;
     }
 
     function jsonpRequest(url, onSuccess, onError) {

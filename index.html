@@ -6476,16 +6476,21 @@
       const sourceCells = Array.from(thead.querySelectorAll('th'));
       const cloneTable = stickyHead.querySelector('table');
       const cloneCells = cloneTable ? Array.from(cloneTable.querySelectorAll('th')) : [];
+      const visibleSourceCells = sourceCells.filter((cell) => cell.offsetParent !== null && cell.getBoundingClientRect().width > 0);
+      stickyHead.style.overflow = 'hidden';
       sourceCells.forEach((cell, index) => {
         const width = cell.getBoundingClientRect().width;
         if (cloneCells[index]) {
+          cloneCells[index].style.display = width > 0 ? '' : 'none';
           cloneCells[index].style.width = `${width}px`;
           cloneCells[index].style.minWidth = `${width}px`;
           cloneCells[index].style.maxWidth = `${width}px`;
         }
       });
       if (cloneTable) {
-        cloneTable.style.width = `${table.getBoundingClientRect().width}px`;
+        const totalVisibleWidth = visibleSourceCells.reduce((sum, cell) => sum + cell.getBoundingClientRect().width, 0);
+        cloneTable.style.width = `${Math.max(totalVisibleWidth, table.getBoundingClientRect().width)}px`;
+        cloneTable.style.minWidth = `${Math.max(totalVisibleWidth, table.getBoundingClientRect().width)}px`;
         cloneTable.style.transform = `translateX(${-tableWrap.scrollLeft}px)`;
       }
 

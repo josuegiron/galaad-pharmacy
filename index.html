@@ -1001,6 +1001,51 @@
       background: rgba(255, 255, 255, 0.03);
       box-shadow: none;
     }
+    thead th.table-resizable {
+      position: relative;
+      padding-right: 20px;
+    }
+    .column-resize-handle {
+      position: absolute;
+      top: 0;
+      right: -5px;
+      width: 12px;
+      height: 100%;
+      cursor: col-resize;
+      touch-action: none;
+      z-index: 3;
+      background: transparent;
+      border: none;
+      outline: none;
+      box-shadow: none;
+      padding: 0;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .column-resize-handle::before {
+      content: '';
+      position: absolute;
+      top: 18%;
+      left: 50%;
+      width: 3px;
+      height: 64%;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: rgba(214, 223, 255, 0.22);
+      transition: background 0.18s ease, opacity 0.18s ease;
+      opacity: 0.7;
+    }
+    .column-resize-handle:hover::before,
+    .column-resize-handle:active::before {
+      background: rgba(214, 255, 120, 0.92);
+      opacity: 1;
+    }
+    table.has-manual-widths thead th,
+    table.has-manual-widths tbody td,
+    table.has-manual-widths tfoot td {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .sticky-table-head {
       position: fixed;
       left: 0;
@@ -2986,18 +3031,25 @@
     }
 
     function getStoredTableColumnState(tbodyId) {
-      if (!tbodyId) return { hiddenColumns: [], columnOrder: [] };
+      if (!tbodyId) return { hiddenColumns: [], columnOrder: [], columnWidths: {} };
       const stored = getStoredTableColumns();
       const state = stored[tbodyId];
       if (Array.isArray(state)) {
-        return { hiddenColumns: state, columnOrder: [] };
+        return { hiddenColumns: state, columnOrder: [], columnWidths: {} };
       }
       if (!state || typeof state !== 'object') {
-        return { hiddenColumns: [], columnOrder: [] };
+        return { hiddenColumns: [], columnOrder: [], columnWidths: {} };
       }
+      const rawWidths = state.columnWidths && typeof state.columnWidths === 'object' ? state.columnWidths : {};
+      const columnWidths = {};
+      Object.entries(rawWidths).forEach(([key, value]) => {
+        const width = Number(value);
+        if (isFinite(width) && width > 0) columnWidths[key] = width;
+      });
       return {
         hiddenColumns: Array.isArray(state.hiddenColumns) ? state.hiddenColumns : [],
         columnOrder: Array.isArray(state.columnOrder) ? state.columnOrder : [],
+        columnWidths,
       };
     }
 
@@ -3007,12 +3059,19 @@
         const stored = getStoredTableColumns();
         const hiddenColumns = Array.isArray(columnState && columnState.hiddenColumns) ? columnState.hiddenColumns : [];
         const columnOrder = Array.isArray(columnState && columnState.columnOrder) ? columnState.columnOrder : [];
-        if (!hiddenColumns.length && !columnOrder.length) {
+        const rawWidths = columnState && columnState.columnWidths && typeof columnState.columnWidths === 'object' ? columnState.columnWidths : {};
+        const columnWidths = {};
+        Object.entries(rawWidths).forEach(([key, value]) => {
+          const width = Number(value);
+          if (isFinite(width) && width > 0) columnWidths[String(key)] = width;
+        });
+        if (!hiddenColumns.length && !columnOrder.length && !Object.keys(columnWidths).length) {
           delete stored[tbodyId];
         } else {
           stored[tbodyId] = {
             hiddenColumns: hiddenColumns.map(String),
             columnOrder: columnOrder.map(String),
+            columnWidths,
           };
         }
         localStorage.setItem(TABLE_COLUMNS_KEY, JSON.stringify(stored));
@@ -4502,6 +4561,7 @@
     let activeTableFilter = null;
     let activeTableColumns = null;
     let activeColumnDrag = null;
+    let activeColumnResize = null;
     const stickyTableEntries = [];
     let cajaTransLoading = false;
     let cajaCredLoading = false;
@@ -4946,7 +5006,48 @@
       setStoredTableColumnState(tbodyId, {
         hiddenColumns: state.hiddenColumns,
         columnOrder: state.columnOrder,
+        columnWidths: state.columnWidths,
       });
+    }
+
+    function applyTableColumnWidths(tbodyId) {
+      const state = tableFilters.get(tbodyId);
+      if (!state) return;
+      const canManageFooter = !(state.table.tFoot && Array.from(state.table.tFoot.rows).some((row) => Array.from(row.cells).some((cell) => Number(cell.colSpan || 1) > 1)));
+      const hasManualWidths = Object.keys(state.columnWidths || {}).length > 0;
+      state.table.classList.toggle('has-manual-widths', hasManualWidths);
+      state.columns.forEach((col) => {
+        const width = Number(state.columnWidths && state.columnWidths[col.key]);
+        const size = isFinite(width) && width > 0 ? `${width}px` : '';
+        if (col.th) {
+          col.th.style.width = size;
+          col.th.style.minWidth = size;
+          col.th.style.maxWidth = size;
+        }
+        Array.from(state.tbody.querySelectorAll('tr')).forEach((row) => {
+          const cell = row.querySelector(`[data-col-key="${col.key}"]`);
+          if (!cell) return;
+          cell.style.width = size;
+          cell.style.minWidth = size;
+          cell.style.maxWidth = size;
+        });
+        if (canManageFooter) {
+          const tfootRows = state.table.tFoot ? Array.from(state.table.tFoot.rows) : [];
+          tfootRows.forEach((row) => {
+            const cell = row.querySelector(`[data-col-key="${col.key}"]`);
+            if (!cell) return;
+            cell.style.width = size;
+            cell.style.minWidth = size;
+            cell.style.maxWidth = size;
+          });
+        }
+      });
+      setStoredTableColumnState(tbodyId, {
+        hiddenColumns: state.hiddenColumns,
+        columnOrder: state.columnOrder,
+        columnWidths: state.columnWidths,
+      });
+      syncStickyHeads();
     }
 
     function syncTableBodyCellKeys(tbodyId) {
@@ -4997,7 +5098,9 @@
       setStoredTableColumnState(tbodyId, {
         hiddenColumns: state.hiddenColumns,
         columnOrder: state.columnOrder,
+        columnWidths: state.columnWidths,
       });
+      applyTableColumnWidths(tbodyId);
       syncStickyHeads();
     }
 
@@ -5049,6 +5152,7 @@
         const type = inferColumnType(label);
         const filterable = isFilterableLabel(label);
         const hideable = isHideableLabel(label);
+        const resizable = hideable;
         const key = `c${index}`;
         th.setAttribute('data-col-key', key);
         th.innerHTML = '';
@@ -5072,7 +5176,17 @@
         } else {
           th.textContent = label;
         }
-        return { key, label, type, index, originalIndex: index, filterable, hideable, th };
+        if (resizable) {
+          th.classList.add('table-resizable');
+          const resizeHandle = document.createElement('button');
+          resizeHandle.type = 'button';
+          resizeHandle.className = 'column-resize-handle';
+          resizeHandle.setAttribute('data-table', tbodyId);
+          resizeHandle.setAttribute('data-key', key);
+          resizeHandle.setAttribute('aria-label', `Cambiar ancho de ${label || 'columna'}`);
+          th.appendChild(resizeHandle);
+        }
+        return { key, label, type, index, originalIndex: index, filterable, hideable, resizable, th };
       });
       const badge = ensureFilterBadge(tbodyId, table);
       const storedState = getStoredTableFilterState(tbodyId);
@@ -5095,6 +5209,9 @@
       const restoredColumnOrder = Array.isArray(storedHiddenColumns.columnOrder)
         ? storedHiddenColumns.columnOrder.filter(key => hideableColumnKeys.has(key))
         : [];
+      const restoredColumnWidths = storedHiddenColumns.columnWidths && typeof storedHiddenColumns.columnWidths === 'object'
+        ? Object.fromEntries(Object.entries(storedHiddenColumns.columnWidths).filter(([key]) => validColumnKeys.has(key)))
+        : {};
       const mergedHideableOrder = restoredColumnOrder.slice();
       columns.filter(col => col.hideable).forEach((col) => {
         if (!mergedHideableOrder.includes(col.key)) mergedHideableOrder.push(col.key);
@@ -5121,12 +5238,14 @@
         sortStack: restoredSortStack,
         hiddenColumns: restoredHiddenColumns,
         columnOrder: finalOrderedKeys,
+        columnWidths: restoredColumnWidths,
         isApplying: false,
       });
       applyTableColumnOrder(tbodyId);
       updateTableFilterButtons(tbodyId);
       updateTableFilterBadge(tbodyId);
       applyTableColumnVisibility(tbodyId);
+      applyTableColumnWidths(tbodyId);
       const observer = new MutationObserver(() => {
         const current = tableFilters.get(tbodyId);
         if (current && current.isApplying) return;
@@ -5220,6 +5339,7 @@
       }
 
       applyTableColumnVisibility(tbodyId);
+      applyTableColumnWidths(tbodyId);
       setStoredTableFilterState(tbodyId, {
         filters: state.filters,
         sortStack: state.sortStack,
@@ -6997,6 +7117,38 @@
       commitTableColumnOrderFromModal(tableId);
     };
 
+    const moveActiveColumnResize = (event) => {
+      if (!activeColumnResize) return;
+      if (event.pointerId !== undefined && event.pointerId !== activeColumnResize.pointerId) return;
+      event.preventDefault();
+      const state = tableFilters.get(activeColumnResize.tableId || '');
+      if (!state) return;
+      const nextWidth = Math.max(72, Math.round(activeColumnResize.startWidth + (event.clientX - activeColumnResize.startX)));
+      state.columnWidths = {
+        ...state.columnWidths,
+        [activeColumnResize.key]: nextWidth,
+      };
+      applyTableColumnWidths(activeColumnResize.tableId);
+    };
+
+    const finishColumnResize = (event) => {
+      if (!activeColumnResize) return;
+      if (event.pointerId !== undefined && event.pointerId !== activeColumnResize.pointerId) return;
+      const { handle, pointerId, tableId } = activeColumnResize;
+      if (handle.releasePointerCapture && handle.hasPointerCapture && handle.hasPointerCapture(pointerId)) {
+        handle.releasePointerCapture(pointerId);
+      }
+      const state = tableFilters.get(tableId || '');
+      if (state) {
+        setStoredTableColumnState(tableId, {
+          hiddenColumns: state.hiddenColumns,
+          columnOrder: state.columnOrder,
+          columnWidths: state.columnWidths,
+        });
+      }
+      activeColumnResize = null;
+    };
+
     if (tableColumnsMenu) {
       tableColumnsMenu.addEventListener('click', (event) => {
         const actionBtn = event.target.closest('button[data-action]');
@@ -7068,7 +7220,31 @@
     document.addEventListener('pointermove', moveActiveColumnDrag, { passive: false });
     document.addEventListener('pointerup', finishColumnDrag);
     document.addEventListener('pointercancel', finishColumnDrag);
+    document.addEventListener('pointermove', moveActiveColumnResize, { passive: false });
+    document.addEventListener('pointerup', finishColumnResize);
+    document.addEventListener('pointercancel', finishColumnResize);
+    document.addEventListener('pointerdown', (event) => {
+      const handle = event.target.closest('.column-resize-handle[data-table][data-key]');
+      if (!handle) return;
+      const tableId = handle.getAttribute('data-table');
+      const key = handle.getAttribute('data-key');
+      const state = tableFilters.get(tableId || '');
+      const col = state ? state.columns.find((item) => item.key === key) : null;
+      if (!state || !col || !col.th) return;
+      event.preventDefault();
+      event.stopPropagation();
+      activeColumnResize = {
+        pointerId: event.pointerId,
+        tableId,
+        key,
+        handle,
+        startX: event.clientX,
+        startWidth: col.th.getBoundingClientRect().width || 0,
+      };
+      if (handle.setPointerCapture) handle.setPointerCapture(event.pointerId);
+    });
     document.addEventListener('click', (event) => {
+      if (event.target.closest('.column-resize-handle[data-table][data-key]')) return;
       const filterBtn = event.target.closest('button.filter-btn[data-table][data-key]');
       if (filterBtn) {
         const tableId = filterBtn.getAttribute('data-table');
@@ -7564,14 +7740,17 @@
           tableFilters.forEach((state, tbodyId) => {
             state.hiddenColumns = [];
             state.columnOrder = state.columns.slice().sort((a, b) => a.originalIndex - b.originalIndex).map(col => col.key);
+            state.columnWidths = {};
             applyTableColumnOrder(tbodyId);
             applyTableColumnVisibility(tbodyId);
+            applyTableColumnWidths(tbodyId);
           });
         } else {
           tableFilters.forEach((state, tbodyId) => {
             setStoredTableColumnState(tbodyId, {
               hiddenColumns: state.hiddenColumns,
               columnOrder: state.columnOrder,
+              columnWidths: state.columnWidths,
             });
           });
         }

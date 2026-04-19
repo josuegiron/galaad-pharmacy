@@ -217,6 +217,13 @@
       color: var(--text);
       width: 100%;
     }
+    .settings-menu .switch-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      cursor: pointer;
+    }
     .settings-menu .switch-label-group {
       display: flex;
       align-items: center;
@@ -1217,46 +1224,56 @@
         <div class="settings-menu" id="settingsMenu" hidden>
           <button type="button" class="panel-close-btn" id="settingsCloseTop" aria-label="Cerrar configuración">×</button>
           <div class="settings-title">Configuracion</div>
-          <label class="switch-row">
+          <div class="switch-row">
             <span class="switch-label-group">
               <span>Modo oscuro</span>
               <button type="button" class="help-btn" data-help="config-theme" aria-label="Ayuda de modo oscuro">?</button>
             </span>
-            <input type="checkbox" id="themeToggle">
-            <span class="switch"></span>
-          </label>
-          <label class="switch-row" style="margin-top:10px;">
+            <label class="switch-toggle" for="themeToggle">
+              <input type="checkbox" id="themeToggle">
+              <span class="switch"></span>
+            </label>
+          </div>
+          <div class="switch-row" style="margin-top:10px;">
             <span class="switch-label-group">
               <span>Recordar fechas de filtros</span>
               <button type="button" class="help-btn" data-help="config-filter-dates" aria-label="Ayuda de recordar fechas de filtros">?</button>
             </span>
-            <input type="checkbox" id="rememberFilterDatesToggle">
-            <span class="switch"></span>
-          </label>
-          <label class="switch-row" style="margin-top:10px;">
+            <label class="switch-toggle" for="rememberFilterDatesToggle">
+              <input type="checkbox" id="rememberFilterDatesToggle">
+              <span class="switch"></span>
+            </label>
+          </div>
+          <div class="switch-row" style="margin-top:10px;">
             <span class="switch-label-group">
               <span>Recordar selección en tablas</span>
               <button type="button" class="help-btn" data-help="config-table-selection" aria-label="Ayuda de recordar selección en tablas">?</button>
             </span>
-            <input type="checkbox" id="rememberTableSelectionToggle">
-            <span class="switch"></span>
-          </label>
-          <label class="switch-row" style="margin-top:10px;">
+            <label class="switch-toggle" for="rememberTableSelectionToggle">
+              <input type="checkbox" id="rememberTableSelectionToggle">
+              <span class="switch"></span>
+            </label>
+          </div>
+          <div class="switch-row" style="margin-top:10px;">
             <span class="switch-label-group">
               <span>Recordar filtros de tablas</span>
               <button type="button" class="help-btn" data-help="config-table-filters" aria-label="Ayuda de recordar filtros de tablas">?</button>
             </span>
-            <input type="checkbox" id="rememberTableFiltersToggle">
-            <span class="switch"></span>
-          </label>
-          <label class="switch-row" style="margin-top:10px;">
+            <label class="switch-toggle" for="rememberTableFiltersToggle">
+              <input type="checkbox" id="rememberTableFiltersToggle">
+              <span class="switch"></span>
+            </label>
+          </div>
+          <div class="switch-row" style="margin-top:10px;">
             <span class="switch-label-group">
               <span>Recordar columnas de tablas</span>
               <button type="button" class="help-btn" data-help="config-table-columns" aria-label="Ayuda de recordar columnas de tablas">?</button>
             </span>
-            <input type="checkbox" id="rememberTableColumnsToggle">
-            <span class="switch"></span>
-          </label>
+            <label class="switch-toggle" for="rememberTableColumnsToggle">
+              <input type="checkbox" id="rememberTableColumnsToggle">
+              <span class="switch"></span>
+            </label>
+          </div>
         </div>
       </div>
     </div>

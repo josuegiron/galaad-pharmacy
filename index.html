@@ -174,7 +174,7 @@
       background: var(--card);
       border: 1px solid var(--stroke);
       border-radius: 14px;
-      padding: 12px;
+      padding: 20px 12px 12px;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
       backdrop-filter: blur(6px);
     }
@@ -183,7 +183,29 @@
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--muted);
-      margin-bottom: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--stroke);
+    }
+    .panel-close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .panel-close-btn:hover {
+      border-color: rgba(233, 255, 112, 0.4);
     }
     .settings-menu .switch-row {
       display: flex;
@@ -808,14 +830,16 @@
       background: var(--filter-menu-bg);
       border: 1px solid var(--filter-menu-border);
       border-radius: 14px;
-      padding: 12px;
+      padding: 20px 12px 12px;
       box-shadow: 0 18px 40px var(--filter-menu-shadow);
       color: var(--filter-menu-text);
       z-index: 40;
     }
     .filter-title {
       font-weight: 700;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--stroke);
     }
     .filter-actions {
       display: grid;
@@ -1131,6 +1155,7 @@
           </svg>
         </button>
         <div class="settings-menu" id="settingsMenu" hidden>
+          <button type="button" class="panel-close-btn" id="settingsCloseTop" aria-label="Cerrar configuración">×</button>
           <div class="settings-title">Configuracion</div>
           <label class="switch-row">
             <span class="switch-label-group">
@@ -1172,9 +1197,6 @@
             <input type="checkbox" id="rememberTableColumnsToggle">
             <span class="switch"></span>
           </label>
-          <div class="modal-actions" style="margin-top:12px;">
-            <button type="button" class="btn" id="settingsClose">Cerrar</button>
-          </div>
         </div>
       </div>
     </div>
@@ -2366,6 +2388,7 @@
   </div>
 
   <div id="ventasTransFilterMenu" class="filter-menu" hidden>
+    <button type="button" class="panel-close-btn" id="tableFilterClose" aria-label="Cerrar filtro">×</button>
     <div class="filter-title" id="ventasTransFilterTitle">Filtrar</div>
     <div class="filter-actions">
       <button type="button" class="btn compact" data-action="sort-asc">Ordenar asc</button>
@@ -2379,11 +2402,11 @@
   </div>
 
   <div id="tableColumnsMenu" class="filter-menu" hidden>
+    <button type="button" class="panel-close-btn" id="tableColumnsClose" aria-label="Cerrar columnas">×</button>
     <div class="filter-title" id="tableColumnsTitle">Columnas</div>
     <div class="column-fields" id="tableColumnsFields"></div>
     <div class="filter-footer">
       <button type="button" class="btn compact" data-action="show-all">Mostrar todas</button>
-      <button type="button" class="btn compact primary" data-action="close-columns">Cerrar</button>
     </div>
   </div>
 
@@ -2578,9 +2601,11 @@
     const tableFilterMenu = document.getElementById('ventasTransFilterMenu');
     const tableFilterTitle = document.getElementById('ventasTransFilterTitle');
     const tableFilterFields = document.getElementById('ventasTransFilterFields');
+    const tableFilterClose = document.getElementById('tableFilterClose');
     const tableColumnsMenu = document.getElementById('tableColumnsMenu');
     const tableColumnsTitle = document.getElementById('tableColumnsTitle');
     const tableColumnsFields = document.getElementById('tableColumnsFields');
+    const tableColumnsClose = document.getElementById('tableColumnsClose');
     const ventasResumenDetail = document.getElementById('ventasResumenDetail');
     const ventasResumenDetailTitle = document.getElementById('ventasResumenDetailTitle');
     const ventasResumenDetailSubtitle = document.getElementById('ventasResumenDetailSubtitle');
@@ -2604,7 +2629,7 @@
     const sectionLabel = document.getElementById('sectionLabel');
     const settingsToggle = document.getElementById('settingsToggle');
     const settingsMenu = document.getElementById('settingsMenu');
-    const settingsClose = document.getElementById('settingsClose');
+    const settingsCloseTop = document.getElementById('settingsCloseTop');
     const themeToggle = document.getElementById('themeToggle');
     const rememberFilterDatesToggle = document.getElementById('rememberFilterDatesToggle');
     const rememberTableSelectionToggle = document.getElementById('rememberTableSelectionToggle');
@@ -7170,8 +7195,8 @@
         }
       });
     }
-    if (settingsClose) {
-      settingsClose.addEventListener('click', (event) => {
+    if (settingsCloseTop) {
+      settingsCloseTop.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
         closeSettingsMenu();
@@ -7250,6 +7275,20 @@
         }
         const activeView = views.find(view => view.classList.contains('active'));
         if (activeView) setActiveView(activeView.id);
+      });
+    }
+    if (tableFilterClose) {
+      tableFilterClose.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeTableFilterMenu();
+      });
+    }
+    if (tableColumnsClose) {
+      tableColumnsClose.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeTableColumnsMenu();
       });
     }
     filterDateFields.forEach(({ el }) => {

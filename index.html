@@ -1616,6 +1616,14 @@
           Buscar
           <input type="text" id="productosSearch" placeholder="Código, nombre o proveedor">
         </label>
+        <label style="margin-top:10px;">
+          Existencia
+          <select id="productosStockFilter">
+            <option value="all">Todos</option>
+            <option value="in_stock">Con existencia</option>
+            <option value="out_of_stock">Sin existencias</option>
+          </select>
+        </label>
         <p class="hint" style="margin-top:8px;">Busca en el catálogo de productos.</p>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
           <button type="button" class="btn" id="productosAdd">Agregar producto</button>
@@ -2542,6 +2550,7 @@
     const cierresCount = document.getElementById('cierresCount');
     const cierresReload = document.getElementById('cierresReload');
     const productosSearch = document.getElementById('productosSearch');
+    const productosStockFilter = document.getElementById('productosStockFilter');
     const productosAdd = document.getElementById('productosAdd');
     const productosReload = document.getElementById('productosReload');
     const productosStatus = document.getElementById('productosStatus');
@@ -5039,7 +5048,11 @@
     function renderProductos() {
       if (!productosBody || !productosStatus || !productosCount) return;
       const q = productosSearch ? productosSearch.value.trim().toLowerCase() : '';
+      const stockFilter = productosStockFilter ? productosStockFilter.value : 'all';
       const rows = productosData.filter(item => {
+        const stock = Number(item.stock_actual || 0);
+        if (stockFilter === 'in_stock' && !(stock > 0)) return false;
+        if (stockFilter === 'out_of_stock' && !(stock < 1)) return false;
         if (!q) return true;
         const codigo = String(item.codigo || '').toLowerCase();
         const nombre = String(item.nombre || '').toLowerCase();
@@ -5049,7 +5062,7 @@
       if (!rows.length) {
         productosBody.innerHTML = '<tr><td colspan="9">Sin productos para este filtro.</td></tr>';
         productosCount.textContent = '0 productos';
-        productosStatus.textContent = q ? 'Sin resultados' : 'Sin registros';
+        productosStatus.textContent = q || stockFilter !== 'all' ? 'Sin resultados' : 'Sin registros';
         syncStickyHeads();
         return;
       }
@@ -5080,7 +5093,7 @@
         `;
       }).join('');
       productosCount.textContent = `${rows.length} productos`;
-      productosStatus.textContent = q ? 'Filtrado' : 'Actualizado';
+      productosStatus.textContent = q || stockFilter !== 'all' ? 'Filtrado' : 'Actualizado';
       syncStickyHeads();
     }
 
@@ -6302,6 +6315,15 @@
     }
     if (productosSearch) {
       productosSearch.addEventListener('input', () => {
+        if (!productosLoaded) {
+          loadProductos();
+        } else {
+          renderProductos();
+        }
+      });
+    }
+    if (productosStockFilter) {
+      productosStockFilter.addEventListener('change', () => {
         if (!productosLoaded) {
           loadProductos();
         } else {

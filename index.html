@@ -3272,6 +3272,10 @@
               <button type="button" class="btn compact sign-toggle-btn" data-action="toggle-sign">+/-</button>
             </div>
           </label>
+          <label>
+            Comentario
+            <input type="text" class="comentario" value="${item.comentario || ''}" placeholder="Motivo del ajuste">
+          </label>
         </div>
       `;
       card.querySelector('.remove-btn').addEventListener('click', () => {
@@ -3554,7 +3558,9 @@
             const qtyRaw = Number(row.querySelector('.cantidad').value || 0);
             const codigo = (row.dataset.codigo || '').trim();
             const nombre = (row.dataset.producto || '').trim();
-            const comentario = nombre ? `Ajuste de inventario: ${nombre}` : 'Ajuste de inventario';
+            const comentarioInput = row.querySelector('.comentario');
+            const comentarioRaw = comentarioInput ? String(comentarioInput.value || '').trim() : '';
+            const comentario = comentarioRaw || (nombre ? `Ajuste de inventario: ${nombre}` : 'Ajuste de inventario');
             const proveedor = (row.dataset.proveedor || '').trim();
             return {
               codigo,

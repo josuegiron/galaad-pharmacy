@@ -1228,21 +1228,23 @@
           <thead>
             <tr>
               <th>Código</th>
-              <th>Producto</th>
-              <th>Afecto</th>
-              <th>Existencia</th>
-              <th>Precio (c/u)</th>
+              <th>Descripción</th>
               <th>Cantidad</th>
+              <th>Precio (c/u)</th>
               <th>Descuento</th>
               <th>Total</th>
+              <th>Existencia</th>
+              <th>Afecto</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="ventasResumenBody"></tbody>
           <tfoot>
             <tr>
-              <td colspan="7"><strong>Suma visible</strong></td>
+              <td colspan="5"><strong>Suma visible</strong></td>
               <td id="ventasResumenVisibleTotal">Q.0.00</td>
+              <td>—</td>
+              <td>—</td>
               <td>—</td>
             </tr>
           </tfoot>
@@ -5520,12 +5522,12 @@
           <tr>
             <td>${row.codigo}</td>
             <td>${row.nombre}</td>
-            <td>${row.afecto}</td>
-            <td>${isFinite(row.stock_actual) ? row.stock_actual : 0}</td>
-            <td>Q.${isFinite(row.costo_unitario) ? row.costo_unitario.toFixed(2) : '0.00'}</td>
             <td>${row.cantidad}</td>
+            <td>Q.${isFinite(row.costo_unitario) ? row.costo_unitario.toFixed(2) : '0.00'}</td>
             <td>Q.${row.descuento.toFixed(2)}</td>
             <td>Q.${row.total.toFixed(2)}</td>
+            <td>${isFinite(row.stock_actual) ? row.stock_actual : 0}</td>
+            <td>${row.afecto}</td>
             <td><button type="button" class="btn compact" data-action="resumen-detalle" data-codigo="${row.codigo}">Ver detalle</button></td>
           </tr>
         `;

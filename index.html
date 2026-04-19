@@ -1075,6 +1075,16 @@
             <input type="checkbox" id="themeToggle">
             <span class="switch"></span>
           </label>
+          <label class="switch-row" style="margin-top:10px;">
+            <span>Recordar fechas de filtros</span>
+            <input type="checkbox" id="rememberFilterDatesToggle">
+            <span class="switch"></span>
+          </label>
+          <label class="switch-row" style="margin-top:10px;">
+            <span>Recordar selección en tablas</span>
+            <input type="checkbox" id="rememberTableSelectionToggle">
+            <span class="switch"></span>
+          </label>
         </div>
       </div>
     </div>
@@ -2493,6 +2503,8 @@
     const settingsToggle = document.getElementById('settingsToggle');
     const settingsMenu = document.getElementById('settingsMenu');
     const themeToggle = document.getElementById('themeToggle');
+    const rememberFilterDatesToggle = document.getElementById('rememberFilterDatesToggle');
+    const rememberTableSelectionToggle = document.getElementById('rememberTableSelectionToggle');
     const lotesFecha = document.getElementById('lotesFecha');
     const lotesStatus = document.getElementById('lotesStatus');
     const lotesBody = document.getElementById('lotesBody');
@@ -2623,6 +2635,9 @@
     const viewButtons = [...document.querySelectorAll('[data-view]')];
 
     const THEME_KEY = 'galaad-theme';
+    const REMEMBER_FILTER_DATES_KEY = 'galaad-remember-filter-dates';
+    const REMEMBER_TABLE_SELECTION_KEY = 'galaad-remember-table-selection';
+    const FILTER_DATES_KEY = 'galaad-filter-dates';
     const TRACKED_TABLE_ROWS_KEY = 'galaad-tracked-table-rows';
     const THEME_COLORS = { dark: '#0c1020', light: '#f5f7fb' };
     function applyTheme(theme) {
@@ -2641,7 +2656,54 @@
     }
     initTheme();
 
+    function getRememberFilterDates() {
+      const stored = localStorage.getItem(REMEMBER_FILTER_DATES_KEY);
+      return stored === null ? true : stored === '1';
+    }
+
+    function setRememberFilterDates(enabled) {
+      localStorage.setItem(REMEMBER_FILTER_DATES_KEY, enabled ? '1' : '0');
+      if (rememberFilterDatesToggle) rememberFilterDatesToggle.checked = enabled;
+    }
+
+    function getRememberTableSelection() {
+      const stored = localStorage.getItem(REMEMBER_TABLE_SELECTION_KEY);
+      return stored === null ? true : stored === '1';
+    }
+
+    function setRememberTableSelection(enabled) {
+      localStorage.setItem(REMEMBER_TABLE_SELECTION_KEY, enabled ? '1' : '0');
+      if (rememberTableSelectionToggle) rememberTableSelectionToggle.checked = enabled;
+    }
+
+    function getStoredFilterDates() {
+      try {
+        const raw = localStorage.getItem(FILTER_DATES_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function setStoredFilterDate(id, value) {
+      if (!id) return;
+      const stored = getStoredFilterDates();
+      if (!value) {
+        delete stored[id];
+      } else {
+        stored[id] = String(value);
+      }
+      localStorage.setItem(FILTER_DATES_KEY, JSON.stringify(stored));
+    }
+
+    function clearStoredFilterDates() {
+      localStorage.removeItem(FILTER_DATES_KEY);
+    }
+
     function getTrackedTableRows() {
+      if (!getRememberTableSelection()) return {};
       try {
         const raw = localStorage.getItem(TRACKED_TABLE_ROWS_KEY);
         if (!raw) return {};
@@ -2662,6 +2724,7 @@
 
     function setTrackedRowMarker(tbodyId, marker) {
       if (!tbodyId) return;
+      if (!getRememberTableSelection()) return;
       try {
         const stored = getTrackedTableRows();
         if (!marker || !marker.key || !marker.context) {
@@ -2678,6 +2741,9 @@
     }
 
     function getTrackedRowAttrs(tbodyId, key, context) {
+      if (!getRememberTableSelection()) {
+        return `class="" data-track-key="${String(key || '')}" data-track-context="${String(context || '')}"`;
+      }
       const marker = getTrackedRowMarker(tbodyId);
       const rowKey = String(key || '');
       const rowContext = String(context || '');
@@ -2949,6 +3015,9 @@
     }
 
     const setActiveView = (viewId) => {
+      if (!getRememberFilterDates()) {
+        applyDefaultFilterDates();
+      }
       const rootView = rootViewsByViewId[viewId] || (viewId.startsWith('ventas') ? 'ventas-menu'
         : viewId.startsWith('facturacion') ? 'facturacion-menu'
         : viewId.startsWith('inventario') ? 'inventario-menu'
@@ -3093,26 +3162,48 @@
     const today = toLocalISODate(new Date());
     const monthStart = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
     const monthEnd = toLocalISODate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0));
+    const filterDateFields = [
+      { el: ventasFecha, defaultValue: () => today },
+      { el: ventasResumenFecha, defaultValue: () => today },
+      { el: facturacionFecha, defaultValue: () => today },
+      { el: lotesFecha, defaultValue: () => today },
+      { el: cajaFecha, defaultValue: () => today },
+      { el: comprasFecha, defaultValue: () => today },
+      { el: ajustesFecha, defaultValue: () => today },
+      { el: ventasTransDesde, defaultValue: () => monthStart },
+      { el: ventasTransHasta, defaultValue: () => monthEnd },
+      { el: cajaTransDesde, defaultValue: () => monthStart },
+      { el: cajaTransHasta, defaultValue: () => monthEnd },
+      { el: cajaCredDesde, defaultValue: () => monthStart },
+      { el: cajaCredHasta, defaultValue: () => monthEnd },
+      { el: cajaPagosDesde, defaultValue: () => monthStart },
+      { el: cajaPagosHasta, defaultValue: () => monthEnd },
+      { el: cierresDesde, defaultValue: () => monthStart },
+      { el: cierresHasta, defaultValue: () => monthEnd },
+    ];
+    const applyDefaultFilterDates = () => {
+      filterDateFields.forEach(({ el, defaultValue }) => {
+        if (!el) return;
+        el.value = defaultValue();
+      });
+    };
+    const restoreFilterDates = () => {
+      const stored = getStoredFilterDates();
+      filterDateFields.forEach(({ el, defaultValue }) => {
+        if (!el) return;
+        el.value = stored[el.id] || defaultValue();
+      });
+    };
     form.fecha.value = today;
-    if (ventasFecha) ventasFecha.value = today;
-    if (ventasResumenFecha) ventasResumenFecha.value = today;
-    if (facturacionFecha) facturacionFecha.value = today;
-    if (lotesFecha) lotesFecha.value = today;
-    if (cajaFecha) cajaFecha.value = today;
     if (compraFecha) compraFecha.value = today;
-    if (comprasFecha) comprasFecha.value = today;
     if (ajusteFecha) ajusteFecha.value = today;
-    if (ajustesFecha) ajustesFecha.value = today;
-    if (cierresDesde) cierresDesde.value = monthStart;
-    if (cierresHasta) cierresHasta.value = monthEnd;
-    if (ventasTransDesde) ventasTransDesde.value = monthStart;
-    if (ventasTransHasta) ventasTransHasta.value = monthEnd;
-    if (cajaTransDesde) cajaTransDesde.value = monthStart;
-    if (cajaTransHasta) cajaTransHasta.value = monthEnd;
-    if (cajaCredDesde) cajaCredDesde.value = monthStart;
-    if (cajaCredHasta) cajaCredHasta.value = monthEnd;
-    if (cajaPagosDesde) cajaPagosDesde.value = monthStart;
-    if (cajaPagosHasta) cajaPagosHasta.value = monthEnd;
+    setRememberFilterDates(getRememberFilterDates());
+    setRememberTableSelection(getRememberTableSelection());
+    if (getRememberFilterDates()) {
+      restoreFilterDates();
+    } else {
+      applyDefaultFilterDates();
+    }
 
     let messageTimer = null;
     const setButtonLoading = (btn, isLoading) => {
@@ -6684,6 +6775,41 @@
         localStorage.setItem(THEME_KEY, theme);
       });
     }
+    if (rememberFilterDatesToggle) {
+      rememberFilterDatesToggle.addEventListener('change', () => {
+        const enabled = !!rememberFilterDatesToggle.checked;
+        setRememberFilterDates(enabled);
+        if (!enabled) {
+          clearStoredFilterDates();
+          applyDefaultFilterDates();
+        } else {
+          filterDateFields.forEach(({ el }) => {
+            if (!el || !el.id) return;
+            setStoredFilterDate(el.id, el.value || '');
+          });
+        }
+        const activeView = views.find(view => view.classList.contains('active'));
+        if (activeView) setActiveView(activeView.id);
+      });
+    }
+    if (rememberTableSelectionToggle) {
+      rememberTableSelectionToggle.addEventListener('change', () => {
+        const enabled = !!rememberTableSelectionToggle.checked;
+        setRememberTableSelection(enabled);
+        if (!enabled) {
+          localStorage.removeItem(TRACKED_TABLE_ROWS_KEY);
+        }
+        const activeView = views.find(view => view.classList.contains('active'));
+        if (activeView) setActiveView(activeView.id);
+      });
+    }
+    filterDateFields.forEach(({ el }) => {
+      if (!el || !el.id) return;
+      el.addEventListener('change', () => {
+        if (!getRememberFilterDates()) return;
+        setStoredFilterDate(el.id, el.value || '');
+      });
+    });
     document.addEventListener('click', (event) => {
       if (!settingsMenu || settingsMenu.hasAttribute('hidden')) return;
       if ((settingsToggle && settingsToggle.contains(event.target)) || settingsMenu.contains(event.target)) return;

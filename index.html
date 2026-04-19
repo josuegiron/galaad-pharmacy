@@ -4564,11 +4564,17 @@
     }
 
     function updateResumenVisibleTotal() {
-      if (!ventasResumenBody || !ventasResumenVisibleTotal) return;
+      if (!ventasResumenBody || !ventasResumenVisibleTotal || !ventasResumenTable) return;
+      const headerCells = Array.from(ventasResumenTable.querySelectorAll('thead th'));
+      const totalColumnIndex = headerCells.findIndex(cell => String(cell.textContent || '').trim().toLowerCase() === 'total');
+      if (totalColumnIndex < 0) {
+        ventasResumenVisibleTotal.textContent = 'Q.0.00';
+        return;
+      }
       const total = Array.from(ventasResumenBody.querySelectorAll('tr'))
-        .filter(row => !row.hidden && row.cells.length > 7)
+        .filter(row => !row.hidden && row.cells.length > totalColumnIndex)
         .reduce((sum, row) => {
-          const raw = row.cells[7] ? String(row.cells[7].textContent || '').trim() : '0';
+          const raw = row.cells[totalColumnIndex] ? String(row.cells[totalColumnIndex].textContent || '').trim() : '0';
           const normalized = raw.replace(/^Q\./, '');
           const value = Number(normalized);
           return sum + (isFinite(value) ? value : 0);

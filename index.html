@@ -1085,6 +1085,11 @@
             <input type="checkbox" id="rememberTableSelectionToggle">
             <span class="switch"></span>
           </label>
+          <label class="switch-row" style="margin-top:10px;">
+            <span>Recordar filtros de tablas</span>
+            <input type="checkbox" id="rememberTableFiltersToggle">
+            <span class="switch"></span>
+          </label>
         </div>
       </div>
     </div>
@@ -2505,6 +2510,7 @@
     const themeToggle = document.getElementById('themeToggle');
     const rememberFilterDatesToggle = document.getElementById('rememberFilterDatesToggle');
     const rememberTableSelectionToggle = document.getElementById('rememberTableSelectionToggle');
+    const rememberTableFiltersToggle = document.getElementById('rememberTableFiltersToggle');
     const lotesFecha = document.getElementById('lotesFecha');
     const lotesStatus = document.getElementById('lotesStatus');
     const lotesBody = document.getElementById('lotesBody');
@@ -2637,8 +2643,10 @@
     const THEME_KEY = 'galaad-theme';
     const REMEMBER_FILTER_DATES_KEY = 'galaad-remember-filter-dates';
     const REMEMBER_TABLE_SELECTION_KEY = 'galaad-remember-table-selection';
+    const REMEMBER_TABLE_FILTERS_KEY = 'galaad-remember-table-filters';
     const FILTER_DATES_KEY = 'galaad-filter-dates';
     const TRACKED_TABLE_ROWS_KEY = 'galaad-tracked-table-rows';
+    const TABLE_FILTERS_KEY = 'galaad-table-filters';
     const THEME_COLORS = { dark: '#0c1020', light: '#f5f7fb' };
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
@@ -2676,6 +2684,16 @@
       if (rememberTableSelectionToggle) rememberTableSelectionToggle.checked = enabled;
     }
 
+    function getRememberTableFilters() {
+      const stored = localStorage.getItem(REMEMBER_TABLE_FILTERS_KEY);
+      return stored === null ? false : stored === '1';
+    }
+
+    function setRememberTableFilters(enabled) {
+      localStorage.setItem(REMEMBER_TABLE_FILTERS_KEY, enabled ? '1' : '0');
+      if (rememberTableFiltersToggle) rememberTableFiltersToggle.checked = enabled;
+    }
+
     function getStoredFilterDates() {
       try {
         const raw = localStorage.getItem(FILTER_DATES_KEY);
@@ -2700,6 +2718,48 @@
 
     function clearStoredFilterDates() {
       localStorage.removeItem(FILTER_DATES_KEY);
+    }
+
+    function getStoredTableFilters() {
+      if (!getRememberTableFilters()) return {};
+      try {
+        const raw = localStorage.getItem(TABLE_FILTERS_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function getStoredTableFilterState(tbodyId) {
+      if (!tbodyId) return null;
+      const stored = getStoredTableFilters();
+      const state = stored[tbodyId];
+      return state && typeof state === 'object' ? state : null;
+    }
+
+    function setStoredTableFilterState(tbodyId, state) {
+      if (!tbodyId || !getRememberTableFilters()) return;
+      try {
+        const stored = getStoredTableFilters();
+        const hasFilters = !!(state && state.filters && Object.keys(state.filters).length);
+        const hasSort = !!(state && Array.isArray(state.sortStack) && state.sortStack.length);
+        if (!hasFilters && !hasSort) {
+          delete stored[tbodyId];
+        } else {
+          stored[tbodyId] = {
+            filters: state.filters,
+            sortStack: state.sortStack,
+          };
+        }
+        localStorage.setItem(TABLE_FILTERS_KEY, JSON.stringify(stored));
+      } catch (err) {
+      }
+    }
+
+    function clearStoredTableFilters() {
+      localStorage.removeItem(TABLE_FILTERS_KEY);
     }
 
     function getTrackedTableRows() {
@@ -3199,6 +3259,7 @@
     if (ajusteFecha) ajusteFecha.value = today;
     setRememberFilterDates(getRememberFilterDates());
     setRememberTableSelection(getRememberTableSelection());
+    setRememberTableFilters(getRememberTableFilters());
     if (getRememberFilterDates()) {
       restoreFilterDates();
     } else {
@@ -4580,13 +4641,25 @@
         return { key, label, type, index, filterable };
       });
       const badge = ensureFilterBadge(tbodyId, table);
+      const storedState = getStoredTableFilterState(tbodyId);
+      const validColumnKeys = new Set(columns.map(col => col.key));
+      const restoredFilters = {};
+      if (storedState && storedState.filters && typeof storedState.filters === 'object') {
+        Object.entries(storedState.filters).forEach(([key, filter]) => {
+          if (!validColumnKeys.has(key) || !filter || typeof filter !== 'object') return;
+          restoredFilters[key] = filter;
+        });
+      }
+      const restoredSortStack = Array.isArray(storedState && storedState.sortStack)
+        ? storedState.sortStack.filter(sort => sort && validColumnKeys.has(sort.key) && (sort.dir === 'asc' || sort.dir === 'desc'))
+        : [];
       tableFilters.set(tbodyId, {
         tbody,
         table,
         columns,
         badge,
-        filters: {},
-        sortStack: [],
+        filters: restoredFilters,
+        sortStack: restoredSortStack,
         isApplying: false,
       });
       updateTableFilterButtons(tbodyId);
@@ -4682,6 +4755,10 @@
         updateResumenVisibleTotal();
       }
 
+      setStoredTableFilterState(tbodyId, {
+        filters: state.filters,
+        sortStack: state.sortStack,
+      });
       updateTableFilterButtons(tbodyId);
       updateTableFilterBadge(tbodyId);
       setTimeout(() => {
@@ -6798,6 +6875,27 @@
         setRememberTableSelection(enabled);
         if (!enabled) {
           localStorage.removeItem(TRACKED_TABLE_ROWS_KEY);
+        }
+        const activeView = views.find(view => view.classList.contains('active'));
+        if (activeView) setActiveView(activeView.id);
+      });
+    }
+    if (rememberTableFiltersToggle) {
+      rememberTableFiltersToggle.addEventListener('change', () => {
+        const enabled = !!rememberTableFiltersToggle.checked;
+        setRememberTableFilters(enabled);
+        if (!enabled) {
+          clearStoredTableFilters();
+          tableFilters.forEach((_, tbodyId) => {
+            resetTableFilters(tbodyId);
+          });
+        } else {
+          tableFilters.forEach((state, tbodyId) => {
+            setStoredTableFilterState(tbodyId, {
+              filters: state.filters,
+              sortStack: state.sortStack,
+            });
+          });
         }
         const activeView = views.find(view => view.classList.contains('active'));
         if (activeView) setActiveView(activeView.id);

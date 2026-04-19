@@ -3160,7 +3160,7 @@
       if (messageTimer) clearTimeout(messageTimer);
       messageTimer = setTimeout(() => {
         messageEl.style.display = 'none';
-      }, 5000);
+      }, isError ? 10000 : 5000);
     };
     if (editCantidadToggle) {
       editCantidadToggle.addEventListener('click', () => {
@@ -3443,7 +3443,7 @@
       compraMessageEl.style.display = 'block';
       setTimeout(() => {
         compraMessageEl.style.display = 'none';
-      }, 5000);
+      }, isError ? 10000 : 5000);
     };
 
     const showAjusteMessage = (text, isError = false) => {
@@ -3454,7 +3454,7 @@
       ajusteMessageEl.style.display = 'block';
       setTimeout(() => {
         ajusteMessageEl.style.display = 'none';
-      }, 5000);
+      }, isError ? 10000 : 5000);
     };
 
     form.addEventListener('submit', async (e) => {
@@ -5718,7 +5718,7 @@
       facturacionMessage.style.display = 'block';
       setTimeout(() => {
         facturacionMessage.style.display = 'none';
-      }, 5000);
+      }, isError ? 10000 : 5000);
     }
 
     let copyToastTimeout = null;

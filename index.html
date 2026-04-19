@@ -1213,6 +1213,14 @@
           Fecha
           <input type="date" id="ventasResumenFecha">
         </label>
+        <label style="margin-top:10px;">
+          Tipo
+          <select id="ventasResumenTipoFilter">
+            <option value="all">Todos</option>
+            <option value="afectos">Afectos</option>
+            <option value="no_afectos">No afectos</option>
+          </select>
+        </label>
         <p class="hint" style="margin-top:8px;">Consolidado de ventas por producto.</p>
       </div>
       <div class="table-meta">
@@ -2432,6 +2440,7 @@
     const ventasHistoricoTable = document.getElementById('ventasHistoricoTable');
     const ventasHistoricoStickyHead = document.getElementById('ventasHistoricoStickyHead');
     const ventasResumenFecha = document.getElementById('ventasResumenFecha');
+    const ventasResumenTipoFilter = document.getElementById('ventasResumenTipoFilter');
     const ventasResumenStatus = document.getElementById('ventasResumenStatus');
     const ventasResumenBody = document.getElementById('ventasResumenBody');
     const ventasResumenCount = document.getElementById('ventasResumenCount');
@@ -5480,6 +5489,7 @@
     function renderResumen() {
       if (!ventasResumenBody || !ventasResumenFecha) return;
       const selectedDate = ventasResumenFecha.value || toLocalISODate(new Date());
+      const tipoFilter = ventasResumenTipoFilter ? ventasResumenTipoFilter.value : 'all';
       if (!movimientosLoaded) {
         ventasResumenStatus.textContent = 'Cargando ventas...';
         return;
@@ -5507,16 +5517,22 @@
       const rows = [...summary.entries()].map(([codigo, data]) => {
         const catalogItem = catalogByCode.get(codigo) || {};
         const name = catalogItem.nombre || 'Sin nombre';
+        const afectoFlag = Number(catalogItem.afecto || 0) === 1 ? 1 : 0;
         return {
           codigo,
           nombre: name,
-          afecto: Number(catalogItem.afecto || 0) === 1 ? 'SI' : 'NO',
+          afecto: afectoFlag === 1 ? 'SI' : 'NO',
+          afectoFlag,
           stock_actual: Number(catalogItem.stock_actual || 0),
           costo_unitario: Number(catalogItem.costo_unitario || 0),
           cantidad: data.cantidad,
           total: data.total,
           descuento: data.descuento,
         };
+      }).filter((row) => {
+        if (tipoFilter === 'afectos') return row.afectoFlag === 1;
+        if (tipoFilter === 'no_afectos') return row.afectoFlag === 0;
+        return true;
       }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
       if (!rows.length) {
@@ -5951,6 +5967,11 @@
           renderMovimientos();
           renderResumen();
         }
+      });
+    }
+    if (ventasResumenTipoFilter) {
+      ventasResumenTipoFilter.addEventListener('change', () => {
+        renderResumen();
       });
     }
     if (lotesFecha) {

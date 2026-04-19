@@ -808,6 +808,33 @@
     .filter-fields input {
       width: 100%;
     }
+    .column-fields {
+      display: grid;
+      gap: 8px;
+      max-height: 320px;
+      overflow: auto;
+      margin-bottom: 10px;
+    }
+    .column-fields .column-option {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      justify-content: flex-start;
+      white-space: nowrap;
+      text-align: left;
+    }
+    .column-fields .column-option input {
+      flex: 0 0 auto;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+    .column-fields .column-option span {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
     .filter-footer {
       display: flex;
       align-items: center;
@@ -839,6 +866,16 @@
       padding: 10px 12px;
       border-bottom: 1px solid var(--stroke);
       white-space: nowrap;
+    }
+    thead th.table-columns-trigger {
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+    }
+    thead th.table-columns-trigger:hover,
+    thead th.table-columns-trigger:active {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.03);
+      box-shadow: none;
     }
     .sticky-table-head {
       position: fixed;
@@ -911,7 +948,9 @@
       color: var(--filter-badge-text);
       font-size: 12px;
       font-weight: 600;
-      width: 100%;
+      flex: 1 1 320px;
+      width: auto;
+      min-width: 280px;
     }
     .table-meta.stacked {
       flex-direction: column;
@@ -1088,6 +1127,11 @@
           <label class="switch-row" style="margin-top:10px;">
             <span>Recordar filtros de tablas</span>
             <input type="checkbox" id="rememberTableFiltersToggle">
+            <span class="switch"></span>
+          </label>
+          <label class="switch-row" style="margin-top:10px;">
+            <span>Recordar columnas de tablas</span>
+            <input type="checkbox" id="rememberTableColumnsToggle">
             <span class="switch"></span>
           </label>
         </div>
@@ -2293,6 +2337,15 @@
     </div>
   </div>
 
+  <div id="tableColumnsMenu" class="filter-menu" hidden>
+    <div class="filter-title" id="tableColumnsTitle">Columnas</div>
+    <div class="column-fields" id="tableColumnsFields"></div>
+    <div class="filter-footer">
+      <button type="button" class="btn compact" data-action="show-all">Mostrar todas</button>
+      <button type="button" class="btn compact primary" data-action="close-columns">Cerrar</button>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="helpModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
       <h3 id="helpModalTitle">Ayuda</h3>
@@ -2484,6 +2537,9 @@
     const tableFilterMenu = document.getElementById('ventasTransFilterMenu');
     const tableFilterTitle = document.getElementById('ventasTransFilterTitle');
     const tableFilterFields = document.getElementById('ventasTransFilterFields');
+    const tableColumnsMenu = document.getElementById('tableColumnsMenu');
+    const tableColumnsTitle = document.getElementById('tableColumnsTitle');
+    const tableColumnsFields = document.getElementById('tableColumnsFields');
     const ventasResumenDetail = document.getElementById('ventasResumenDetail');
     const ventasResumenDetailTitle = document.getElementById('ventasResumenDetailTitle');
     const ventasResumenDetailSubtitle = document.getElementById('ventasResumenDetailSubtitle');
@@ -2511,6 +2567,7 @@
     const rememberFilterDatesToggle = document.getElementById('rememberFilterDatesToggle');
     const rememberTableSelectionToggle = document.getElementById('rememberTableSelectionToggle');
     const rememberTableFiltersToggle = document.getElementById('rememberTableFiltersToggle');
+    const rememberTableColumnsToggle = document.getElementById('rememberTableColumnsToggle');
     const lotesFecha = document.getElementById('lotesFecha');
     const lotesStatus = document.getElementById('lotesStatus');
     const lotesBody = document.getElementById('lotesBody');
@@ -2644,9 +2701,11 @@
     const REMEMBER_FILTER_DATES_KEY = 'galaad-remember-filter-dates';
     const REMEMBER_TABLE_SELECTION_KEY = 'galaad-remember-table-selection';
     const REMEMBER_TABLE_FILTERS_KEY = 'galaad-remember-table-filters';
+    const REMEMBER_TABLE_COLUMNS_KEY = 'galaad-remember-table-columns';
     const FILTER_DATES_KEY = 'galaad-filter-dates';
     const TRACKED_TABLE_ROWS_KEY = 'galaad-tracked-table-rows';
     const TABLE_FILTERS_KEY = 'galaad-table-filters';
+    const TABLE_COLUMNS_KEY = 'galaad-table-columns';
     const THEME_COLORS = { dark: '#0c1020', light: '#f5f7fb' };
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
@@ -2692,6 +2751,16 @@
     function setRememberTableFilters(enabled) {
       localStorage.setItem(REMEMBER_TABLE_FILTERS_KEY, enabled ? '1' : '0');
       if (rememberTableFiltersToggle) rememberTableFiltersToggle.checked = enabled;
+    }
+
+    function getRememberTableColumns() {
+      const stored = localStorage.getItem(REMEMBER_TABLE_COLUMNS_KEY);
+      return stored === null ? false : stored === '1';
+    }
+
+    function setRememberTableColumns(enabled) {
+      localStorage.setItem(REMEMBER_TABLE_COLUMNS_KEY, enabled ? '1' : '0');
+      if (rememberTableColumnsToggle) rememberTableColumnsToggle.checked = enabled;
     }
 
     function getStoredFilterDates() {
@@ -2760,6 +2829,42 @@
 
     function clearStoredTableFilters() {
       localStorage.removeItem(TABLE_FILTERS_KEY);
+    }
+
+    function getStoredTableColumns() {
+      if (!getRememberTableColumns()) return {};
+      try {
+        const raw = localStorage.getItem(TABLE_COLUMNS_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function getStoredTableColumnState(tbodyId) {
+      if (!tbodyId) return [];
+      const stored = getStoredTableColumns();
+      return Array.isArray(stored[tbodyId]) ? stored[tbodyId] : [];
+    }
+
+    function setStoredTableColumnState(tbodyId, hiddenColumns) {
+      if (!tbodyId || !getRememberTableColumns()) return;
+      try {
+        const stored = getStoredTableColumns();
+        if (!Array.isArray(hiddenColumns) || !hiddenColumns.length) {
+          delete stored[tbodyId];
+        } else {
+          stored[tbodyId] = hiddenColumns.map(String);
+        }
+        localStorage.setItem(TABLE_COLUMNS_KEY, JSON.stringify(stored));
+      } catch (err) {
+      }
+    }
+
+    function clearStoredTableColumns() {
+      localStorage.removeItem(TABLE_COLUMNS_KEY);
     }
 
     function getTrackedTableRows() {
@@ -3260,6 +3365,7 @@
     setRememberFilterDates(getRememberFilterDates());
     setRememberTableSelection(getRememberTableSelection());
     setRememberTableFilters(getRememberTableFilters());
+    setRememberTableColumns(getRememberTableColumns());
     if (getRememberFilterDates()) {
       restoreFilterDates();
     } else {
@@ -4190,6 +4296,7 @@
     let ventasTransLoading = false;
     const tableFilters = new Map();
     let activeTableFilter = null;
+    let activeTableColumns = null;
     let cajaTransLoading = false;
     let cajaCredLoading = false;
     let cajaPagosLoading = false;
@@ -4575,6 +4682,11 @@
       );
     }
 
+    function isHideableLabel(label) {
+      const normalized = String(label || '').trim().toLowerCase();
+      return !!normalized && !normalized.includes('acciones');
+    }
+
     function ensureFilterBadge(tbodyId, table) {
       let badge = document.querySelector(`.filter-badge[data-table="${tbodyId}"]`);
       if (badge) return badge;
@@ -4606,6 +4718,39 @@
       return badge;
     }
 
+    function applyTableColumnVisibility(tbodyId) {
+      const state = tableFilters.get(tbodyId);
+      if (!state) return;
+      state.columns.forEach((col) => {
+        const hidden = state.hiddenColumns.includes(col.key);
+        if (col.th) col.th.style.display = hidden ? 'none' : '';
+        Array.from(state.tbody.querySelectorAll('tr')).forEach((row) => {
+          const cell = row.cells[col.index];
+          if (cell) cell.style.display = hidden ? 'none' : '';
+        });
+        const tfootRows = state.table.tFoot ? Array.from(state.table.tFoot.rows) : [];
+        tfootRows.forEach((row) => {
+          const cell = row.cells[col.index];
+          if (cell) cell.style.display = hidden ? 'none' : '';
+        });
+      });
+      setStoredTableColumnState(tbodyId, state.hiddenColumns);
+    }
+
+    function buildTableColumnsFields(tableId) {
+      if (!tableColumnsFields || !tableColumnsTitle) return;
+      const state = tableFilters.get(tableId || '');
+      if (!state) return;
+      tableColumnsTitle.textContent = 'Columnas visibles';
+      const options = state.columns.filter(col => col.hideable);
+      tableColumnsFields.innerHTML = options.map(col => `
+        <label class="column-option">
+          <input type="checkbox" data-column-key="${col.key}" data-table="${tableId}" ${state.hiddenColumns.includes(col.key) ? '' : 'checked'}>
+          <span>${col.label}</span>
+        </label>
+      `).join('') || '<div class="empty-state" style="padding:0;">No hay columnas configurables.</div>';
+    }
+
     function initTableFilter(tbodyId) {
       const tbody = document.getElementById(tbodyId);
       if (!tbody) return;
@@ -4618,8 +4763,11 @@
         const label = th.textContent.trim();
         const type = inferColumnType(label);
         const filterable = isFilterableLabel(label);
+        const hideable = isHideableLabel(label);
         const key = `c${index}`;
         th.innerHTML = '';
+        th.classList.add('table-columns-trigger');
+        th.setAttribute('data-table-columns', tbodyId);
         if (filterable) {
           const wrap = document.createElement('div');
           wrap.className = 'th-inner';
@@ -4638,11 +4786,13 @@
         } else {
           th.textContent = label;
         }
-        return { key, label, type, index, filterable };
+        return { key, label, type, index, filterable, hideable, th };
       });
       const badge = ensureFilterBadge(tbodyId, table);
       const storedState = getStoredTableFilterState(tbodyId);
+      const storedHiddenColumns = getStoredTableColumnState(tbodyId);
       const validColumnKeys = new Set(columns.map(col => col.key));
+      const hideableColumnKeys = new Set(columns.filter(col => col.hideable).map(col => col.key));
       const restoredFilters = {};
       if (storedState && storedState.filters && typeof storedState.filters === 'object') {
         Object.entries(storedState.filters).forEach(([key, filter]) => {
@@ -4653,6 +4803,9 @@
       const restoredSortStack = Array.isArray(storedState && storedState.sortStack)
         ? storedState.sortStack.filter(sort => sort && validColumnKeys.has(sort.key) && (sort.dir === 'asc' || sort.dir === 'desc'))
         : [];
+      const restoredHiddenColumns = Array.isArray(storedHiddenColumns)
+        ? storedHiddenColumns.filter(key => hideableColumnKeys.has(key))
+        : [];
       tableFilters.set(tbodyId, {
         tbody,
         table,
@@ -4660,10 +4813,12 @@
         badge,
         filters: restoredFilters,
         sortStack: restoredSortStack,
+        hiddenColumns: restoredHiddenColumns,
         isApplying: false,
       });
       updateTableFilterButtons(tbodyId);
       updateTableFilterBadge(tbodyId);
+      applyTableColumnVisibility(tbodyId);
       const observer = new MutationObserver(() => {
         const current = tableFilters.get(tbodyId);
         if (current && current.isApplying) return;
@@ -4755,6 +4910,7 @@
         updateResumenVisibleTotal();
       }
 
+      applyTableColumnVisibility(tbodyId);
       setStoredTableFilterState(tbodyId, {
         filters: state.filters,
         sortStack: state.sortStack,
@@ -4940,6 +5096,34 @@
       if (!tableFilterMenu) return;
       tableFilterMenu.hidden = true;
       activeTableFilter = null;
+    }
+
+    function openTableColumnsMenu(button) {
+      if (!tableColumnsMenu || !tableColumnsTitle) return;
+      const tableId = button.getAttribute('data-table-columns');
+      const state = tableFilters.get(tableId || '');
+      if (!state) return;
+      buildTableColumnsFields(tableId);
+      activeTableColumns = { tableId };
+      tableColumnsMenu.setAttribute('data-table', tableId);
+      tableColumnsMenu.hidden = false;
+      const menuRect = tableColumnsMenu.getBoundingClientRect();
+      const btnRect = button.getBoundingClientRect();
+      let left = Math.min(btnRect.left, window.innerWidth - menuRect.width - 12);
+      left = Math.max(12, left);
+      let top = btnRect.bottom + 8;
+      if (top + menuRect.height > window.innerHeight - 12) {
+        top = btnRect.top - menuRect.height - 8;
+      }
+      if (top < 12) top = 12;
+      tableColumnsMenu.style.left = `${left}px`;
+      tableColumnsMenu.style.top = `${top}px`;
+    }
+
+    function closeTableColumnsMenu() {
+      if (!tableColumnsMenu) return;
+      tableColumnsMenu.hidden = true;
+      activeTableColumns = null;
     }
 
     const filterTableBodies = [
@@ -6433,6 +6617,39 @@
         }
       });
     }
+    if (tableColumnsMenu) {
+      tableColumnsMenu.addEventListener('click', (event) => {
+        const actionBtn = event.target.closest('button[data-action]');
+        if (!actionBtn) return;
+        const action = actionBtn.getAttribute('data-action');
+        const tableId = tableColumnsMenu.getAttribute('data-table');
+        const state = tableFilters.get(tableId || '');
+        if (!state) return;
+        if (action === 'show-all') {
+          state.hiddenColumns = [];
+          applyTableColumnVisibility(tableId);
+          buildTableColumnsFields(tableId);
+          return;
+        }
+        if (action === 'close-columns') {
+          closeTableColumnsMenu();
+        }
+      });
+      tableColumnsMenu.addEventListener('change', (event) => {
+        const input = event.target.closest('input[type="checkbox"][data-column-key][data-table]');
+        if (!input) return;
+        const tableId = input.getAttribute('data-table');
+        const key = input.getAttribute('data-column-key');
+        const state = tableFilters.get(tableId || '');
+        if (!state || !key) return;
+        if (input.checked) {
+          state.hiddenColumns = state.hiddenColumns.filter(item => item !== key);
+        } else if (!state.hiddenColumns.includes(key)) {
+          state.hiddenColumns.push(key);
+        }
+        applyTableColumnVisibility(tableId);
+      });
+    }
     document.addEventListener('click', (event) => {
       const filterBtn = event.target.closest('button.filter-btn[data-table][data-key]');
       if (filterBtn) {
@@ -6443,6 +6660,16 @@
           return;
         }
         openTableFilterMenu(filterBtn);
+        return;
+      }
+      const columnsTrigger = event.target.closest('th[data-table-columns]');
+      if (columnsTrigger) {
+        const tableId = columnsTrigger.getAttribute('data-table-columns');
+        if (activeTableColumns && activeTableColumns.tableId === tableId && tableColumnsMenu && !tableColumnsMenu.hidden) {
+          closeTableColumnsMenu();
+          return;
+        }
+        openTableColumnsMenu(columnsTrigger);
         return;
       }
       const clearBtn = event.target.closest('button.filter-clear');
@@ -6474,6 +6701,9 @@
       }
       if (tableFilterMenu && !tableFilterMenu.hidden && !event.target.closest('#ventasTransFilterMenu')) {
         closeTableFilterMenu();
+      }
+      if (tableColumnsMenu && !tableColumnsMenu.hidden && !event.target.closest('#tableColumnsMenu')) {
+        closeTableColumnsMenu();
       }
     });
     [
@@ -6895,6 +7125,25 @@
               filters: state.filters,
               sortStack: state.sortStack,
             });
+          });
+        }
+        const activeView = views.find(view => view.classList.contains('active'));
+        if (activeView) setActiveView(activeView.id);
+      });
+    }
+    if (rememberTableColumnsToggle) {
+      rememberTableColumnsToggle.addEventListener('change', () => {
+        const enabled = !!rememberTableColumnsToggle.checked;
+        setRememberTableColumns(enabled);
+        if (!enabled) {
+          clearStoredTableColumns();
+          tableFilters.forEach((state, tbodyId) => {
+            state.hiddenColumns = [];
+            applyTableColumnVisibility(tbodyId);
+          });
+        } else {
+          tableFilters.forEach((state, tbodyId) => {
+            setStoredTableColumnState(tbodyId, state.hiddenColumns);
           });
         }
         const activeView = views.find(view => view.classList.contains('active'));

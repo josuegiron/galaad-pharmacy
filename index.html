@@ -392,11 +392,11 @@
       width: 16px;
       height: 16px;
     }
-    .resumen-current-row td {
+    .tracked-current-row td {
       background: rgba(233, 255, 112, 0.18) !important;
       box-shadow: inset 0 1px 0 rgba(233, 255, 112, 0.28), inset 0 -1px 0 rgba(233, 255, 112, 0.28);
     }
-    .resumen-current-row td:first-child {
+    .tracked-current-row td:first-child {
       box-shadow: inset 4px 0 0 rgba(233, 255, 112, 0.95), inset 0 1px 0 rgba(233, 255, 112, 0.28), inset 0 -1px 0 rgba(233, 255, 112, 0.28);
     }
     .signed-input-row {
@@ -2623,7 +2623,7 @@
     const viewButtons = [...document.querySelectorAll('[data-view]')];
 
     const THEME_KEY = 'galaad-theme';
-    const RESUMEN_CURRENT_KEY = 'galaad-ventas-resumen-current';
+    const TRACKED_TABLE_ROWS_KEY = 'galaad-tracked-table-rows';
     const THEME_COLORS = { dark: '#0c1020', light: '#f5f7fb' };
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
@@ -2641,30 +2641,61 @@
     }
     initTheme();
 
-    function getResumenCurrentMarker() {
+    function getTrackedTableRows() {
       try {
-        const raw = localStorage.getItem(RESUMEN_CURRENT_KEY);
-        if (!raw) return null;
+        const raw = localStorage.getItem(TRACKED_TABLE_ROWS_KEY);
+        if (!raw) return {};
         const parsed = JSON.parse(raw);
-        if (!parsed || !parsed.fecha || !parsed.codigo) return null;
-        return parsed;
+        return parsed && typeof parsed === 'object' ? parsed : {};
       } catch (err) {
-        return null;
+        return {};
       }
     }
 
-    function setResumenCurrentMarker(marker) {
+    function getTrackedRowMarker(tbodyId) {
+      if (!tbodyId) return null;
+      const stored = getTrackedTableRows();
+      const marker = stored[tbodyId];
+      if (!marker || !marker.key || !marker.context) return null;
+      return marker;
+    }
+
+    function setTrackedRowMarker(tbodyId, marker) {
+      if (!tbodyId) return;
       try {
-        if (!marker || !marker.fecha || !marker.codigo) {
-          localStorage.removeItem(RESUMEN_CURRENT_KEY);
-          return;
+        const stored = getTrackedTableRows();
+        if (!marker || !marker.key || !marker.context) {
+          delete stored[tbodyId];
+        } else {
+          stored[tbodyId] = {
+            key: String(marker.key),
+            context: String(marker.context),
+          };
         }
-        localStorage.setItem(RESUMEN_CURRENT_KEY, JSON.stringify({
-          fecha: String(marker.fecha),
-          codigo: String(marker.codigo),
-        }));
+        localStorage.setItem(TRACKED_TABLE_ROWS_KEY, JSON.stringify(stored));
       } catch (err) {
       }
+    }
+
+    function getTrackedRowAttrs(tbodyId, key, context) {
+      const marker = getTrackedRowMarker(tbodyId);
+      const rowKey = String(key || '');
+      const rowContext = String(context || '');
+      const isCurrent = !!(marker && marker.key === rowKey && marker.context === rowContext);
+      return `class="${isCurrent ? 'tracked-current-row' : ''}" data-track-key="${rowKey}" data-track-context="${rowContext}"`;
+    }
+
+    function restoreTrackedRowPosition(tbody) {
+      if (!tbody) return;
+      const currentRow = tbody.querySelector('tr.tracked-current-row[data-track-key]');
+      if (!currentRow) return;
+      const modal = currentRow.closest('.modal-backdrop');
+      const view = currentRow.closest('.view');
+      if (modal && !modal.classList.contains('active')) return;
+      if (view && !view.classList.contains('active')) return;
+      requestAnimationFrame(() => {
+        currentRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
     }
 
     const viewLabels = {
@@ -3810,6 +3841,7 @@
         return;
       }
       const rows = movimientos.filter(item => Number(item.transaccionId) === Number(transaccionId) && Number(item.tipo) === 1);
+      const contextKey = String(transaccionId || '');
       ventasTransDetailTitle.textContent = `Detalle de venta #${transaccionId}`;
       if (!rows.length) {
         ventasTransDetailBody.innerHTML = '<tr><td colspan="7">Sin items para esta transaccion.</td></tr>';
@@ -3822,7 +3854,7 @@
         const descuento = isFinite(item.descuento) ? item.descuento : 0;
         const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('ventasTransDetailBody', item.numero || item.codigo || '', contextKey)}>
             <td>${item.codigo || ''}</td>
             <td>${cantidad}</td>
             <td>Q.${valor.toFixed(2)}</td>
@@ -3833,6 +3865,7 @@
           </tr>
         `;
       }).join('');
+      restoreTrackedRowPosition(ventasTransDetailBody);
       openTransaccionDetalleModal();
     }
 
@@ -3858,6 +3891,7 @@
       const catalogItem = (catalog || []).find(item => String(item.codigo || '').trim() === String(codigo || '').trim());
       const resolvedName = nombre || (catalogItem && catalogItem.nombre) || 'Producto';
       const selectedDate = ventasResumenFecha ? ventasResumenFecha.value : '';
+      const contextKey = `${selectedDate}|${codigo || ''}`;
       const rows = movimientos.filter(item => {
         if (Number(item.tipo) !== 1) return false;
         if (String(item.codigo || '').trim() !== String(codigo || '').trim()) return false;
@@ -3881,7 +3915,7 @@
         const descuento = isFinite(item.descuento) ? item.descuento : 0;
         const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('ventasResumenDetailBody', item.transaccionId || item.numero || '', contextKey)}>
             <td>${formatDateTime(item.fechaRaw)}</td>
             <td>${item.transaccionId || ''}</td>
             <td>${cantidad}</td>
@@ -3893,6 +3927,7 @@
       }).join('');
       markCopyableCells(ventasResumenDetailBody);
       if (ventasResumenDetailCount) ventasResumenDetailCount.textContent = `${rows.length} ventas`;
+      restoreTrackedRowPosition(ventasResumenDetailBody);
       openResumenDetalleModal();
     }
 
@@ -3909,6 +3944,8 @@
         return;
       }
       const rows = movimientos.filter(item => Number(item.transaccionId) === Number(transaccionId) && Number(item.tipo) === 2);
+      const detailBodyId = isCuentas ? 'cajaCredDetailBody' : 'cajaTransDetailBody';
+      const contextKey = `${target}|${transaccionId || ''}`;
       detailTitle.textContent = `Detalle de compra #${transaccionId}`;
       if (!rows.length) {
         detailBody.innerHTML = '<tr><td colspan="7">Sin items para esta compra.</td></tr>';
@@ -3925,7 +3962,7 @@
         const descuento = isFinite(item.descuento) ? item.descuento : 0;
         const total = isFinite(item.total) ? item.total : ((cantidad * valor) - descuento);
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs(detailBodyId, item.numero || item.codigo || '', contextKey)}>
             <td>${item.codigo || ''}</td>
             <td>${cantidad}</td>
             <td>Q.${valor.toFixed(2)}</td>
@@ -3936,6 +3973,7 @@
           </tr>
         `;
       }).join('');
+      restoreTrackedRowPosition(detailBody);
       if (isCuentas) {
         detail.hidden = false;
       } else {
@@ -4021,6 +4059,7 @@
 
     function renderLotes() {
       if (!lotesBody || !lotesStatus || !lotesCount) return;
+      const contextKey = lotesFecha ? lotesFecha.value || '' : '';
       if (!lotesData.length) {
         lotesBody.innerHTML = '<tr><td colspan="10">Sin lotes para esta fecha.</td></tr>';
         lotesCount.textContent = '0 lotes';
@@ -4042,7 +4081,7 @@
           </div>
         `;
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('lotesBody', item.lote_id || '', contextKey)}>
             <td>${item.lote_id || ''}</td>
             <td>${formatDateTime(item.fecha_creacion)}</td>
             <td>${formatDate(item.fecha_desde)}</td>
@@ -4059,6 +4098,7 @@
       }).join('');
       lotesCount.textContent = `${lotesData.length} lotes`;
       lotesStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(lotesBody);
     }
 
     function loadCaja(force = false) {
@@ -4160,6 +4200,7 @@
 
     function renderCaja() {
       if (!cajaBody || !cajaStatus || !cajaCount || !cajaSaldoFinal) return;
+      const contextKey = cajaFecha ? cajaFecha.value || '' : '';
       if (cajaSaldoInicial) {
         cajaSaldoInicial.textContent = `Q.${(cajaMeta.saldoInicial || 0).toFixed(2)}`;
       }
@@ -4199,7 +4240,7 @@
         if (tipo === 1) totalEntradas += monto;
         if (tipo === 2) totalSalidas += monto;
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('cajaBody', item.id || '', contextKey)}>
             <td>${formatDateTime(item.fecha)}</td>
             <td>${tipo === 2 ? 'Salida' : 'Entrada'}</td>
             <td>Q.${monto.toFixed(2)}</td>
@@ -4224,6 +4265,7 @@
       if (cajaSalidas) cajaSalidas.textContent = `Q.${totalSalidas.toFixed(2)}`;
       const totalFinal = (cajaMeta.saldoInicial || 0) + totalEntradas - totalSalidas;
       cajaSaldoFinal.textContent = `Q.${totalFinal.toFixed(2)}`;
+      restoreTrackedRowPosition(cajaBody);
       if (cajaStatus) {
         cajaStatus.classList.remove('ok', 'warn', 'blocked');
         if (cajaMeta.cerrado) {
@@ -4273,6 +4315,7 @@
 
     function renderCierres() {
       if (!cierresBody || !cierresStatus || !cierresCount) return;
+      const contextKey = `${cierresDesde ? cierresDesde.value || '' : ''}|${cierresHasta ? cierresHasta.value || '' : ''}`;
       if (!cierresData.length) {
         cierresBody.innerHTML = '<tr><td colspan="7">Sin cierres para esta fecha.</td></tr>';
         cierresCount.textContent = '0 cierres';
@@ -4287,7 +4330,7 @@
         const timestamp = item.timestamp ? formatDateTime(item.timestamp) : '—';
         const usuario = item.usuario ? String(item.usuario) : '—';
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('cierresBody', item.fecha || '', contextKey)}>
             <td>${formatDate(item.fecha)}</td>
             <td>Q.${saldoInicial.toFixed(2)}</td>
             <td>Q.${totalEntradas.toFixed(2)}</td>
@@ -4300,6 +4343,7 @@
       }).join('');
       cierresCount.textContent = `${cierresData.length} cierres`;
       cierresStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(cierresBody);
     }
 
     function parseDateInputValue(value, isEnd = false) {
@@ -4736,6 +4780,7 @@
 
     function renderTransaccionesVenta(items) {
       if (!ventasTransBody || !ventasTransStatus || !ventasTransCount) return;
+      const contextKey = `${ventasTransDesde ? ventasTransDesde.value || '' : ''}|${ventasTransHasta ? ventasTransHasta.value || '' : ''}`;
       if (!items.length) {
         ventasTransBody.innerHTML = '<tr><td colspan="5">Sin transacciones.</td></tr>';
         ventasTransCount.textContent = '0 transacciones';
@@ -4752,7 +4797,7 @@
             ? 'Pendiente: venta aún sin confirmar.'
             : 'Estado informado por el sistema.';
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('ventasTransBody', item.id || '', contextKey)}>
             <td>${item.id || ''}</td>
             <td>${formatDateTime(item.fecha)}</td>
             <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
@@ -4767,11 +4812,13 @@
       ventasTransCount.textContent = `${items.length} transacciones`;
       ventasTransStatus.textContent = 'Actualizado';
       applyTableFilters('ventasTransBody');
+      restoreTrackedRowPosition(ventasTransBody);
     }
 
     function renderTransaccionesCompra(items) {
       if (!cajaTransBody || !cajaTransStatus || !cajaTransCount) return;
       const onlyCredito = cajaTransCreditoOnly && cajaTransCreditoOnly.checked;
+      const contextKey = `${cajaTransDesde ? cajaTransDesde.value || '' : ''}|${cajaTransHasta ? cajaTransHasta.value || '' : ''}|${onlyCredito ? '1' : '0'}`;
       const filteredItems = onlyCredito
         ? items.filter(item => Number(item.credito || 0) === 1)
         : items;
@@ -4791,7 +4838,7 @@
           ? `<button type="button" class="btn compact" data-action="compra-credito-pagar" data-id="${item.id}" data-saldo="${saldo}">Pagar</button>`
           : '—';
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('cajaTransBody', item.id || '', contextKey)}>
             <td>${item.id || ''}</td>
             <td>${formatDate(item.fecha)}</td>
             <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
@@ -4805,10 +4852,12 @@
       }).join('');
       cajaTransCount.textContent = `${filteredItems.length} transacciones`;
       cajaTransStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(cajaTransBody);
     }
 
     function renderCuentasPorPagar(items) {
       if (!cajaCredBody || !cajaCredStatus || !cajaCredCount) return;
+      const contextKey = `${cajaCredDesde ? cajaCredDesde.value || '' : ''}|${cajaCredHasta ? cajaCredHasta.value || '' : ''}`;
       if (!items.length) {
         cajaCredBody.innerHTML = '<tr><td colspan="9">Sin transacciones.</td></tr>';
         cajaCredCount.textContent = '0 transacciones';
@@ -4826,7 +4875,7 @@
           ? `<button type="button" class="btn compact" data-action="compra-credito-pagar" data-id="${item.id}" data-saldo="${saldo}">Pagar</button>`
           : '—';
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('cajaCredBody', item.id || '', contextKey)}>
             <td>${item.id || ''}</td>
             <td>${formatDate(item.fecha)}</td>
             <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
@@ -4841,6 +4890,7 @@
       }).join('');
       cajaCredCount.textContent = `${items.length} transacciones`;
       cajaCredStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(cajaCredBody);
     }
 
     function loadTransacciones(tipo) {
@@ -4965,6 +5015,7 @@
 
     function renderPagosCredito() {
       if (!cajaPagosBody || !cajaPagosStatus || !cajaPagosCount) return;
+      const contextKey = `${cajaPagosDesde ? cajaPagosDesde.value || '' : ''}|${cajaPagosHasta ? cajaPagosHasta.value || '' : ''}|${cajaPagosPendientes && cajaPagosPendientes.checked ? '1' : '0'}`;
       if (!cajaPagosData.length) {
         cajaPagosBody.innerHTML = '<tr><td colspan="7">Sin pagos para este filtro.</td></tr>';
         cajaPagosCount.textContent = '0 pagos';
@@ -4982,7 +5033,7 @@
           ? '—'
           : `<button type="button" class="btn compact" data-action="pago-editar" data-id="${item.id}" data-transaccion="${item.transaccion_id}" data-fecha="${fechaIso}" data-monto="${monto}" data-nota="${nota}">Editar</button>`;
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('cajaPagosBody', item.id || '', contextKey)}>
             <td>${item.id || ''}</td>
             <td>${formatDate(item.fecha)}</td>
             <td>${item.transaccion_id || ''}</td>
@@ -4995,11 +5046,13 @@
       }).join('');
       cajaPagosCount.textContent = `${cajaPagosData.length} pagos`;
       cajaPagosStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(cajaPagosBody);
     }
 
     // Carga y muestra pagos de una compra desde cuentas por pagar.
     function renderPagosCreditoModal() {
       if (!pagosCreditoBody || !pagosCreditoStatus || !pagosCreditoCount) return;
+      const contextKey = pagosCreditoModal ? pagosCreditoModal.dataset.transaccionId || '' : '';
       if (!pagosCreditoData.length) {
         pagosCreditoBody.innerHTML = '<tr><td colspan="5">Sin pagos para esta compra.</td></tr>';
         pagosCreditoCount.textContent = '0 pagos';
@@ -5012,7 +5065,7 @@
         const estadoLabel = confirmado ? 'Confirmado' : 'Pendiente';
         const nota = item.nota ? String(item.nota) : '';
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('pagosCreditoBody', item.id || '', contextKey)}>
             <td>${item.id || ''}</td>
             <td>${formatDate(item.fecha)}</td>
             <td>Q.${isFinite(monto) ? monto.toFixed(2) : '0.00'}</td>
@@ -5023,6 +5076,7 @@
       }).join('');
       pagosCreditoCount.textContent = `${pagosCreditoData.length} pagos`;
       pagosCreditoStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(pagosCreditoBody);
     }
 
     function loadPagosCreditoTransaccion(transaccionId) {
@@ -5098,6 +5152,7 @@
       if (!productosBody || !productosStatus || !productosCount) return;
       const q = productosSearch ? productosSearch.value.trim().toLowerCase() : '';
       const stockFilter = productosStockFilter ? productosStockFilter.value : 'all';
+      const contextKey = 'catalogo-productos';
       const rows = productosData.filter(item => {
         const stock = Number(item.stock_actual || 0);
         if (stockFilter === 'in_stock' && !(stock > 0)) return false;
@@ -5122,7 +5177,7 @@
         const afecto = Number(item.afecto || 0) === 1 ? 'Sí' : 'No';
         const activo = Number(item.activo || 0) === 1 ? 'Sí' : 'No';
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('productosBody', item.codigo || '', contextKey)}>
             <td>${item.codigo || ''}</td>
             <td>${item.nombre || ''}</td>
             <td>${afecto}</td>
@@ -5144,6 +5199,7 @@
       productosCount.textContent = `${rows.length} productos`;
       productosStatus.textContent = q || stockFilter !== 'all' ? 'Filtrado' : 'Actualizado';
       syncStickyHeads();
+      restoreTrackedRowPosition(productosBody);
     }
 
     function openProductoModal(mode, data = {}) {
@@ -5375,6 +5431,7 @@
     function renderMovimientos() {
       if (!ventasBody || !ventasFecha) return;
       const selectedDate = ventasFecha.value || toLocalISODate(new Date());
+      const contextKey = selectedDate;
       if (!movimientosLoaded) {
         ventasStatus.textContent = 'Cargando ventas...';
         return;
@@ -5405,7 +5462,7 @@
         const canEdit = canDelete;
         totalSum += total;
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('ventasBody', item.numero || '', contextKey)}>
             <td>${formatDateTime(item.fechaRaw)}</td>
             <td>${item.codigo || ''}</td>
             <td>${cantidad}</td>
@@ -5428,11 +5485,13 @@
       ventasCount.textContent = `${rows.length} ventas`;
       ventasTotal.textContent = `Q.${totalSum.toFixed(2)}`;
       ventasStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(ventasBody);
     }
 
     function renderCompras() {
       if (!comprasBody || !comprasFecha) return;
       const selectedDate = comprasFecha.value || toLocalISODate(new Date());
+      const contextKey = selectedDate;
       if (!movimientosLoaded) {
         if (comprasStatus) comprasStatus.textContent = 'Cargando compras...';
         return;
@@ -5463,7 +5522,7 @@
         const canEdit = canDelete;
         totalSum += total;
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('comprasBody', item.numero || '', contextKey)}>
             <td>${formatDateTime(item.fechaRaw)}</td>
             <td>${item.codigo || ''}</td>
             <td>${cantidad}</td>
@@ -5486,11 +5545,13 @@
       if (comprasCount) comprasCount.textContent = `${rows.length} compras`;
       if (comprasTotal) comprasTotal.textContent = `Q.${totalSum.toFixed(2)}`;
       if (comprasStatus) comprasStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(comprasBody);
     }
 
     function renderAjustes() {
       if (!ajustesBody || !ajustesFecha) return;
       const selectedDate = ajustesFecha.value || toLocalISODate(new Date());
+      const contextKey = selectedDate;
       if (!movimientosLoaded) {
         if (ajustesStatus) ajustesStatus.textContent = 'Cargando ajustes...';
         return;
@@ -5513,7 +5574,7 @@
       ajustesBody.innerHTML = rows.map(item => {
         const cantidad = isFinite(item.cantidad) ? item.cantidad : 0;
         return `
-          <tr>
+          <tr ${getTrackedRowAttrs('ajustesBody', item.numero || `${item.codigo || ''}|${cantidad}|${formatDateTime(item.fechaRaw)}`, contextKey)}>
             <td>${formatDateTime(item.fechaRaw)}</td>
             <td>${item.codigo || ''}</td>
             <td>${cantidad}</td>
@@ -5524,13 +5585,14 @@
       if (ajustesCount) ajustesCount.textContent = `${rows.length} ajustes`;
       if (ajustesTotal) ajustesTotal.textContent = 'Q.0.00';
       if (ajustesStatus) ajustesStatus.textContent = 'Actualizado';
+      restoreTrackedRowPosition(ajustesBody);
     }
 
     function renderResumen() {
       if (!ventasResumenBody || !ventasResumenFecha) return;
       const selectedDate = ventasResumenFecha.value || toLocalISODate(new Date());
       const tipoFilter = ventasResumenTipoFilter ? ventasResumenTipoFilter.value : 'all';
-      const currentMarker = getResumenCurrentMarker();
+      const contextKey = `${selectedDate}|${tipoFilter}`;
       if (!movimientosLoaded) {
         ventasResumenStatus.textContent = 'Cargando ventas...';
         return;
@@ -5588,9 +5650,8 @@
       let totalGeneral = 0;
       ventasResumenBody.innerHTML = rows.map(row => {
         totalGeneral += row.total;
-        const isCurrent = currentMarker && currentMarker.fecha === selectedDate && currentMarker.codigo === row.codigo;
         return `
-          <tr class="${isCurrent ? 'resumen-current-row' : ''}" data-codigo="${row.codigo}" data-fecha="${selectedDate}">
+          <tr ${getTrackedRowAttrs('ventasResumenBody', row.codigo, contextKey)} data-codigo="${row.codigo}" data-fecha="${selectedDate}">
             <td>${row.codigo}</td>
             <td>${row.nombre}</td>
             <td>${row.cantidad}</td>
@@ -5611,14 +5672,7 @@
       updateResumenVisibleTotal();
       ventasResumenStatus.textContent = 'Actualizado';
       syncStickyHeads();
-      if (currentMarker && currentMarker.fecha === selectedDate) {
-        const currentRow = ventasResumenBody.querySelector(`tr[data-codigo="${currentMarker.codigo}"]`);
-        if (currentRow) {
-          requestAnimationFrame(() => {
-            currentRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
-          });
-        }
-      }
+      restoreTrackedRowPosition(ventasResumenBody);
     }
 
     function showFacturacionMessage(text, isError = false) {
@@ -6219,25 +6273,48 @@
         closeTableFilterMenu();
       }
     });
+    [
+      ventasBody,
+      ventasResumenBody,
+      ventasTransBody,
+      cajaTransBody,
+      cajaCredBody,
+      cajaCredDetailBody,
+      cajaPagosBody,
+      productosBody,
+      comprasBody,
+      ajustesBody,
+      cajaBody,
+      cierresBody,
+      lotesBody,
+      pagosCreditoBody,
+      cajaTransDetailBody,
+      ventasTransDetailBody,
+      ventasResumenDetailBody,
+    ].filter(Boolean).forEach((tbody) => {
+      tbody.addEventListener('click', (event) => {
+        if (event.target.closest('button, a')) return;
+        const row = event.target.closest('tr[data-track-key][data-track-context]');
+        if (!row || !tbody.contains(row)) return;
+        const key = row.getAttribute('data-track-key');
+        const context = row.getAttribute('data-track-context');
+        if (!key || !context) return;
+        setTrackedRowMarker(tbody.id, { key, context });
+        tbody.querySelectorAll('tr.tracked-current-row').forEach((item) => {
+          item.classList.remove('tracked-current-row');
+        });
+        row.classList.add('tracked-current-row');
+      });
+    });
     if (ventasResumenBody) {
       bindSummaryCopy(ventasResumenBody);
       ventasResumenBody.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-action="resumen-detalle"][data-codigo]');
-        if (btn) {
-          const codigo = btn.getAttribute('data-codigo');
-          const nombre = btn.getAttribute('data-nombre') || '';
-          if (!codigo) return;
-          showResumenDetalle(codigo, nombre);
-          return;
-        }
-        if (event.target.closest('button')) return;
-        const row = event.target.closest('tr[data-codigo][data-fecha]');
-        if (!row) return;
-        const codigo = row.getAttribute('data-codigo');
-        const fecha = row.getAttribute('data-fecha') || (ventasResumenFecha ? (ventasResumenFecha.value || toLocalISODate(new Date())) : toLocalISODate(new Date()));
+        if (!btn) return;
+        const codigo = btn.getAttribute('data-codigo');
+        const nombre = btn.getAttribute('data-nombre') || '';
         if (!codigo) return;
-        setResumenCurrentMarker({ fecha, codigo });
-        renderResumen();
+        showResumenDetalle(codigo, nombre);
       });
     }
     if (ventasResumenDetailBody) {

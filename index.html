@@ -1172,6 +1172,9 @@
             <input type="checkbox" id="rememberTableColumnsToggle">
             <span class="switch"></span>
           </label>
+          <div class="modal-actions" style="margin-top:12px;">
+            <button type="button" class="btn" id="settingsClose">Cerrar</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2601,6 +2604,7 @@
     const sectionLabel = document.getElementById('sectionLabel');
     const settingsToggle = document.getElementById('settingsToggle');
     const settingsMenu = document.getElementById('settingsMenu');
+    const settingsClose = document.getElementById('settingsClose');
     const themeToggle = document.getElementById('themeToggle');
     const rememberFilterDatesToggle = document.getElementById('rememberFilterDatesToggle');
     const rememberTableSelectionToggle = document.getElementById('rememberTableSelectionToggle');
@@ -3249,6 +3253,12 @@
       helpModal.setAttribute('aria-hidden', 'true');
     };
 
+    const closeSettingsMenu = () => {
+      if (!settingsMenu) return;
+      settingsMenu.setAttribute('hidden', '');
+      if (settingsToggle) settingsToggle.setAttribute('aria-expanded', 'false');
+    };
+
     if (facturacionLoteCard) facturacionLoteCard.hidden = true;
 
     function updateProductosStickyOffset() {
@@ -3380,11 +3390,18 @@
       });
     });
     if (helpModalClose) {
-      helpModalClose.addEventListener('click', closeHelp);
+      helpModalClose.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeHelp();
+      });
     }
     if (helpModal) {
       helpModal.addEventListener('click', (event) => {
-        if (event.target === helpModal) closeHelp();
+        if (event.target === helpModal) {
+          event.stopPropagation();
+          closeHelp();
+        }
       });
     }
     if (ventasTransDetail) {
@@ -7149,9 +7166,15 @@
           settingsMenu.removeAttribute('hidden');
           settingsToggle.setAttribute('aria-expanded', 'true');
         } else {
-          settingsMenu.setAttribute('hidden', '');
-          settingsToggle.setAttribute('aria-expanded', 'false');
+          closeSettingsMenu();
         }
+      });
+    }
+    if (settingsClose) {
+      settingsClose.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeSettingsMenu();
       });
     }
     if (themeToggle) {
@@ -7238,9 +7261,9 @@
     });
     document.addEventListener('click', (event) => {
       if (!settingsMenu || settingsMenu.hasAttribute('hidden')) return;
+      if (helpModal && helpModal.classList.contains('active') && helpModal.contains(event.target)) return;
       if ((settingsToggle && settingsToggle.contains(event.target)) || settingsMenu.contains(event.target)) return;
-      settingsMenu.setAttribute('hidden', '');
-      if (settingsToggle) settingsToggle.setAttribute('aria-expanded', 'false');
+      closeSettingsMenu();
     });
     if (pagosCreditoClose) {
       pagosCreditoClose.addEventListener('click', () => {

@@ -862,7 +862,7 @@
       overflow: auto;
       margin-bottom: 10px;
     }
-    .column-fields .column-option {
+    .column-option {
       display: flex;
       flex-direction: row;
       align-items: center;
@@ -875,19 +875,31 @@
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.03);
     }
-    .column-fields .column-option.dragging {
+    .column-option.dragging {
       opacity: 0.6;
       border-color: rgba(233, 255, 112, 0.4);
       background: rgba(233, 255, 112, 0.08);
     }
-    .column-fields .column-option-main {
+    .column-option-placeholder {
+      border: 1px dashed rgba(233, 255, 112, 0.35);
+      background: rgba(233, 255, 112, 0.06);
+      min-height: 46px;
+    }
+    .column-option.drag-ghost {
+      position: fixed;
+      z-index: 90;
+      pointer-events: none;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+      transform: scale(1.01);
+    }
+    .column-option-main {
       display: flex;
       align-items: center;
       gap: 10px;
       flex: 1 1 auto;
       min-width: 0;
     }
-    .column-fields .column-option-main span {
+    .column-option-main span {
       flex: 1 1 auto;
       min-width: 0;
       white-space: nowrap;
@@ -6962,13 +6974,25 @@
         if (!item || !tableId) return;
         event.preventDefault();
         event.stopPropagation();
+        const rect = item.getBoundingClientRect();
+        const placeholder = document.createElement('div');
+        placeholder.className = 'column-option column-option-placeholder';
+        placeholder.style.height = `${rect.height}px`;
+        tableColumnsFields.insertBefore(placeholder, item.nextSibling);
+        document.body.appendChild(item);
         activeColumnDrag = {
           pointerId: event.pointerId,
           tableId,
           item,
           handle,
+          placeholder,
+          offsetX: event.clientX - rect.left,
+          offsetY: event.clientY - rect.top,
         };
-        item.classList.add('dragging');
+        item.classList.add('dragging', 'drag-ghost');
+        item.style.width = `${rect.width}px`;
+        item.style.left = `${rect.left}px`;
+        item.style.top = `${rect.top}px`;
         if (handle.setPointerCapture) handle.setPointerCapture(event.pointerId);
       });
       tableColumnsMenu.addEventListener('pointermove', (event) => {
@@ -6976,7 +7000,9 @@
         if (event.pointerId !== activeColumnDrag.pointerId) return;
         event.preventDefault();
         const draggingItem = activeColumnDrag.item;
-        const siblings = Array.from(tableColumnsFields.querySelectorAll('.column-option[data-column-key]:not(.dragging)'));
+        draggingItem.style.left = `${event.clientX - activeColumnDrag.offsetX}px`;
+        draggingItem.style.top = `${event.clientY - activeColumnDrag.offsetY}px`;
+        const siblings = Array.from(tableColumnsFields.querySelectorAll('.column-option[data-column-key]:not(.column-option-placeholder)'));
         let insertBefore = null;
         for (const sibling of siblings) {
           const rect = sibling.getBoundingClientRect();
@@ -6986,16 +7012,23 @@
           }
         }
         if (insertBefore) {
-          tableColumnsFields.insertBefore(draggingItem, insertBefore);
+          tableColumnsFields.insertBefore(activeColumnDrag.placeholder, insertBefore);
         } else {
-          tableColumnsFields.appendChild(draggingItem);
+          tableColumnsFields.appendChild(activeColumnDrag.placeholder);
         }
       });
       const finishColumnDrag = (event) => {
         if (!activeColumnDrag || !tableColumnsFields) return;
         if (event.pointerId !== undefined && event.pointerId !== activeColumnDrag.pointerId) return;
-        const { item, handle, tableId, pointerId } = activeColumnDrag;
-        item.classList.remove('dragging');
+        const { item, handle, tableId, pointerId, placeholder } = activeColumnDrag;
+        if (placeholder && placeholder.parentNode === tableColumnsFields) {
+          tableColumnsFields.insertBefore(item, placeholder);
+          placeholder.remove();
+        }
+        item.classList.remove('dragging', 'drag-ghost');
+        item.style.width = '';
+        item.style.left = '';
+        item.style.top = '';
         if (handle.releasePointerCapture && handle.hasPointerCapture && handle.hasPointerCapture(pointerId)) {
           handle.releasePointerCapture(pointerId);
         }

@@ -355,6 +355,9 @@ function doPost(e) {
 
     if (!isAjusteInventario) {
       syncTransaccionAndCaja(transaccionId);
+      if (tipoTextoFromPayload === 'compra' || tipoTextoFromItems === 'compra') {
+        updateProductosCostoFromCompraItems(items);
+      }
     }
 
     return jsonResponse({ ok: true, inserted: rows.length, first_numero: nextNum, transaccion_id: transaccionId });
@@ -372,6 +375,32 @@ function jsonpResponse(obj, callback) {
   const safeCallback = String(callback || '').replace(/[^\w$.]/g, '');
   const payload = `${safeCallback}(${JSON.stringify(obj)});`;
   return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function updateProductosCostoFromCompraItems(items) {
+  if (!items || !items.length) return;
+  const sheet = getProductosSheet();
+  if (!sheet) throw new Error('No se encontró la hoja "productos".');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxCodigo = headers.indexOf('codigo');
+  const idxCosto = headers.indexOf('costo_unitario');
+  if (idxCodigo < 0 || idxCosto < 0) {
+    throw new Error('Columnas requeridas faltantes en productos.');
+  }
+  const updatesByCodigo = {};
+  items.forEach((item) => {
+    const codigo = String(item.codigo || '').trim();
+    const tipo = Number(item.tipo || 0);
+    const costoUnitario = Number(item.valor_unitario || 0);
+    if (!codigo || tipo !== 2 || !isFinite(costoUnitario)) return;
+    updatesByCodigo[codigo] = costoUnitario;
+  });
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i += 1) {
+    const codigo = String(data[i][idxCodigo] || '').trim();
+    if (!codigo || !Object.prototype.hasOwnProperty.call(updatesByCodigo, codigo)) continue;
+    sheet.getRange(i + 1, idxCosto + 1).setValue(updatesByCodigo[codigo]);
+  }
 }
 
 function normalizeTransaccionTipo(value) {

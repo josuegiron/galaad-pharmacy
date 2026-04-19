@@ -2325,7 +2325,7 @@
 
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4LQ1n7jvjAvgJVRpJkwnqA17RINqBDX5ZtRnzPQhyjje-XOYjqjVV8zOWCNYlm8pq/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-oqnovamtlMHBaDB2ZTtn31yGHCp3yOcT6WrF2EtWaqG-21bzcrMvmAwy1CTwDy0U/exec';
     const SHEET_NAME = 'movimientos';
 
     const form = document.getElementById('ventaForm');
@@ -3020,7 +3020,7 @@
       card.dataset.producto = item.nombre || '';
       card.dataset.proveedor = item.proveedor || '';
       card.dataset.stock = item.stock_actual !== undefined ? item.stock_actual : '';
-      const precioDefault = item.valor_unitario || item.precio_venta || 0;
+      const precioDefault = item.valor_unitario || item.costo_unitario || item.precio_venta || 0;
       const stockActual = Number(item.stock_actual || 0);
       card.dataset.precio = precioDefault;
       card.innerHTML = `
@@ -3066,7 +3066,7 @@
       card.dataset.codigo = item.codigo || '';
       card.dataset.producto = item.nombre || '';
       card.dataset.proveedor = item.proveedor || '';
-      const precioDefault = item.valor_unitario || item.precio_venta || 0;
+      const precioDefault = item.valor_unitario || item.costo_unitario || item.precio_venta || 0;
       card.dataset.precio = precioDefault;
       card.innerHTML = `
         <div class="row">
@@ -3077,7 +3077,7 @@
         </div>
         <div class="controls">
           <label>
-            Precio
+            Precio costo
             <input type="number" class="precio" step="0.01" value="${precioDefault}" required>
           </label>
           <label>
@@ -3186,8 +3186,9 @@
           nombre: selected.nombre,
           proveedor: selected.proveedor,
           stock_actual: selected.stock_actual,
+          costo_unitario: selected.costo_unitario,
           precio_venta: selected.precio_venta,
-          valor_unitario: selected.precio_venta,
+          valor_unitario: selected.costo_unitario,
         };
         createCompraItemRow(item);
         if (compraProductSearch) compraProductSearch.value = '';

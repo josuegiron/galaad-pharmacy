@@ -6928,6 +6928,48 @@
         }
       });
     }
+    const moveActiveColumnDrag = (event) => {
+      if (!activeColumnDrag || !tableColumnsFields) return;
+      if (event.pointerId !== undefined && event.pointerId !== activeColumnDrag.pointerId) return;
+      event.preventDefault();
+      const draggingItem = activeColumnDrag.item;
+      draggingItem.style.left = `${event.clientX - activeColumnDrag.offsetX}px`;
+      draggingItem.style.top = `${event.clientY - activeColumnDrag.offsetY}px`;
+      const siblings = Array.from(tableColumnsFields.querySelectorAll('.column-option[data-column-key]:not(.column-option-placeholder)'));
+      let insertBefore = null;
+      for (const sibling of siblings) {
+        const rect = sibling.getBoundingClientRect();
+        if (event.clientY < rect.top + rect.height / 2) {
+          insertBefore = sibling;
+          break;
+        }
+      }
+      if (insertBefore) {
+        tableColumnsFields.insertBefore(activeColumnDrag.placeholder, insertBefore);
+      } else {
+        tableColumnsFields.appendChild(activeColumnDrag.placeholder);
+      }
+    };
+
+    const finishColumnDrag = (event) => {
+      if (!activeColumnDrag || !tableColumnsFields) return;
+      if (event.pointerId !== undefined && event.pointerId !== activeColumnDrag.pointerId) return;
+      const { item, handle, tableId, pointerId, placeholder } = activeColumnDrag;
+      if (placeholder && placeholder.parentNode === tableColumnsFields) {
+        tableColumnsFields.insertBefore(item, placeholder);
+        placeholder.remove();
+      }
+      item.classList.remove('dragging', 'drag-ghost');
+      item.style.width = '';
+      item.style.left = '';
+      item.style.top = '';
+      if (handle.releasePointerCapture && handle.hasPointerCapture && handle.hasPointerCapture(pointerId)) {
+        handle.releasePointerCapture(pointerId);
+      }
+      activeColumnDrag = null;
+      commitTableColumnOrderFromModal(tableId);
+    };
+
     if (tableColumnsMenu) {
       tableColumnsMenu.addEventListener('click', (event) => {
         const actionBtn = event.target.closest('button[data-action]');
@@ -6995,49 +7037,10 @@
         item.style.top = `${rect.top}px`;
         if (handle.setPointerCapture) handle.setPointerCapture(event.pointerId);
       });
-      tableColumnsMenu.addEventListener('pointermove', (event) => {
-        if (!activeColumnDrag || !tableColumnsFields) return;
-        if (event.pointerId !== activeColumnDrag.pointerId) return;
-        event.preventDefault();
-        const draggingItem = activeColumnDrag.item;
-        draggingItem.style.left = `${event.clientX - activeColumnDrag.offsetX}px`;
-        draggingItem.style.top = `${event.clientY - activeColumnDrag.offsetY}px`;
-        const siblings = Array.from(tableColumnsFields.querySelectorAll('.column-option[data-column-key]:not(.column-option-placeholder)'));
-        let insertBefore = null;
-        for (const sibling of siblings) {
-          const rect = sibling.getBoundingClientRect();
-          if (event.clientY < rect.top + rect.height / 2) {
-            insertBefore = sibling;
-            break;
-          }
-        }
-        if (insertBefore) {
-          tableColumnsFields.insertBefore(activeColumnDrag.placeholder, insertBefore);
-        } else {
-          tableColumnsFields.appendChild(activeColumnDrag.placeholder);
-        }
-      });
-      const finishColumnDrag = (event) => {
-        if (!activeColumnDrag || !tableColumnsFields) return;
-        if (event.pointerId !== undefined && event.pointerId !== activeColumnDrag.pointerId) return;
-        const { item, handle, tableId, pointerId, placeholder } = activeColumnDrag;
-        if (placeholder && placeholder.parentNode === tableColumnsFields) {
-          tableColumnsFields.insertBefore(item, placeholder);
-          placeholder.remove();
-        }
-        item.classList.remove('dragging', 'drag-ghost');
-        item.style.width = '';
-        item.style.left = '';
-        item.style.top = '';
-        if (handle.releasePointerCapture && handle.hasPointerCapture && handle.hasPointerCapture(pointerId)) {
-          handle.releasePointerCapture(pointerId);
-        }
-        activeColumnDrag = null;
-        commitTableColumnOrderFromModal(tableId);
-      };
-      tableColumnsMenu.addEventListener('pointerup', finishColumnDrag);
-      tableColumnsMenu.addEventListener('pointercancel', finishColumnDrag);
     }
+    document.addEventListener('pointermove', moveActiveColumnDrag, { passive: false });
+    document.addEventListener('pointerup', finishColumnDrag);
+    document.addEventListener('pointercancel', finishColumnDrag);
     document.addEventListener('click', (event) => {
       const filterBtn = event.target.closest('button.filter-btn[data-table][data-key]');
       if (filterBtn) {

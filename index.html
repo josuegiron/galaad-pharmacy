@@ -392,6 +392,13 @@
       width: 16px;
       height: 16px;
     }
+    .resumen-current-row td {
+      background: rgba(233, 255, 112, 0.18) !important;
+      box-shadow: inset 0 1px 0 rgba(233, 255, 112, 0.28), inset 0 -1px 0 rgba(233, 255, 112, 0.28);
+    }
+    .resumen-current-row td:first-child {
+      box-shadow: inset 4px 0 0 rgba(233, 255, 112, 0.95), inset 0 1px 0 rgba(233, 255, 112, 0.28), inset 0 -1px 0 rgba(233, 255, 112, 0.28);
+    }
     .signed-input-row {
       display: flex;
       align-items: center;
@@ -2616,6 +2623,7 @@
     const viewButtons = [...document.querySelectorAll('[data-view]')];
 
     const THEME_KEY = 'galaad-theme';
+    const RESUMEN_CURRENT_KEY = 'galaad-ventas-resumen-current';
     const THEME_COLORS = { dark: '#0c1020', light: '#f5f7fb' };
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
@@ -2632,6 +2640,32 @@
       applyTheme('dark');
     }
     initTheme();
+
+    function getResumenCurrentMarker() {
+      try {
+        const raw = localStorage.getItem(RESUMEN_CURRENT_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.fecha || !parsed.codigo) return null;
+        return parsed;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function setResumenCurrentMarker(marker) {
+      try {
+        if (!marker || !marker.fecha || !marker.codigo) {
+          localStorage.removeItem(RESUMEN_CURRENT_KEY);
+          return;
+        }
+        localStorage.setItem(RESUMEN_CURRENT_KEY, JSON.stringify({
+          fecha: String(marker.fecha),
+          codigo: String(marker.codigo),
+        }));
+      } catch (err) {
+      }
+    }
 
     const viewLabels = {
       'ventas-menu': 'Ventas',
@@ -5496,6 +5530,7 @@
       if (!ventasResumenBody || !ventasResumenFecha) return;
       const selectedDate = ventasResumenFecha.value || toLocalISODate(new Date());
       const tipoFilter = ventasResumenTipoFilter ? ventasResumenTipoFilter.value : 'all';
+      const currentMarker = getResumenCurrentMarker();
       if (!movimientosLoaded) {
         ventasResumenStatus.textContent = 'Cargando ventas...';
         return;
@@ -5553,8 +5588,9 @@
       let totalGeneral = 0;
       ventasResumenBody.innerHTML = rows.map(row => {
         totalGeneral += row.total;
+        const isCurrent = currentMarker && currentMarker.fecha === selectedDate && currentMarker.codigo === row.codigo;
         return `
-          <tr>
+          <tr class="${isCurrent ? 'resumen-current-row' : ''}" data-codigo="${row.codigo}" data-fecha="${selectedDate}">
             <td>${row.codigo}</td>
             <td>${row.nombre}</td>
             <td>${row.cantidad}</td>
@@ -5563,7 +5599,9 @@
             <td>Q.${row.total.toFixed(2)}</td>
             <td>${isFinite(row.stock_actual) ? row.stock_actual : 0}</td>
             <td>${row.afecto}</td>
-            <td><button type="button" class="btn compact" data-action="resumen-detalle" data-codigo="${row.codigo}">Ver detalle</button></td>
+            <td>
+              <button type="button" class="btn compact" data-action="resumen-detalle" data-codigo="${row.codigo}" data-nombre="${row.nombre}">Ver detalle</button>
+            </td>
           </tr>
         `;
       }).join('');
@@ -5573,6 +5611,14 @@
       updateResumenVisibleTotal();
       ventasResumenStatus.textContent = 'Actualizado';
       syncStickyHeads();
+      if (currentMarker && currentMarker.fecha === selectedDate) {
+        const currentRow = ventasResumenBody.querySelector(`tr[data-codigo="${currentMarker.codigo}"]`);
+        if (currentRow) {
+          requestAnimationFrame(() => {
+            currentRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          });
+        }
+      }
     }
 
     function showFacturacionMessage(text, isError = false) {
@@ -6177,11 +6223,21 @@
       bindSummaryCopy(ventasResumenBody);
       ventasResumenBody.addEventListener('click', (event) => {
         const btn = event.target.closest('button[data-action="resumen-detalle"][data-codigo]');
-        if (!btn) return;
-        const codigo = btn.getAttribute('data-codigo');
-        const nombre = btn.getAttribute('data-nombre') || '';
+        if (btn) {
+          const codigo = btn.getAttribute('data-codigo');
+          const nombre = btn.getAttribute('data-nombre') || '';
+          if (!codigo) return;
+          showResumenDetalle(codigo, nombre);
+          return;
+        }
+        if (event.target.closest('button')) return;
+        const row = event.target.closest('tr[data-codigo][data-fecha]');
+        if (!row) return;
+        const codigo = row.getAttribute('data-codigo');
+        const fecha = row.getAttribute('data-fecha') || (ventasResumenFecha ? (ventasResumenFecha.value || toLocalISODate(new Date())) : toLocalISODate(new Date()));
         if (!codigo) return;
-        showResumenDetalle(codigo, nombre);
+        setResumenCurrentMarker({ fecha, codigo });
+        renderResumen();
       });
     }
     if (ventasResumenDetailBody) {

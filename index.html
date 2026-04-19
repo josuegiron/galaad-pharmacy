@@ -169,7 +169,8 @@
       position: absolute;
       right: 0;
       top: calc(100% + 10px);
-      min-width: 200px;
+      min-width: 280px;
+      max-width: min(92vw, 340px);
       background: var(--card);
       border: 1px solid var(--stroke);
       border-radius: 14px;
@@ -184,16 +185,38 @@
       color: var(--muted);
       margin-bottom: 8px;
     }
-    .switch-row {
+    .settings-menu .switch-row {
       display: flex;
+      flex-direction: row;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
       font-size: 14px;
       color: var(--text);
+      width: 100%;
     }
-    .switch-row input { display: none; }
-    .switch {
+    .settings-menu .switch-label-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .settings-menu .switch-label-group span {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .settings-menu .help-btn {
+      width: 24px;
+      height: 24px;
+      flex: 0 0 auto;
+      font-size: 12px;
+    }
+    .settings-menu .switch-row input { display: none; }
+    .settings-menu .switch {
+      flex: 0 0 auto;
       width: 42px;
       height: 24px;
       border-radius: 999px;
@@ -202,7 +225,7 @@
       position: relative;
       transition: background 0.2s ease, border-color 0.2s ease;
     }
-    .switch::after {
+    .settings-menu .switch::after {
       content: '';
       position: absolute;
       top: 3px;
@@ -213,11 +236,11 @@
       background: var(--text);
       transition: transform 0.2s ease;
     }
-    .switch-row input:checked + .switch {
+    .settings-menu .switch-row input:checked + .switch {
       background: var(--switch-on-bg);
       border-color: var(--switch-on-border);
     }
-    .switch-row input:checked + .switch::after {
+    .settings-menu .switch-row input:checked + .switch::after {
       transform: translateX(18px);
     }
     main { width: 100%; max-width: 100%; margin: 0 auto; padding: 0 0 96px; }
@@ -1110,27 +1133,42 @@
         <div class="settings-menu" id="settingsMenu" hidden>
           <div class="settings-title">Configuracion</div>
           <label class="switch-row">
-            <span>Modo oscuro</span>
+            <span class="switch-label-group">
+              <span>Modo oscuro</span>
+              <button type="button" class="help-btn" data-help="config-theme" aria-label="Ayuda de modo oscuro">?</button>
+            </span>
             <input type="checkbox" id="themeToggle">
             <span class="switch"></span>
           </label>
           <label class="switch-row" style="margin-top:10px;">
-            <span>Recordar fechas de filtros</span>
+            <span class="switch-label-group">
+              <span>Recordar fechas de filtros</span>
+              <button type="button" class="help-btn" data-help="config-filter-dates" aria-label="Ayuda de recordar fechas de filtros">?</button>
+            </span>
             <input type="checkbox" id="rememberFilterDatesToggle">
             <span class="switch"></span>
           </label>
           <label class="switch-row" style="margin-top:10px;">
-            <span>Recordar selección en tablas</span>
+            <span class="switch-label-group">
+              <span>Recordar selección en tablas</span>
+              <button type="button" class="help-btn" data-help="config-table-selection" aria-label="Ayuda de recordar selección en tablas">?</button>
+            </span>
             <input type="checkbox" id="rememberTableSelectionToggle">
             <span class="switch"></span>
           </label>
           <label class="switch-row" style="margin-top:10px;">
-            <span>Recordar filtros de tablas</span>
+            <span class="switch-label-group">
+              <span>Recordar filtros de tablas</span>
+              <button type="button" class="help-btn" data-help="config-table-filters" aria-label="Ayuda de recordar filtros de tablas">?</button>
+            </span>
             <input type="checkbox" id="rememberTableFiltersToggle">
             <span class="switch"></span>
           </label>
           <label class="switch-row" style="margin-top:10px;">
-            <span>Recordar columnas de tablas</span>
+            <span class="switch-label-group">
+              <span>Recordar columnas de tablas</span>
+              <button type="button" class="help-btn" data-help="config-table-columns" aria-label="Ayuda de recordar columnas de tablas">?</button>
+            </span>
             <input type="checkbox" id="rememberTableColumnsToggle">
             <span class="switch"></span>
           </label>
@@ -3140,6 +3178,46 @@
           'Se confirman al cerrar el día.',
         ],
       },
+      'config-theme': {
+        title: 'Modo oscuro',
+        desc: 'Cambia la apariencia general entre tema oscuro y claro.',
+        bullets: [
+          'Se guarda en este dispositivo.',
+          'No afecta datos ni cálculos.',
+        ],
+      },
+      'config-filter-dates': {
+        title: 'Recordar fechas de filtros',
+        desc: 'Decide si las fechas elegidas en filtros se conservan entre vistas o recargas.',
+        bullets: [
+          'Activado: recuerda las fechas seleccionadas.',
+          'Desactivado: usa la fecha actual o el rango por defecto.',
+        ],
+      },
+      'config-table-selection': {
+        title: 'Recordar selección en tablas',
+        desc: 'Guarda la fila marcada para retomar dónde ibas al volver a la tabla.',
+        bullets: [
+          'Activado: la fila marcada se restaura en este dispositivo.',
+          'Desactivado: la marca solo dura en la sesión actual.',
+        ],
+      },
+      'config-table-filters': {
+        title: 'Recordar filtros de tablas',
+        desc: 'Guarda filtros y orden aplicados en las tablas.',
+        bullets: [
+          'Activado: cada tabla recupera sus filtros y orden.',
+          'Desactivado: las tablas vuelven limpias.',
+        ],
+      },
+      'config-table-columns': {
+        title: 'Recordar columnas de tablas',
+        desc: 'Conserva qué columnas ocultaste o dejaste visibles en cada tabla.',
+        bullets: [
+          'Activado: cada tabla recuerda su vista de columnas.',
+          'Desactivado: se muestran todas al volver a entrar.',
+        ],
+      },
     };
 
     const defaultHelpContent = {
@@ -3296,6 +3374,7 @@
     });
     helpButtons.forEach((btn) => {
       btn.addEventListener('click', (event) => {
+        event.preventDefault();
         event.stopPropagation();
         openHelp(btn.dataset.help);
       });

@@ -2720,6 +2720,28 @@
       'caja-cuentas': 'Cuentas por pagar',
       'caja-pagos': 'Administrar pagos',
     };
+    const rootViewsByViewId = {
+      'ventas-menu': 'ventas-menu',
+      'ventas-form': 'ventas-menu',
+      'ventas-historico': 'ventas-menu',
+      'ventas-resumen': 'ventas-menu',
+      'ventas-transacciones': 'ventas-menu',
+      'facturacion-menu': 'facturacion-menu',
+      'facturacion-generar': 'facturacion-menu',
+      'facturacion-lotes': 'facturacion-menu',
+      'inventario-menu': 'inventario-menu',
+      'inventario-productos': 'inventario-menu',
+      'inventario-compras-crear': 'inventario-menu',
+      'inventario-compras-listado': 'inventario-menu',
+      'inventario-ajustes-crear': 'inventario-menu',
+      'inventario-ajustes-listado': 'inventario-menu',
+      'caja-transacciones': 'inventario-menu',
+      'caja-menu': 'caja-menu',
+      'caja-view': 'caja-menu',
+      'caja-cierres': 'caja-menu',
+      'caja-cuentas': 'caja-menu',
+      'caja-pagos': 'caja-menu',
+    };
 
     const helpContent = {
       'ventas-menu': {
@@ -2927,11 +2949,11 @@
     }
 
     const setActiveView = (viewId) => {
-      const rootView = viewId.startsWith('ventas') ? 'ventas-menu'
+      const rootView = rootViewsByViewId[viewId] || (viewId.startsWith('ventas') ? 'ventas-menu'
         : viewId.startsWith('facturacion') ? 'facturacion-menu'
         : viewId.startsWith('inventario') ? 'inventario-menu'
         : viewId.startsWith('caja') ? 'caja-menu'
-        : viewId;
+        : viewId);
       views.forEach(view => {
         view.classList.toggle('active', view.id === viewId);
       });

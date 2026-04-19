@@ -866,21 +866,79 @@
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       font-size: 14px;
       justify-content: flex-start;
-      white-space: nowrap;
       text-align: left;
+      padding: 8px 10px;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
     }
-    .column-fields .column-option input {
-      flex: 0 0 auto;
-      width: 16px;
-      height: 16px;
-      accent-color: var(--accent);
+    .column-fields .column-option.dragging {
+      opacity: 0.6;
+      border-color: rgba(233, 255, 112, 0.4);
+      background: rgba(233, 255, 112, 0.08);
     }
-    .column-fields .column-option span {
+    .column-fields .column-option-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       flex: 1 1 auto;
       min-width: 0;
+    }
+    .column-fields .column-option-main span {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .column-visibility-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      flex: 0 0 auto;
+    }
+    .column-visibility-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    .column-visibility-btn.is-hidden {
+      color: var(--muted);
+      opacity: 0.72;
+    }
+    .column-drag-handle {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+      flex: 0 0 auto;
+      touch-action: none;
+    }
+    .column-drag-handle:hover {
+      border-color: rgba(233, 255, 112, 0.4);
+    }
+    .column-visibility-btn:hover {
+      border-color: rgba(233, 255, 112, 0.4);
     }
     .filter-footer {
       display: flex;
@@ -2407,6 +2465,7 @@
     <div class="column-fields" id="tableColumnsFields"></div>
     <div class="filter-footer">
       <button type="button" class="btn compact" data-action="show-all">Mostrar todas</button>
+      <button type="button" class="btn compact" data-action="reset-order">Restaurar orden</button>
     </div>
   </div>
 
@@ -2911,19 +2970,34 @@
     }
 
     function getStoredTableColumnState(tbodyId) {
-      if (!tbodyId) return [];
+      if (!tbodyId) return { hiddenColumns: [], columnOrder: [] };
       const stored = getStoredTableColumns();
-      return Array.isArray(stored[tbodyId]) ? stored[tbodyId] : [];
+      const state = stored[tbodyId];
+      if (Array.isArray(state)) {
+        return { hiddenColumns: state, columnOrder: [] };
+      }
+      if (!state || typeof state !== 'object') {
+        return { hiddenColumns: [], columnOrder: [] };
+      }
+      return {
+        hiddenColumns: Array.isArray(state.hiddenColumns) ? state.hiddenColumns : [],
+        columnOrder: Array.isArray(state.columnOrder) ? state.columnOrder : [],
+      };
     }
 
-    function setStoredTableColumnState(tbodyId, hiddenColumns) {
+    function setStoredTableColumnState(tbodyId, columnState) {
       if (!tbodyId || !getRememberTableColumns()) return;
       try {
         const stored = getStoredTableColumns();
-        if (!Array.isArray(hiddenColumns) || !hiddenColumns.length) {
+        const hiddenColumns = Array.isArray(columnState && columnState.hiddenColumns) ? columnState.hiddenColumns : [];
+        const columnOrder = Array.isArray(columnState && columnState.columnOrder) ? columnState.columnOrder : [];
+        if (!hiddenColumns.length && !columnOrder.length) {
           delete stored[tbodyId];
         } else {
-          stored[tbodyId] = hiddenColumns.map(String);
+          stored[tbodyId] = {
+            hiddenColumns: hiddenColumns.map(String),
+            columnOrder: columnOrder.map(String),
+          };
         }
         localStorage.setItem(TABLE_COLUMNS_KEY, JSON.stringify(stored));
       } catch (err) {
@@ -4418,6 +4492,7 @@
     const tableFilters = new Map();
     let activeTableFilter = null;
     let activeTableColumns = null;
+    let activeColumnDrag = null;
     let cajaTransLoading = false;
     let cajaCredLoading = false;
     let cajaPagosLoading = false;
@@ -4842,6 +4917,7 @@
     function applyTableColumnVisibility(tbodyId) {
       const state = tableFilters.get(tbodyId);
       if (!state) return;
+      const canManageFooter = !(state.table.tFoot && Array.from(state.table.tFoot.rows).some((row) => Array.from(row.cells).some((cell) => Number(cell.colSpan || 1) > 1)));
       state.columns.forEach((col) => {
         const hidden = state.hiddenColumns.includes(col.key);
         if (col.th) col.th.style.display = hidden ? 'none' : '';
@@ -4849,13 +4925,70 @@
           const cell = row.cells[col.index];
           if (cell) cell.style.display = hidden ? 'none' : '';
         });
-        const tfootRows = state.table.tFoot ? Array.from(state.table.tFoot.rows) : [];
-        tfootRows.forEach((row) => {
-          const cell = row.cells[col.index];
-          if (cell) cell.style.display = hidden ? 'none' : '';
+        if (canManageFooter) {
+          const tfootRows = state.table.tFoot ? Array.from(state.table.tFoot.rows) : [];
+          tfootRows.forEach((row) => {
+            const cell = row.cells[col.index];
+            if (cell) cell.style.display = hidden ? 'none' : '';
+          });
+        }
+      });
+      setStoredTableColumnState(tbodyId, {
+        hiddenColumns: state.hiddenColumns,
+        columnOrder: state.columnOrder,
+      });
+    }
+
+    function syncTableBodyCellKeys(tbodyId) {
+      const state = tableFilters.get(tbodyId);
+      if (!state) return;
+      const originalColumns = state.columns.slice().sort((a, b) => a.originalIndex - b.originalIndex);
+      Array.from(state.tbody.querySelectorAll('tr')).forEach((row) => {
+        if (row.cells.length !== originalColumns.length) return;
+        if (Array.from(row.cells).every((cell) => cell.hasAttribute('data-col-key'))) return;
+        originalColumns.forEach((col, index) => {
+          const cell = row.cells[index];
+          if (cell) cell.setAttribute('data-col-key', col.key);
         });
       });
-      setStoredTableColumnState(tbodyId, state.hiddenColumns);
+    }
+
+    function applyTableColumnOrder(tbodyId) {
+      const state = tableFilters.get(tbodyId);
+      if (!state || !state.headerRow) return;
+      syncTableBodyCellKeys(tbodyId);
+      const orderedKeys = state.columnOrder.length ? state.columnOrder.slice() : state.columns.map(col => col.key);
+      const keySet = new Set(orderedKeys);
+      state.columns.forEach((col) => {
+        if (!keySet.has(col.key)) orderedKeys.push(col.key);
+      });
+      const orderedColumns = orderedKeys.map((key) => state.columns.find(col => col.key === key)).filter(Boolean);
+      orderedColumns.forEach((col, index) => {
+        col.index = index;
+        state.headerRow.appendChild(col.th);
+      });
+      Array.from(state.tbody.querySelectorAll('tr')).forEach((row) => {
+        orderedColumns.forEach((col) => {
+          const cell = row.querySelector(`[data-col-key="${col.key}"]`);
+          if (cell) row.appendChild(cell);
+        });
+      });
+      const canManageFooter = !(state.table.tFoot && Array.from(state.table.tFoot.rows).some((row) => Array.from(row.cells).some((cell) => Number(cell.colSpan || 1) > 1)));
+      if (canManageFooter) {
+        const tfootRows = state.table.tFoot ? Array.from(state.table.tFoot.rows) : [];
+        tfootRows.forEach((row) => {
+          orderedColumns.forEach((col) => {
+            const cell = row.querySelector(`[data-col-key="${col.key}"]`);
+            if (cell) row.appendChild(cell);
+          });
+        });
+      }
+      state.columnOrder = orderedColumns.map(col => col.key);
+      setStoredTableColumnState(tbodyId, {
+        hiddenColumns: state.hiddenColumns,
+        columnOrder: state.columnOrder,
+      });
+      syncStickyHeads();
     }
 
     function buildTableColumnsFields(tableId) {
@@ -4863,13 +4996,34 @@
       const state = tableFilters.get(tableId || '');
       if (!state) return;
       tableColumnsTitle.textContent = 'Columnas visibles';
-      const options = state.columns.filter(col => col.hideable);
-      tableColumnsFields.innerHTML = options.map(col => `
-        <label class="column-option">
-          <input type="checkbox" data-column-key="${col.key}" data-table="${tableId}" ${state.hiddenColumns.includes(col.key) ? '' : 'checked'}>
-          <span>${col.label}</span>
-        </label>
+      const options = state.columns.filter(col => col.hideable)
+        .slice()
+        .sort((a, b) => state.columnOrder.indexOf(a.key) - state.columnOrder.indexOf(b.key));
+      const eyeOpenIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5.23 0 9.27 3.11 11 7-1.73 3.89-5.77 7-11 7S2.73 15.89 1 12c1.73-3.89 5.77-7 11-7Zm0 2C8.05 7 4.94 9.06 3.2 12 4.94 14.94 8.05 17 12 17s7.06-2.06 8.8-5C19.06 9.06 15.95 7 12 7Zm0 2.5A2.5 2.5 0 1 1 12 14.5 2.5 2.5 0 0 1 12 9.5Z"/></svg>';
+      const eyeClosedIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m2.81 2.81 18.38 18.38-1.41 1.41-3.03-3.03A12.87 12.87 0 0 1 12 20c-5.23 0-9.27-3.11-11-7a12.84 12.84 0 0 1 4.2-4.89L1.4 4.22l1.41-1.41Zm7.72 7.72 3.94 3.94A2.48 2.48 0 0 0 14.5 12a2.5 2.5 0 0 0-3.97-1.47ZM12 7c3.95 0 7.06 2.06 8.8 5a10.7 10.7 0 0 1-2.63 3.15l-1.43-1.43A8.12 8.12 0 0 0 18.8 12C17.06 9.06 13.95 7 10 7c-.59 0-1.16.05-1.71.15L6.65 5.51A12.7 12.7 0 0 1 12 7Zm-7.02 5c1.02 1.72 2.6 3.08 4.54 3.88l-1.61-1.61A4.47 4.47 0 0 1 7.5 12c0-.49.08-.96.23-1.39L6.4 9.28A10.9 10.9 0 0 0 4.98 12Z"/></svg>';
+      tableColumnsFields.innerHTML = options.map((col) => `
+        <div class="column-option" data-column-key="${col.key}" data-table="${tableId}">
+          <div class="column-option-main">
+            <button type="button" class="column-visibility-btn ${state.hiddenColumns.includes(col.key) ? 'is-hidden' : ''}" data-action="toggle-visibility" data-column-key="${col.key}" data-table="${tableId}" aria-label="${state.hiddenColumns.includes(col.key) ? `Mostrar ${col.label}` : `Ocultar ${col.label}`}" title="${state.hiddenColumns.includes(col.key) ? 'Mostrar columna' : 'Ocultar columna'}">
+              ${state.hiddenColumns.includes(col.key) ? eyeClosedIcon : eyeOpenIcon}
+            </button>
+            <span>${col.label}</span>
+          </div>
+          <button type="button" class="column-drag-handle" data-column-key="${col.key}" data-table="${tableId}" aria-label="Arrastrar ${col.label}" title="Arrastrar para reordenar">≡</button>
+        </div>
       `).join('') || '<div class="empty-state" style="padding:0;">No hay columnas configurables.</div>';
+    }
+
+    function commitTableColumnOrderFromModal(tableId) {
+      const state = tableFilters.get(tableId || '');
+      if (!state || !tableColumnsFields) return;
+      const moveKeys = Array.from(tableColumnsFields.querySelectorAll('.column-option[data-column-key]'))
+        .map((item) => item.getAttribute('data-column-key'))
+        .filter(Boolean);
+      state.columnOrder = moveKeys.concat(state.columns.filter(col => !col.hideable).map(col => col.key));
+      applyTableColumnOrder(tableId);
+      applyTableColumnVisibility(tableId);
+      buildTableColumnsFields(tableId);
     }
 
     function initTableFilter(tbodyId) {
@@ -4886,6 +5040,7 @@
         const filterable = isFilterableLabel(label);
         const hideable = isHideableLabel(label);
         const key = `c${index}`;
+        th.setAttribute('data-col-key', key);
         th.innerHTML = '';
         th.classList.add('table-columns-trigger');
         th.setAttribute('data-table-columns', tbodyId);
@@ -4907,7 +5062,7 @@
         } else {
           th.textContent = label;
         }
-        return { key, label, type, index, filterable, hideable, th };
+        return { key, label, type, index, originalIndex: index, filterable, hideable, th };
       });
       const badge = ensureFilterBadge(tbodyId, table);
       const storedState = getStoredTableFilterState(tbodyId);
@@ -4924,19 +5079,41 @@
       const restoredSortStack = Array.isArray(storedState && storedState.sortStack)
         ? storedState.sortStack.filter(sort => sort && validColumnKeys.has(sort.key) && (sort.dir === 'asc' || sort.dir === 'desc'))
         : [];
-      const restoredHiddenColumns = Array.isArray(storedHiddenColumns)
-        ? storedHiddenColumns.filter(key => hideableColumnKeys.has(key))
+      const restoredHiddenColumns = Array.isArray(storedHiddenColumns.hiddenColumns)
+        ? storedHiddenColumns.hiddenColumns.filter(key => hideableColumnKeys.has(key))
         : [];
+      const restoredColumnOrder = Array.isArray(storedHiddenColumns.columnOrder)
+        ? storedHiddenColumns.columnOrder.filter(key => hideableColumnKeys.has(key))
+        : [];
+      const mergedHideableOrder = restoredColumnOrder.slice();
+      columns.filter(col => col.hideable).forEach((col) => {
+        if (!mergedHideableOrder.includes(col.key)) mergedHideableOrder.push(col.key);
+      });
+      const finalOrderedKeys = mergedHideableOrder.concat(columns.filter(col => !col.hideable).map(col => col.key));
+      Array.from(tbody.querySelectorAll('tr')).forEach((row) => {
+        Array.from(row.cells).forEach((cell, index) => {
+          cell.setAttribute('data-col-key', `c${index}`);
+        });
+      });
+      const tfootRows = table.tFoot ? Array.from(table.tFoot.rows) : [];
+      tfootRows.forEach((row) => {
+        Array.from(row.cells).forEach((cell, index) => {
+          cell.setAttribute('data-col-key', `c${index}`);
+        });
+      });
       tableFilters.set(tbodyId, {
         tbody,
         table,
+        headerRow,
         columns,
         badge,
         filters: restoredFilters,
         sortStack: restoredSortStack,
         hiddenColumns: restoredHiddenColumns,
+        columnOrder: finalOrderedKeys,
         isApplying: false,
       });
+      applyTableColumnOrder(tbodyId);
       updateTableFilterButtons(tbodyId);
       updateTableFilterBadge(tbodyId);
       applyTableColumnVisibility(tbodyId);
@@ -4952,6 +5129,7 @@
       const state = tableFilters.get(tbodyId);
       if (!state) return;
       if (state.isApplying) return;
+      syncTableBodyCellKeys(tbodyId);
       const rows = Array.from(state.tbody.querySelectorAll('tr'));
       if (!rows.length) return;
       if (rows.length === 1 && rows[0].cells.length === 1) return;
@@ -6742,6 +6920,8 @@
       tableColumnsMenu.addEventListener('click', (event) => {
         const actionBtn = event.target.closest('button[data-action]');
         if (!actionBtn) return;
+        event.preventDefault();
+        event.stopPropagation();
         const action = actionBtn.getAttribute('data-action');
         const tableId = tableColumnsMenu.getAttribute('data-table');
         const state = tableFilters.get(tableId || '');
@@ -6752,24 +6932,78 @@
           buildTableColumnsFields(tableId);
           return;
         }
-        if (action === 'close-columns') {
-          closeTableColumnsMenu();
+        if (action === 'toggle-visibility') {
+          const key = actionBtn.getAttribute('data-column-key');
+          if (!key) return;
+          if (state.hiddenColumns.includes(key)) {
+            state.hiddenColumns = state.hiddenColumns.filter(item => item !== key);
+          } else {
+            state.hiddenColumns.push(key);
+          }
+          applyTableColumnVisibility(tableId);
+          buildTableColumnsFields(tableId);
+          return;
+        }
+        if (action === 'reset-order') {
+          state.columnOrder = state.columns
+            .slice()
+            .sort((a, b) => a.originalIndex - b.originalIndex)
+            .map(col => col.key);
+          applyTableColumnOrder(tableId);
+          applyTableColumnVisibility(tableId);
+          buildTableColumnsFields(tableId);
         }
       });
-      tableColumnsMenu.addEventListener('change', (event) => {
-        const input = event.target.closest('input[type="checkbox"][data-column-key][data-table]');
-        if (!input) return;
-        const tableId = input.getAttribute('data-table');
-        const key = input.getAttribute('data-column-key');
-        const state = tableFilters.get(tableId || '');
-        if (!state || !key) return;
-        if (input.checked) {
-          state.hiddenColumns = state.hiddenColumns.filter(item => item !== key);
-        } else if (!state.hiddenColumns.includes(key)) {
-          state.hiddenColumns.push(key);
-        }
-        applyTableColumnVisibility(tableId);
+      tableColumnsMenu.addEventListener('pointerdown', (event) => {
+        const handle = event.target.closest('.column-drag-handle[data-column-key][data-table]');
+        if (!handle || !tableColumnsFields) return;
+        const item = handle.closest('.column-option[data-column-key]');
+        const tableId = handle.getAttribute('data-table');
+        if (!item || !tableId) return;
+        event.preventDefault();
+        event.stopPropagation();
+        activeColumnDrag = {
+          pointerId: event.pointerId,
+          tableId,
+          item,
+          handle,
+        };
+        item.classList.add('dragging');
+        if (handle.setPointerCapture) handle.setPointerCapture(event.pointerId);
       });
+      tableColumnsMenu.addEventListener('pointermove', (event) => {
+        if (!activeColumnDrag || !tableColumnsFields) return;
+        if (event.pointerId !== activeColumnDrag.pointerId) return;
+        event.preventDefault();
+        const draggingItem = activeColumnDrag.item;
+        const siblings = Array.from(tableColumnsFields.querySelectorAll('.column-option[data-column-key]:not(.dragging)'));
+        let insertBefore = null;
+        for (const sibling of siblings) {
+          const rect = sibling.getBoundingClientRect();
+          if (event.clientY < rect.top + rect.height / 2) {
+            insertBefore = sibling;
+            break;
+          }
+        }
+        if (insertBefore) {
+          tableColumnsFields.insertBefore(draggingItem, insertBefore);
+        } else {
+          tableColumnsFields.appendChild(draggingItem);
+        }
+      });
+      const finishColumnDrag = (event) => {
+        if (!activeColumnDrag || !tableColumnsFields) return;
+        if (event.pointerId !== undefined && event.pointerId !== activeColumnDrag.pointerId) return;
+        const { item, handle, tableId, pointerId } = activeColumnDrag;
+        item.classList.remove('dragging');
+        if (handle.releasePointerCapture && handle.hasPointerCapture && handle.hasPointerCapture(pointerId)) {
+          handle.releasePointerCapture(pointerId);
+        }
+        activeColumnDrag = null;
+        commitTableColumnOrderFromModal(tableId);
+      };
+      tableColumnsMenu.addEventListener('pointerup', finishColumnDrag);
+      tableColumnsMenu.addEventListener('pointercancel', finishColumnDrag);
     }
     document.addEventListener('click', (event) => {
       const filterBtn = event.target.closest('button.filter-btn[data-table][data-key]');
@@ -7266,11 +7500,16 @@
           clearStoredTableColumns();
           tableFilters.forEach((state, tbodyId) => {
             state.hiddenColumns = [];
+            state.columnOrder = state.columns.slice().sort((a, b) => a.originalIndex - b.originalIndex).map(col => col.key);
+            applyTableColumnOrder(tbodyId);
             applyTableColumnVisibility(tbodyId);
           });
         } else {
           tableFilters.forEach((state, tbodyId) => {
-            setStoredTableColumnState(tbodyId, state.hiddenColumns);
+            setStoredTableColumnState(tbodyId, {
+              hiddenColumns: state.hiddenColumns,
+              columnOrder: state.columnOrder,
+            });
           });
         }
         const activeView = views.find(view => view.classList.contains('active'));

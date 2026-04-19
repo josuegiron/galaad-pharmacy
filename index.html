@@ -5447,6 +5447,13 @@
         const dateObj = parseSheetDate(item.fechaRaw);
         if (!dateObj) return false;
         return toLocalISODate(dateObj) === selectedDate;
+      }).sort((a, b) => {
+        const dateA = parseSheetDate(a.fechaRaw);
+        const dateB = parseSheetDate(b.fechaRaw);
+        const timeA = dateA ? dateA.getTime() : 0;
+        const timeB = dateB ? dateB.getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return Number(b.numero || 0) - Number(a.numero || 0);
       });
 
       if (!rows.length) {

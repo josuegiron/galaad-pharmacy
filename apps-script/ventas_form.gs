@@ -661,7 +661,7 @@ function syncTransaccionAndCaja(transaccionId) {
     tipoTexto: tipoTexto,
     fecha: fecha,
     monto: summary.total,
-    concepto: `${conceptoBase} #${transaccionId}`,
+    concepto: `${conceptoBase} trx:#${transaccionId}`,
   });
 }
 

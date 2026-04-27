@@ -64,6 +64,11 @@ function doGet(e) {
       const result = updateMovimiento(payload);
       return callback ? jsonpResponse(result, callback) : jsonResponse(result);
     }
+    if (action === 'compra_actualizar') {
+      const payload = e && e.parameter ? e.parameter : {};
+      const result = updateCompra(payload);
+      return callback ? jsonpResponse(result, callback) : jsonResponse(result);
+    }
     if (action === 'caja_listar') {
       const payload = e && e.parameter ? e.parameter : {};
       const result = listCaja(payload);
@@ -170,6 +175,9 @@ function doPost(e) {
     }
     if (action === 'movimiento_actualizar') {
       return jsonResponse(updateMovimiento(payload));
+    }
+    if (action === 'compra_actualizar') {
+      return jsonResponse(updateCompra(payload));
     }
     if (action === 'caja_crear') {
       return jsonResponse(createCaja(payload));
@@ -552,6 +560,23 @@ function updateTransaccionEstado(transaccionId, estado) {
   if (idxTimestamp >= 0) sheet.getRange(meta.rowIndex, idxTimestamp + 1).setValue(new Date());
 }
 
+function updateTransaccionMeta(transaccionId, data) {
+  const sheet = getTransaccionesSheet();
+  const meta = getTransaccionMetaById(transaccionId);
+  if (!meta) return;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).toLowerCase());
+  const idxFecha = headers.indexOf('fecha');
+  const idxUsuario = headers.indexOf('usuario');
+  const idxReferencia = headers.indexOf('referencia_externa');
+  const idxNota = headers.indexOf('nota');
+  const idxTimestamp = headers.indexOf('timestamp');
+  if (idxFecha >= 0 && data.fecha !== undefined) sheet.getRange(meta.rowIndex, idxFecha + 1).setValue(data.fecha);
+  if (idxUsuario >= 0 && data.usuario !== undefined) sheet.getRange(meta.rowIndex, idxUsuario + 1).setValue(data.usuario);
+  if (idxReferencia >= 0 && data.referencia_externa !== undefined) sheet.getRange(meta.rowIndex, idxReferencia + 1).setValue(data.referencia_externa);
+  if (idxNota >= 0 && data.nota !== undefined) sheet.getRange(meta.rowIndex, idxNota + 1).setValue(data.nota);
+  if (idxTimestamp >= 0) sheet.getRange(meta.rowIndex, idxTimestamp + 1).setValue(new Date());
+}
+
 function deleteTransaccionRecord(transaccionId) {
   const sheet = getTransaccionesSheet();
   const meta = getTransaccionMetaById(transaccionId);
@@ -647,13 +672,13 @@ function syncTransaccionAndCaja(transaccionId) {
     return;
   }
   updateTransaccionTotal(transaccionId, summary.total);
-  if (summary.credito === 1) {
-    deleteCajaByTransaccionId(transaccionId);
-    return;
-  }
   const meta = getTransaccionMetaById(transaccionId);
   const tipoTexto = normalizeTransaccionTipo(meta && meta.tipo ? meta.tipo : summary.tipo);
   if (!tipoTexto) return;
+  if (summary.credito === 1) {
+    deleteCajaMovimientoByTransaccionId(transaccionId, tipoTexto);
+    return;
+  }
   const fecha = (meta && meta.fecha) ? meta.fecha : (summary.fecha || new Date());
   const conceptoBase = tipoTexto === 'compra' ? 'Compra' : 'Venta';
   upsertCajaByTransaccionId({
@@ -687,7 +712,8 @@ function upsertCajaByTransaccionId(data) {
   const dataRange = sheet.getDataRange().getValues();
   let rowIndex = -1;
   for (let i = 1; i < dataRange.length; i += 1) {
-    if (String(dataRange[i][idxReferencia] || '') === String(data.transaccionId)) {
+    const tipoDescripcion = String(dataRange[i][idxTipoDescripcion] || '').toLowerCase().trim();
+    if (String(dataRange[i][idxReferencia] || '') === String(data.transaccionId) && tipoDescripcion === String(data.tipoTexto || '').toLowerCase().trim()) {
       rowIndex = i + 1;
       break;
     }
@@ -734,6 +760,24 @@ function deleteCajaByTransaccionId(transaccionId) {
     if (String(data[i][idxReferencia] || '') === String(transaccionId)) {
       cajaSheet.deleteRow(i + 1);
     }
+  }
+}
+
+function deleteCajaMovimientoByTransaccionId(transaccionId, tipoTexto) {
+  const cajaSheet = SpreadsheetApp.getActive().getSheetByName(CAJA_SHEET_NAME);
+  if (!cajaSheet) return;
+  const data = cajaSheet.getDataRange().getValues();
+  if (data.length < 2) return;
+  const headers = data[0].map(h => String(h).toLowerCase());
+  let idxReferencia = headers.indexOf('referencia');
+  if (idxReferencia < 0 && data[0].length >= 6) idxReferencia = 5;
+  const idxTipoDescripcion = headers.indexOf('tipo_descripcion');
+  if (idxReferencia < 0 || idxTipoDescripcion < 0) return;
+  const targetTipo = String(tipoTexto || '').toLowerCase().trim();
+  for (let i = data.length - 1; i >= 1; i -= 1) {
+    if (String(data[i][idxReferencia] || '') !== String(transaccionId)) continue;
+    if (String(data[i][idxTipoDescripcion] || '').toLowerCase().trim() !== targetTipo) continue;
+    cajaSheet.deleteRow(i + 1);
   }
 }
 
@@ -1025,6 +1069,133 @@ function updateMovimiento(payload) {
     updateCajaMontoByNumero(numero, costoTotal);
   }
   return { ok: true, numero: numero, total: costoTotal, confirmado: nextConfirmado, transaccion_id: transaccionId || '' };
+}
+
+function updateCompra(payload) {
+  const transaccionId = Number(payload && payload.transaccion_id || 0);
+  if (!transaccionId) throw new Error('Transacción requerida.');
+  const meta = getTransaccionMetaById(transaccionId);
+  if (!meta) throw new Error('Transacción no encontrada.');
+  if (normalizeTransaccionTipo(meta.tipo) !== 'compra') {
+    throw new Error('Solo se puede editar una transacción de compra.');
+  }
+  if (String(meta.estado || '').toLowerCase() !== 'pendiente') {
+    throw new Error('Solo se pueden editar compras pendientes.');
+  }
+
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  if (!items.length) throw new Error('No hay items para registrar.');
+  items.forEach((item) => {
+    if (Number(item.tipo || 0) !== 2) {
+      throw new Error('Todos los items deben ser de compra.');
+    }
+    const cantidad = Number(item.cantidad || 0);
+    const valor = Number(item.valor_unitario || 0);
+    const descuento = Number(item.descuento || 0);
+    if (!isFinite(cantidad) || cantidad <= 0) throw new Error('Cantidad inválida.');
+    if (!isFinite(valor) || valor < 0) throw new Error('Valor unitario inválido.');
+    if (!isFinite(descuento) || descuento < 0) throw new Error('Descuento inválido.');
+  });
+
+  const summary = getTransaccionSummary(transaccionId);
+  if (summary && summary.hasConfirmado) {
+    throw new Error('No se puede editar una compra con movimientos confirmados.');
+  }
+
+  const fecha = payload && payload.fecha ? parseDateValue(payload.fecha) : parseDateValue(meta.fecha);
+  if (!fecha) throw new Error('Fecha inválida.');
+  assertDateNotClosed(meta.fecha);
+  assertDateNotClosed(fecha);
+
+  const creditoFlag = getCreditoFlag(items, payload);
+  const pagosMap = getPagosCreditoMap();
+  const pagado = Number(pagosMap[String(transaccionId)] || 0);
+  const totalNuevo = items.reduce((acc, item) => {
+    return acc + ((Math.abs(Number(item.cantidad || 0)) * Number(item.valor_unitario || 0)) - Number(item.descuento || 0));
+  }, 0);
+  if (pagado > totalNuevo) {
+    throw new Error('La compra no se puede editar: el total nuevo es menor al monto ya pagado.');
+  }
+
+  const sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error(`No se encontró la hoja "${SHEET_NAME}".`);
+  let headers = ensureHeader(sheet, 'transaccion_id');
+  headers = ensureHeader(sheet, 'timestamp');
+  const idxNumero = headers.indexOf('numero') >= 0 ? headers.indexOf('numero') : 0;
+  const idxFecha = headers.indexOf('fecha') >= 0 ? headers.indexOf('fecha') : 1;
+  const idxCodigo = headers.indexOf('codigo_producto') >= 0 ? headers.indexOf('codigo_producto') : 2;
+  const idxTipo = headers.indexOf('tipo') >= 0 ? headers.indexOf('tipo') : 3;
+  const idxCantidad = headers.indexOf('cantidad') >= 0 ? headers.indexOf('cantidad') : 4;
+  const idxValor = headers.indexOf('valor_unitario') >= 0 ? headers.indexOf('valor_unitario') : 5;
+  const idxDescuento = headers.indexOf('descuento') >= 0 ? headers.indexOf('descuento') : 6;
+  const idxTotal = headers.indexOf('costo_total') >= 0 ? headers.indexOf('costo_total') : 7;
+  const idxComentario = headers.indexOf('comentario') >= 0 ? headers.indexOf('comentario') : 8;
+  const idxConfirmado = headers.indexOf('confirmado') >= 0 ? headers.indexOf('confirmado') : 9;
+  const idxCredito = headers.indexOf('credito') >= 0 ? headers.indexOf('credito') : 10;
+  const idxTransaccionId = headers.indexOf('transaccion_id');
+  const idxTimestamp = headers.indexOf('timestamp');
+  if (idxTransaccionId < 0) throw new Error('Columna transaccion_id faltante en movimientos.');
+
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(15000);
+  try {
+    const data = sheet.getDataRange().getValues();
+    const deleteRows = [];
+    for (let i = 1; i < data.length; i += 1) {
+      if (Number(data[i][idxTransaccionId] || 0) === transaccionId) {
+        deleteRows.push(i + 1);
+      }
+    }
+    if (!deleteRows.length) throw new Error('No se encontraron movimientos para la compra.');
+    deleteRows.sort((a, b) => b - a).forEach((rowIndex) => {
+      sheet.deleteRow(rowIndex);
+    });
+
+    const lastRow = sheet.getLastRow();
+    let nextNum = 1;
+    if (lastRow >= 2) {
+      const lastValue = sheet.getRange(lastRow, 1).getValue();
+      nextNum = (typeof lastValue === 'number' && !isNaN(lastValue)) ? lastValue + 1 : lastRow;
+    }
+    const timestamp = new Date();
+    const rows = items.map((item, idx) => {
+      const cantidad = Math.abs(Number(item.cantidad || 0));
+      const valorUnitario = Number(item.valor_unitario || 0);
+      const descuento = Math.max(0, Number(item.descuento || 0));
+      const comentario = item.comentario && String(item.comentario).trim()
+        ? String(item.comentario).trim()
+        : 'Compra';
+      const row = new Array(headers.length).fill('');
+      row[idxNumero] = nextNum + idx;
+      row[idxFecha] = fecha;
+      row[idxCodigo] = String(item.codigo || '').trim();
+      row[idxTipo] = 2;
+      row[idxCantidad] = cantidad;
+      row[idxValor] = valorUnitario;
+      row[idxDescuento] = descuento;
+      row[idxTotal] = (cantidad * valorUnitario) - descuento;
+      row[idxComentario] = comentario;
+      row[idxConfirmado] = 0;
+      row[idxCredito] = creditoFlag;
+      row[idxTransaccionId] = transaccionId;
+      if (idxTimestamp >= 0) row[idxTimestamp] = timestamp;
+      return row;
+    });
+    sheet.getRange(lastRow + 1, 1, rows.length, headers.length).setValues(rows);
+  } finally {
+    lock.releaseLock();
+  }
+
+  updateTransaccionMeta(transaccionId, {
+    fecha: fecha,
+    usuario: payload.usuario !== undefined ? payload.usuario : meta.usuario,
+    referencia_externa: payload.referencia_externa !== undefined ? payload.referencia_externa : meta.referencia_externa,
+    nota: payload.nota !== undefined ? payload.nota : meta.nota,
+  });
+  syncTransaccionAndCaja(transaccionId);
+  updateProductosCostoFromCompraItems(items);
+  updateTransaccionEstadoByPagos(transaccionId);
+  return { ok: true, transaccion_id: transaccionId, total: totalNuevo };
 }
 
 function assertDateNotClosed(dateValue) {

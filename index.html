@@ -335,6 +335,28 @@
       border-color: rgba(233, 255, 112, 0.4);
       transform: translateY(-1px);
     }
+    .section-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+    }
+    .section-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 180px;
+      padding: 8px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: var(--dropdown-bg);
+      box-shadow: var(--dropdown-shadow);
+      z-index: 15;
+    }
+    .section-menu button {
+      width: 100%;
+      justify-content: flex-start;
+    }
     .help-body {
       color: var(--muted);
       font-size: 14px;
@@ -1917,7 +1939,13 @@
     <section id="inventario-compras-crear" class="form-wrap view">
       <div class="section-head">
         <h2 class="section-title">Nueva compra</h2>
-        <button type="button" class="help-btn" data-help="inventario-compras-crear" aria-label="Ayuda de registro de compra">?</button>
+        <div class="section-actions">
+          <button type="button" class="help-btn" id="compraActionsToggle" aria-label="Acciones de compra" aria-expanded="false" aria-controls="compraActionsMenu">+</button>
+          <div class="section-menu" id="compraActionsMenu" hidden>
+            <button type="button" class="btn compact" id="createProductFromCompraBtn">Crear producto</button>
+          </div>
+          <button type="button" class="help-btn" data-help="inventario-compras-crear" aria-label="Ayuda de registro de compra">?</button>
+        </div>
       </div>
       <form id="compraForm">
         <div class="card date-card">
@@ -2625,7 +2653,7 @@
 
   <script>
     // CONFIGURADO: URL del Web App de Apps Script (termina en /exec).
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-oqnovamtlMHBaDB2ZTtn31yGHCp3yOcT6WrF2EtWaqG-21bzcrMvmAwy1CTwDy0U/exec';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyemP2eVo46kxxNSH1zhglz03s8Fi2ExCMI3uqzevF1S8GXx0mfBUooU2plDnkEFeHk/exec';
     const SHEET_NAME = 'movimientos';
 
     const form = document.getElementById('ventaForm');
@@ -2645,11 +2673,15 @@
     const compraClearSearchBtn = document.getElementById('compraClearSearchBtn');
     const compraSearchResults = document.getElementById('compraSearchResults');
     const compraSearchError = document.getElementById('compraSearchError');
+    const createProductFromCompraBtn = document.getElementById('createProductFromCompraBtn');
+    const compraActionsToggle = document.getElementById('compraActionsToggle');
+    const compraActionsMenu = document.getElementById('compraActionsMenu');
     const compraAddSelectedBtn = document.getElementById('compraAddSelectedBtn');
     const compraItemsWrapper = document.getElementById('compraItemsWrapper');
     const compraTotalEl = document.getElementById('compraTotal');
     const compraSubmitBtn = document.getElementById('compraSubmitBtn');
     const compraMessageEl = document.getElementById('compraMessage');
+    const compraSectionTitle = document.querySelector('#inventario-compras-crear .section-title');
     const ajusteForm = document.getElementById('ajusteForm');
     const ajusteFecha = document.getElementById('ajusteFecha');
     const ajusteProductSearch = document.getElementById('ajusteProductSearch');
@@ -2690,6 +2722,14 @@
     let pendingResumenDetalle = null;
     let pendingAjusteCheck = null;
     let pendingCompraDetalleTarget = 'transacciones';
+    let pendingCompraEdit = null;
+    let pendingCreatedProductCode = '';
+    let pendingCreatedProductTarget = '';
+    const compraEditState = {
+      active: false,
+      transaccionId: '',
+      source: 'transacciones',
+    };
     const gvizHandlers = [];
 
     const ventasFecha = document.getElementById('ventasFecha');
@@ -2880,7 +2920,7 @@
     const helpModalTitle = document.getElementById('helpModalTitle');
     const helpModalBody = document.getElementById('helpModalBody');
     const helpModalClose = document.getElementById('helpModalClose');
-    const helpButtons = [...document.querySelectorAll('.help-btn')];
+    const helpButtons = [...document.querySelectorAll('.help-btn[data-help]')];
     const views = [...document.querySelectorAll('.view')];
     const viewButtons = [...document.querySelectorAll('[data-view]')];
 
@@ -3547,7 +3587,12 @@
     initHistory();
 
     viewButtons.forEach(btn => {
-      btn.addEventListener('click', () => navigateTo(btn.dataset.view));
+      btn.addEventListener('click', () => {
+        if (btn.dataset.view === 'inventario-compras-crear' && !btn.closest('#caja-transacciones') && !btn.closest('#caja-cuentas')) {
+          resetCompraEditState({ silent: true });
+        }
+        navigateTo(btn.dataset.view);
+      });
     });
     helpButtons.forEach((btn) => {
       btn.addEventListener('click', (event) => {
@@ -3967,6 +4012,71 @@
       }, isError ? 10000 : 5000);
     };
 
+    const resetCompraEditState = ({ silent = false } = {}) => {
+      compraEditState.active = false;
+      compraEditState.transaccionId = '';
+      compraEditState.source = 'transacciones';
+      if (compraSubmitBtn) compraSubmitBtn.textContent = 'Guardar compra';
+      if (compraSectionTitle) compraSectionTitle.textContent = 'Nueva compra';
+      if (!silent && compraMessageEl) compraMessageEl.style.display = 'none';
+    };
+
+    const getCompraEditItems = (transaccionId) => {
+      const catalogByCode = new Map((catalog || []).map(item => [String(item.codigo || '').trim(), item]));
+      return movimientos
+        .filter(item => Number(item.transaccionId) === Number(transaccionId) && Number(item.tipo) === 2)
+        .map((item) => {
+          const codigo = String(item.codigo || '').trim();
+          const catalogItem = catalogByCode.get(codigo) || {};
+          return {
+            codigo,
+            nombre: catalogItem.nombre || item.comentario || 'Producto',
+            proveedor: catalogItem.proveedor || '',
+            cantidad: Math.abs(Number(item.cantidad || 0)),
+            descuento: Number(item.descuento || 0),
+            valor_unitario: Number(item.valorUnitario || 0),
+            costo_unitario: Number(item.valorUnitario || 0),
+            precio_venta: Number(catalogItem.precio_venta || item.valorUnitario || 0),
+          };
+        });
+    };
+
+    const startCompraEdit = (data) => {
+      const transaccionId = Number(data && data.transaccionId || 0);
+      if (!transaccionId) return;
+      if (!movimientosLoaded) {
+        pendingCompraEdit = data;
+        loadMovimientos(true);
+        return;
+      }
+      if (!catalog.length) loadCatalog();
+      const items = getCompraEditItems(transaccionId);
+      if (!items.length || !compraForm || !compraItemsWrapper) {
+        showCompraMessage('No se encontraron items para esta compra.', true);
+        return;
+      }
+      compraEditState.active = true;
+      compraEditState.transaccionId = String(transaccionId);
+      compraEditState.source = data && data.source ? data.source : 'transacciones';
+      if (compraSectionTitle) compraSectionTitle.textContent = `Editar compra #${transaccionId}`;
+      if (compraSubmitBtn) compraSubmitBtn.textContent = 'Guardar cambios';
+      if (compraFecha) {
+        const parsedDate = parseSheetDate(data && data.fecha ? data.fecha : '');
+        compraFecha.value = parsedDate ? toLocalISODate(parsedDate) : toLocalISODate(new Date());
+      }
+      if (compraCredito) compraCredito.checked = Number(data && data.credito || 0) === 1;
+      compraItemsWrapper.innerHTML = '';
+      items.forEach(item => createCompraItemRow(item));
+      updateCompraTotal();
+      if (data && data.source === 'cuentas') {
+        if (cajaCredDetail) cajaCredDetail.hidden = true;
+      } else {
+        closeCompraDetalleModal();
+      }
+      navigateTo('inventario-compras-crear');
+      showCompraMessage(`Editando compra pendiente #${transaccionId}.`, false);
+    };
+
     const showAjusteMessage = (text, isError = false) => {
       if (!ajusteMessageEl) return;
       ajusteMessageEl.textContent = text;
@@ -4059,11 +4169,13 @@
           const time = now.toTimeString().slice(0, 8);
           const fechaConHora = `${selectedDate} ${time}`;
           const payload = {
+            action: compraEditState.active ? 'compra_actualizar' : undefined,
             fecha: fechaConHora,
             facturado: 0,
             credito: compraCredito && compraCredito.checked ? 1 : 0,
             items,
           };
+          if (compraEditState.active) payload.transaccion_id = compraEditState.transaccionId;
           const fd = new FormData();
           fd.append('payload', JSON.stringify(payload));
           await fetch(SCRIPT_URL, {
@@ -4071,12 +4183,15 @@
             mode: 'no-cors',
             body: fd,
           });
-          showCompraMessage('¡Compra registrada con éxito!');
+          showCompraMessage(compraEditState.active ? '¡Compra actualizada con éxito!' : '¡Compra registrada con éxito!');
           compraForm.reset();
           if (compraFecha) compraFecha.value = toLocalISODate(new Date());
           if (compraItemsWrapper) compraItemsWrapper.innerHTML = '';
           updateCompraTotal();
+          resetCompraEditState({ silent: true });
           loadMovimientos(true);
+          loadTransacciones('compra');
+          loadCuentasPorPagar();
         } catch (err) {
           showCompraMessage(err.message || 'No se pudo enviar.', true);
         } finally {
@@ -4183,6 +4298,13 @@
           };
         }).filter(p => p.codigo || p.nombre);
         catalogOptions.innerHTML = catalog.map(p => `<option value="${p.codigo} - ${p.nombre} / ${p.proveedor || '—'} / Q.${p.precio_venta}">`).join('');
+        if (pendingCreatedProductCode) {
+          const createdCode = pendingCreatedProductCode;
+          const createdTarget = pendingCreatedProductTarget || 'venta';
+          pendingCreatedProductCode = '';
+          pendingCreatedProductTarget = '';
+          selectCreatedProduct(createdCode, createdTarget);
+        }
       } catch (err) {
         console.log('No se pudo procesar catálogo', err);
       }
@@ -4299,6 +4421,11 @@
           pendingCompraDetalle = null;
           pendingCompraDetalleTarget = 'transacciones';
           showCompraDetalle(targetId, targetView);
+        }
+        if (pendingCompraEdit) {
+          const pending = pendingCompraEdit;
+          pendingCompraEdit = null;
+          startCompraEdit(pending);
         }
         if (pendingResumenDetalle) {
           const pending = pendingResumenDetalle;
@@ -5642,6 +5769,8 @@
         const total = Number(item.total || 0);
         const credito = Number(item.credito || 0);
         const saldo = Number(item.saldo || 0);
+        const estado = String(item.estado || '—');
+        const canEdit = estado.toLowerCase() === 'pendiente';
         const saldoLabel = credito ? `Q.${isFinite(saldo) ? saldo.toFixed(2) : '0.00'}` : '—';
         const creditoLabel = credito ? 'Si' : 'No';
         const pagarBtn = credito && saldo > 0
@@ -5652,10 +5781,15 @@
             <td>${item.id || ''}</td>
             <td>${formatDate(item.fecha)}</td>
             <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
-            <td>${item.estado || '—'}</td>
+            <td>${estado}</td>
             <td>${creditoLabel}</td>
             <td>${saldoLabel}</td>
-            <td><button type="button" class="btn compact" data-action="compra-transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:nowrap;">
+                <button type="button" class="btn compact" data-action="compra-transaccion-detalle" data-id="${item.id}">Ver detalle</button>
+                ${canEdit ? `<button type="button" class="btn compact" data-action="compra-transaccion-editar" data-id="${item.id}" data-fecha="${item.fecha || ''}" data-credito="${credito}">Editar</button>` : ''}
+              </div>
+            </td>
             <td>${pagarBtn}</td>
           </tr>
         `;
@@ -5678,6 +5812,8 @@
         const total = Number(item.total || 0);
         const credito = Number(item.credito || 0);
         const saldo = Number(item.saldo || 0);
+        const estado = String(item.estado || '—');
+        const canEdit = estado.toLowerCase() === 'pendiente';
         const saldoLabel = credito ? `Q.${isFinite(saldo) ? saldo.toFixed(2) : '0.00'}` : '—';
         const creditoLabel = credito ? 'Si' : 'No';
         const pagosBtn = `<button type="button" class="btn compact" data-action="compra-credito-pagos" data-id="${item.id}">Ver pagos</button>`;
@@ -5689,10 +5825,15 @@
             <td>${item.id || ''}</td>
             <td>${formatDate(item.fecha)}</td>
             <td>Q.${isFinite(total) ? total.toFixed(2) : '0.00'}</td>
-            <td>${item.estado || '—'}</td>
+            <td>${estado}</td>
             <td>${creditoLabel}</td>
             <td>${saldoLabel}</td>
-            <td><button type="button" class="btn compact" data-action="compra-transaccion-detalle" data-id="${item.id}">Ver detalle</button></td>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:nowrap;">
+                <button type="button" class="btn compact" data-action="compra-transaccion-detalle" data-id="${item.id}">Ver detalle</button>
+                ${canEdit ? `<button type="button" class="btn compact" data-action="compra-transaccion-editar" data-id="${item.id}" data-fecha="${item.fecha || ''}" data-credito="${credito}">Editar</button>` : ''}
+              </div>
+            </td>
             <td>${pagosBtn}</td>
             <td>${pagarBtn}</td>
           </tr>
@@ -5927,6 +6068,12 @@
       pagosCreditoModal.dataset.transaccionId = '';
     }
 
+    function closeCompraActionsMenu() {
+      if (!compraActionsMenu) return;
+      compraActionsMenu.hidden = true;
+      if (compraActionsToggle) compraActionsToggle.setAttribute('aria-expanded', 'false');
+    }
+
     function loadProductos() {
       if (productosLoading || !productosStatus) return;
       productosLoading = true;
@@ -6015,6 +6162,7 @@
     function openProductoModal(mode, data = {}) {
       if (!productoModal || !productoCodigo || !productoNombre || !productoAfecto || !productoProveedor || !productoCosto || !productoPrecio || !productoActivo || !productoTitle) return;
       productoModal.dataset.mode = mode;
+      productoModal.dataset.source = data.source || '';
       productoTitle.textContent = mode === 'edit' ? 'Editar producto' : 'Agregar producto';
       productoCodigo.value = data.codigo || '';
       productoNombre.value = data.nombre || '';
@@ -6031,6 +6179,7 @@
       if (!productoModal) return;
       productoModal.classList.remove('active');
       productoModal.dataset.mode = '';
+      productoModal.dataset.source = '';
     }
 
     function openAjusteModal(data = {}) {
@@ -6196,6 +6345,7 @@
     function saveProducto() {
       if (!productoModal || !productoCodigo || !productoNombre || !productoAfecto || !productoProveedor || !productoCosto || !productoPrecio || !productoActivo) return;
       const mode = productoModal ? productoModal.dataset.mode : 'create';
+      const source = productoModal ? productoModal.dataset.source : '';
       const codigo = String(productoCodigo.value || '').trim();
       const nombre = String(productoNombre.value || '').trim();
       if (!codigo) {
@@ -6231,6 +6381,10 @@
           return;
         }
         closeProductoModal();
+        if ((source === 'venta' || source === 'compra') && mode !== 'edit') {
+          pendingCreatedProductCode = codigo;
+          pendingCreatedProductTarget = source;
+        }
         loadCatalog();
         loadProductos();
       }, () => {
@@ -6673,6 +6827,41 @@
       document.body.appendChild(script);
     }
 
+    function getNextProductCode() {
+      let maxCode = 0;
+      catalog.forEach((item) => {
+        const code = Number(item && item.codigo);
+        if (isFinite(code) && code > maxCode) maxCode = code;
+      });
+      return String(maxCode + 1);
+    }
+
+    function selectCreatedProduct(code, target = 'venta') {
+      if (!code) return;
+      const product = catalog.find(p => String(p.codigo || '') === String(code));
+      if (!product) return;
+      if (target === 'compra') {
+        if (!compraProductSearch) return;
+        compraProductSearch.value = `${product.codigo} - ${product.nombre} / ${product.proveedor || '—'} / Q.${product.precio_venta}`;
+        toggleCompraClear();
+        if (compraSearchError) compraSearchError.hidden = true;
+        if (compraSearchResults) {
+          compraSearchResults.hidden = true;
+          compraSearchResults.innerHTML = '';
+        }
+        return;
+      }
+      if (!productSearch) return;
+      currentProduct = product;
+      productSearch.value = `${product.codigo} - ${product.nombre} / ${product.proveedor || '—'} / Q.${product.precio_venta}`;
+      toggleClear();
+      if (searchError) searchError.hidden = true;
+      if (searchResults) {
+        searchResults.hidden = true;
+        searchResults.innerHTML = '';
+      }
+    }
+
     function findProduct(query) {
       if (!query) return null;
       const trimmed = query.trim();
@@ -6748,6 +6937,7 @@
     };
     function renderCompraResults(query) {
       if (!compraSearchResults) return;
+      if (compraSearchError) compraSearchError.hidden = true;
       const normalized = query.trim().toLowerCase();
       if (!normalized) {
         compraSearchResults.hidden = true;
@@ -6763,6 +6953,7 @@
       if (!results.length) {
         compraSearchResults.hidden = true;
         compraSearchResults.innerHTML = '';
+        if (compraSearchError) compraSearchError.hidden = false;
         return;
       }
       compraSearchResults.innerHTML = results.map(p => {
@@ -6812,6 +7003,7 @@
           compraProductSearch.value = `${product.codigo} - ${product.nombre} / ${product.proveedor || '—'} / Q.${product.precio_venta}`;
           toggleCompraClear();
           compraSearchResults.hidden = true;
+          if (compraSearchError) compraSearchError.hidden = true;
         }
       });
     }
@@ -7358,6 +7550,16 @@
           openCreditoModal({ transaccionId, saldo });
           return;
         }
+        const editBtn = event.target.closest('button[data-action="compra-transaccion-editar"][data-id]');
+        if (editBtn) {
+          startCompraEdit({
+            transaccionId: editBtn.getAttribute('data-id'),
+            fecha: editBtn.getAttribute('data-fecha') || '',
+            credito: editBtn.getAttribute('data-credito') || '0',
+            source: 'transacciones',
+          });
+          return;
+        }
         const btn = event.target.closest('button[data-action="compra-transaccion-detalle"][data-id]');
         if (!btn) return;
         const transaccionId = btn.getAttribute('data-id');
@@ -7380,6 +7582,16 @@
           if (!transaccionId) return;
           const saldo = payBtn.getAttribute('data-saldo');
           openCreditoModal({ transaccionId, saldo });
+          return;
+        }
+        const editBtn = event.target.closest('button[data-action="compra-transaccion-editar"][data-id]');
+        if (editBtn) {
+          startCompraEdit({
+            transaccionId: editBtn.getAttribute('data-id'),
+            fecha: editBtn.getAttribute('data-fecha') || '',
+            credito: editBtn.getAttribute('data-credito') || '0',
+            source: 'cuentas',
+          });
           return;
         }
         const btn = event.target.closest('button[data-action="compra-transaccion-detalle"][data-id]');
@@ -7530,6 +7742,26 @@
     if (productosAdd) {
       productosAdd.addEventListener('click', () => {
         openProductoModal('create');
+      });
+    }
+    if (createProductFromCompraBtn) {
+      createProductFromCompraBtn.addEventListener('click', () => {
+        closeCompraActionsMenu();
+        if (!catalog.length) loadCatalog();
+        openProductoModal('create', {
+          codigo: getNextProductCode(),
+          afecto: 1,
+          activo: 1,
+          source: 'compra',
+        });
+      });
+    }
+    if (compraActionsToggle && compraActionsMenu) {
+      compraActionsToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const isHidden = !!compraActionsMenu.hidden;
+        compraActionsMenu.hidden = !isHidden;
+        compraActionsToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
       });
     }
     if (productoCancel) {
@@ -7785,6 +8017,11 @@
       if (helpModal && helpModal.classList.contains('active') && helpModal.contains(event.target)) return;
       if ((settingsToggle && settingsToggle.contains(event.target)) || settingsMenu.contains(event.target)) return;
       closeSettingsMenu();
+    });
+    document.addEventListener('click', (event) => {
+      if (!compraActionsMenu || compraActionsMenu.hidden) return;
+      if ((compraActionsToggle && compraActionsToggle.contains(event.target)) || compraActionsMenu.contains(event.target)) return;
+      closeCompraActionsMenu();
     });
     if (pagosCreditoClose) {
       pagosCreditoClose.addEventListener('click', () => {
